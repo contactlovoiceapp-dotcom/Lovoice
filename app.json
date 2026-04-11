@@ -1,0 +1,31 @@
+{
+  "expo": {
+    "name": "Lovoice",
+    "slug": "lovoice",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#f8f5ff"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.shrtcut.lovoice"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#f8f5ff"
+      },
+      "edgeToEdgeEnabled": true,
+      "package": "com.shrtcut.lovoice"
+    },
+    "plugins": [
+      "expo-font"
+    ]
+  }
+}
