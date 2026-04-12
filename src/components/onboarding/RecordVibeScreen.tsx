@@ -1,4 +1,4 @@
-/* Voice recording screen — the key onboarding moment where users create their Vibe (Expo / NativeWind / Reanimated). */
+/* Voice recording screen — the key onboarding moment where users create their Vibe. */
 
 import React, { useEffect, useState } from 'react';
 import {
@@ -17,13 +17,11 @@ import Animated, {
   withRepeat,
   withSequence,
   withTiming,
-  withSpring,
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ArrowRight, Lightbulb, Mic, Square } from 'lucide-react-native';
+import { ArrowRight, Lightbulb, Mic, Square, X } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS, CTA_GRADIENT, ONBOARDING_GRADIENT } from '../../theme';
-import ModalOverlay from '../ui/ModalOverlay';
 
 const INSPIRATION_QUESTIONS = [
   'Dis-moi ton talent le plus inutile mais incroyable...',
@@ -42,6 +40,7 @@ interface Props {
   onSkip: () => void;
 }
 
+/** Decorative glow that pulses while recording — invisible if animation fails. */
 function ReactiveGlow({ isRecording }: { isRecording: boolean }) {
   const opacity = useSharedValue(0.1);
   const scale = useSharedValue(1);
@@ -78,7 +77,10 @@ function ReactiveGlow({ isRecording }: { isRecording: boolean }) {
   }));
 
   return (
-    <View className="pointer-events-none absolute inset-0 items-center justify-center overflow-hidden">
+    <View
+      pointerEvents="none"
+      style={{ position: 'absolute', inset: 0, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}
+    >
       <Animated.View
         style={[
           {
@@ -94,6 +96,7 @@ function ReactiveGlow({ isRecording }: { isRecording: boolean }) {
   );
 }
 
+/** Decorative expanding ring shown during recording. */
 function PingRing({
   delayMs,
   diameter,
@@ -165,21 +168,6 @@ const RecordVibeScreen: React.FC<Props> = ({ onNext, onSkip }) => {
   const { width: windowWidth } = useWindowDimensions();
   const contentMaxWidth = Math.min(384, windowWidth - 48);
 
-  const micScale = useSharedValue(0);
-  const headerOpacity = useSharedValue(0);
-  const headerY = useSharedValue(-20);
-  const subtitleOpacity = useSharedValue(0);
-  const timerOpacity = useSharedValue(0);
-  const recommencerOpacity = useSharedValue(0);
-  const inspirationCtaOpacity = useSharedValue(0);
-
-  useEffect(() => {
-    micScale.value = withSpring(1, { damping: 15, stiffness: 200 });
-    headerOpacity.value = withTiming(1, { duration: 400 });
-    headerY.value = withTiming(0, { duration: 400 });
-    subtitleOpacity.value = withDelay(100, withTiming(1, { duration: 400 }));
-  }, []);
-
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
     if (isRecording) {
@@ -196,18 +184,6 @@ const RecordVibeScreen: React.FC<Props> = ({ onNext, onSkip }) => {
     }
     return () => clearInterval(interval);
   }, [isRecording]);
-
-  useEffect(() => {
-    timerOpacity.value = withTiming(isRecording || hasRecorded ? 1 : 0, { duration: 200 });
-  }, [isRecording, hasRecorded]);
-
-  useEffect(() => {
-    recommencerOpacity.value = withTiming(hasRecorded && !isRecording ? 1 : 0, { duration: 200 });
-  }, [hasRecorded, isRecording]);
-
-  useEffect(() => {
-    inspirationCtaOpacity.value = withTiming(!hasRecorded ? 1 : 0, { duration: 200 });
-  }, [hasRecorded]);
 
   const toggleRecording = () => {
     if (isRecording) {
@@ -226,68 +202,31 @@ const RecordVibeScreen: React.FC<Props> = ({ onNext, onSkip }) => {
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
-  const micContainerStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: micScale.value }],
-  }));
-
-  const recordingMicStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: withTiming(isRecording ? 1.1 : 1, { duration: 200 }) }],
-  }));
-
-  const headerStyle = useAnimatedStyle(() => ({
-    opacity: headerOpacity.value,
-    transform: [{ translateY: headerY.value }],
-  }));
-
-  const subtitleStyle = useAnimatedStyle(() => ({
-    opacity: subtitleOpacity.value,
-  }));
-
-  const timerStyle = useAnimatedStyle(() => ({
-    opacity: timerOpacity.value,
-  }));
-
-  const recommencerStyle = useAnimatedStyle(() => ({
-    opacity: recommencerOpacity.value,
-  }));
-
-  const inspirationCtaStyle = useAnimatedStyle(() => ({
-    opacity: inspirationCtaOpacity.value,
-  }));
-
   return (
     <LinearGradient
       colors={[...ONBOARDING_GRADIENT]}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
-      className="flex-1"
+      style={{ flex: 1 }}
     >
       <ReactiveGlow isRecording={isRecording} />
 
-      <SafeAreaView className="relative z-10 flex-1" edges={['top', 'bottom']}>
-        <View className="flex-1 flex-col justify-between px-6 py-8">
-          <View
-            className="w-full self-center pt-4"
-            style={{ maxWidth: contentMaxWidth }}
-          >
-            <Animated.View style={headerStyle}>
-              <Text className="mb-2 text-center text-3xl font-bold text-dark">
-                Ta{' '}
-                <Text className="font-serif italic text-primary">Vibe</Text>
-              </Text>
-            </Animated.View>
-            <Animated.Text
-              style={subtitleStyle}
-              className="text-center font-medium text-dark/40"
-            >
+      <SafeAreaView style={{ position: 'relative', zIndex: 10, flex: 1 }} edges={['top', 'bottom']}>
+        <View style={{ flex: 1, flexDirection: 'column', justifyContent: 'space-between', paddingHorizontal: 24, paddingVertical: 32 }}>
+          {/* Header */}
+          <View style={{ width: '100%', alignSelf: 'center', paddingTop: 16, maxWidth: contentMaxWidth }}>
+            <Text className="mb-2 text-center text-3xl font-bold text-dark">
+              Ta{' '}
+              <Text className="font-serif italic text-primary">Vibe</Text>
+            </Text>
+            <Text className="text-center font-medium text-dark/40">
               Zéro pression. Juste ta voix.
-            </Animated.Text>
+            </Text>
           </View>
 
-          <View className="flex-col items-center">
-            <Animated.View
-              style={[micContainerStyle, { position: 'relative', alignItems: 'center', justifyContent: 'center', width: 220, height: 220 }]}
-            >
+          {/* Mic + timer */}
+          <View style={{ flexDirection: 'column', alignItems: 'center' }}>
+            <View style={{ position: 'relative', alignItems: 'center', justifyContent: 'center', width: 220, height: 220 }}>
               {isRecording && (
                 <>
                   <PingRing
@@ -302,13 +241,18 @@ const RecordVibeScreen: React.FC<Props> = ({ onNext, onSkip }) => {
                   />
                 </>
               )}
-              <Animated.View className="absolute" style={recordingMicStyle}>
+              <View style={{ position: 'absolute' }}>
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={isRecording ? 'Arrêter l\'enregistrement' : 'Enregistrer'}
                   onPress={toggleRecording}
-                  className="h-32 w-32 overflow-hidden rounded-full shadow-2xl shadow-primary/30"
-                  style={{ opacity: isRecording ? 0.9 : 1 }}
+                  style={{
+                    width: MIC_SIZE,
+                    height: MIC_SIZE,
+                    borderRadius: MIC_SIZE / 2,
+                    overflow: 'hidden',
+                    opacity: isRecording ? 0.9 : 1,
+                  }}
                 >
                   <LinearGradient
                     colors={[...CTA_GRADIENT]}
@@ -328,11 +272,11 @@ const RecordVibeScreen: React.FC<Props> = ({ onNext, onSkip }) => {
                     )}
                   </LinearGradient>
                 </Pressable>
-              </Animated.View>
-            </Animated.View>
+              </View>
+            </View>
 
-            <View className="mt-6 h-16 flex-col items-center justify-start">
-              <Animated.View style={timerStyle}>
+            <View style={{ marginTop: 24, height: 64, flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start' }}>
+              {(isRecording || hasRecorded) && (
                 <Text
                   className="text-3xl font-semibold tracking-tight text-dark"
                   style={{ fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' }}
@@ -340,16 +284,16 @@ const RecordVibeScreen: React.FC<Props> = ({ onNext, onSkip }) => {
                   {formatTime(time)}{' '}
                   <Text className="text-lg text-dark/25">/ 1:30</Text>
                 </Text>
-              </Animated.View>
+              )}
 
-              <Animated.View style={recommencerStyle}>
+              {hasRecorded && !isRecording && (
                 <Pressable
                   accessibilityRole="button"
                   onPress={() => {
                     setHasRecorded(false);
                     setTime(0);
                   }}
-                  className="mt-2"
+                  style={{ marginTop: 8 }}
                 >
                   <Text
                     className="text-sm font-medium text-dark/30"
@@ -358,49 +302,68 @@ const RecordVibeScreen: React.FC<Props> = ({ onNext, onSkip }) => {
                     Recommencer
                   </Text>
                 </Pressable>
-              </Animated.View>
+              )}
             </View>
           </View>
 
-          <View
-            className="w-full self-center gap-3"
-            style={{ maxWidth: contentMaxWidth }}
-          >
-            <View className="rounded-2xl border border-dark/5 bg-white/70 p-4">
+          {/* Bottom */}
+          <View style={{ width: '100%', alignSelf: 'center', gap: 12, maxWidth: contentMaxWidth }}>
+            <View
+              style={{
+                borderRadius: 16,
+                borderWidth: 1,
+                borderColor: 'rgba(75,22,76,0.05)',
+                backgroundColor: 'rgba(255,255,255,0.7)',
+                padding: 16,
+              }}
+            >
               <Text className="text-sm leading-relaxed text-dark/45">
                 {hasRecorded
                   ? 'Vibe enregistrée ! 🎤'
                   : 'Une intro, une pensée, un délire... Parle librement. (1m30 max)'}
               </Text>
 
-              <Animated.View style={[inspirationCtaStyle, { marginTop: 12 }]}>
+              {!hasRecorded && (
                 <Pressable
                   accessibilityRole="button"
                   onPress={() => setShowInspiration(true)}
-                  className="w-full flex-row items-center justify-center gap-2 rounded-xl bg-dark/5 py-2.5"
+                  style={{
+                    marginTop: 12,
+                    width: '100%',
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                    borderRadius: 12,
+                    backgroundColor: 'rgba(75,22,76,0.05)',
+                    paddingVertical: 10,
+                  }}
                 >
                   <Lightbulb size={16} color="#f59e0b" />
                   <Text className="text-sm font-medium text-dark/50">
                     Besoin d'inspiration ?
                   </Text>
                 </Pressable>
-              </Animated.View>
+              )}
             </View>
 
             <Pressable
               accessibilityRole="button"
               disabled={!hasRecorded}
               onPress={onNext}
-              className={`w-full overflow-hidden rounded-full shadow-lg shadow-primary/30 ${
-                hasRecorded ? '' : 'opacity-20'
-              }`}
+              style={{
+                width: '100%',
+                borderRadius: 999,
+                overflow: 'hidden',
+                opacity: hasRecorded ? 1 : 0.2,
+              }}
             >
               <LinearGradient
                 colors={[...CTA_GRADIENT]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
               >
-                <View className="flex-row items-center justify-center gap-2 py-4">
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 16 }}>
                   <Text className="font-bold text-white">Continuer</Text>
                   <ArrowRight size={20} color={COLORS.surface} />
                 </View>
@@ -411,7 +374,7 @@ const RecordVibeScreen: React.FC<Props> = ({ onNext, onSkip }) => {
               <Pressable
                 accessibilityRole="button"
                 onPress={onSkip}
-                className="w-full py-2"
+                style={{ width: '100%', paddingVertical: 8 }}
               >
                 <Text className="text-center text-sm font-medium text-dark/25">
                   Passer pour l'instant
@@ -422,29 +385,81 @@ const RecordVibeScreen: React.FC<Props> = ({ onNext, onSkip }) => {
         </View>
       </SafeAreaView>
 
-      <ModalOverlay visible={showInspiration} onClose={() => setShowInspiration(false)}>
-        <View className="mb-6 h-12 w-12 items-center justify-center rounded-full bg-amber-500/10">
-          <Lightbulb size={24} color="#f59e0b" />
+      {/* Inspiration modal */}
+      {showInspiration && (
+        <View
+          style={{
+            position: 'absolute',
+            inset: 0,
+            zIndex: 50,
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 24,
+            backgroundColor: 'rgba(75, 22, 76, 0.4)',
+          }}
+        >
+          <View
+            style={{
+              position: 'relative',
+              width: '100%',
+              maxWidth: contentMaxWidth,
+              backgroundColor: 'white',
+              borderRadius: 24,
+              borderWidth: 1,
+              borderColor: 'rgba(75,22,76,0.05)',
+              padding: 32,
+            }}
+          >
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Fermer"
+              onPress={() => setShowInspiration(false)}
+              style={{ position: 'absolute', right: 16, top: 16, padding: 8 }}
+            >
+              <X size={22} color="rgba(75, 22, 76, 0.3)" />
+            </Pressable>
+
+            <View
+              style={{
+                marginBottom: 24,
+                width: 48,
+                height: 48,
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: 24,
+                backgroundColor: 'rgba(245,158,11,0.1)',
+              }}
+            >
+              <Lightbulb size={24} color="#f59e0b" />
+            </View>
+
+            <Text className="mb-4 text-xl font-bold text-dark">Idée de vibe</Text>
+            <Text
+              className="mb-8 font-serif text-lg font-medium italic text-dark/50"
+              style={{ minHeight: 80 }}
+            >
+              {`\u201C${INSPIRATION_QUESTIONS[currentQuestion]}\u201D`}
+            </Text>
+
+            <Pressable
+              accessibilityRole="button"
+              onPress={() =>
+                setCurrentQuestion((prev) => (prev + 1) % INSPIRATION_QUESTIONS.length)
+              }
+              style={{
+                width: '100%',
+                borderRadius: 999,
+                borderWidth: 1,
+                borderColor: 'rgba(75,22,76,0.05)',
+                backgroundColor: 'rgba(75,22,76,0.05)',
+                paddingVertical: 12,
+              }}
+            >
+              <Text className="text-center font-bold text-dark/60">Une autre idée</Text>
+            </Pressable>
+          </View>
         </View>
-
-        <Text className="mb-4 text-xl font-bold text-dark">Idée de vibe</Text>
-        <Text
-          className="mb-8 font-serif text-lg font-medium italic text-dark/50"
-          style={{ minHeight: 80 }}
-        >
-          {`\u201C${INSPIRATION_QUESTIONS[currentQuestion]}\u201D`}
-        </Text>
-
-        <Pressable
-          accessibilityRole="button"
-          onPress={() =>
-            setCurrentQuestion((prev) => (prev + 1) % INSPIRATION_QUESTIONS.length)
-          }
-          className="w-full rounded-full border border-dark/5 bg-dark/5 py-3"
-        >
-          <Text className="text-center font-bold text-dark/60">Une autre idée</Text>
-        </Pressable>
-      </ModalOverlay>
+      )}
     </LinearGradient>
   );
 };

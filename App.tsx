@@ -1,6 +1,6 @@
 /* Root application shell — manages navigation state, the Discover feed (FlatList), font loading, and safe-area context. */
 
-import React, { useCallback, useReducer, useRef, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
   FlatList,
   Image,
@@ -113,63 +113,22 @@ const INITIAL_PROFILES: Profile[] = [
   },
 ];
 
-/* ─── Navigation reducer ─────────────────────────────────────────────────── */
-
-interface NavState {
-  screen: AppState;
-  activeTab: Tab;
-  hasRecordedVibe: boolean;
-}
-
-type NavAction =
-  | { type: 'NAVIGATE'; screen: AppState }
-  | { type: 'SET_TAB'; tab: Tab }
-  | { type: 'FINISH_RECORDING' }
-  | { type: 'SKIP_RECORDING' };
-
-const INITIAL_NAV: NavState = {
-  screen: 'splash',
-  activeTab: 'discover',
-  hasRecordedVibe: false,
-};
-
-function navReducer(state: NavState, action: NavAction): NavState {
-  switch (action.type) {
-    case 'NAVIGATE':
-      return { ...state, screen: action.screen };
-    case 'SET_TAB':
-      return { ...state, activeTab: action.tab };
-    case 'FINISH_RECORDING':
-      return { ...state, hasRecordedVibe: true, screen: 'onboarding_profile' };
-    case 'SKIP_RECORDING':
-      return { ...state, hasRecordedVibe: false, screen: 'main' };
-    default:
-      return state;
-  }
-}
-
-/* ─── AppContent ─────────────────────────────────────────────────────────── */
-
 function AppContent() {
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
 
-  const [nav, dispatch] = useReducer(navReducer, INITIAL_NAV);
-  const { screen: appState, activeTab, hasRecordedVibe } = nav;
-
+  const [appState, setAppState] = useState<AppState>('splash');
   const [profiles, setProfiles] = useState<Profile[]>(INITIAL_PROFILES);
+  const [activeTab, setActiveTab] = useState<Tab>('discover');
   const [isGenerating, setIsGenerating] = useState(false);
   const [autoplay, setAutoplay] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  const [hasRecordedVibe, setHasRecordedVibe] = useState(false);
 
   const flatListRef = useRef<FlatList<Profile>>(null);
 
   const navigateTo = useCallback((next: AppState) => {
-    dispatch({ type: 'NAVIGATE', screen: next });
-  }, []);
-
-  const setActiveTab = useCallback((tab: Tab) => {
-    dispatch({ type: 'SET_TAB', tab });
+    setAppState(next);
   }, []);
 
   const isDiscover = activeTab === 'discover';
@@ -237,13 +196,14 @@ function AppContent() {
         />
       </View>
     ),
-    [windowWidth, windowHeight, togglePlay, handleTrackFinish, hasRecordedVibe, handleLike, navigateTo],
+    [windowWidth, windowHeight, togglePlay, handleTrackFinish, hasRecordedVibe, handleLike],
   );
 
   const renderMainScreen = () => (
     <View className="flex-1 bg-background">
+      {/* Header */}
       <View
-        className="absolute left-0 right-0 top-0 z-40 flex-row items-center justify-between px-4"
+        className="absolute top-0 left-0 right-0 z-40 flex-row items-center justify-between px-4"
         style={{
           paddingTop: insets.top + 8,
           paddingBottom: 8,
@@ -309,6 +269,7 @@ function AppContent() {
         </View>
       </View>
 
+      {/* Feed */}
       {isDiscover && (
         <>
           {profiles.length > 0 ? (
@@ -443,8 +404,14 @@ function AppContent() {
       case 'onboarding_record':
         return (
           <RecordVibeScreen
-            onNext={() => dispatch({ type: 'FINISH_RECORDING' })}
-            onSkip={() => dispatch({ type: 'SKIP_RECORDING' })}
+            onNext={() => {
+              setHasRecordedVibe(true);
+              navigateTo('onboarding_profile');
+            }}
+            onSkip={() => {
+              setHasRecordedVibe(false);
+              navigateTo('main');
+            }}
           />
         );
       case 'onboarding_profile':

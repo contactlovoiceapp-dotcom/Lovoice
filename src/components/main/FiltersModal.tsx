@@ -2,18 +2,11 @@
  * Filter bottom sheet for tuning Discover feed preferences: toggles, age range,
  * city chips, and apply action — presented as a modal overlay with motion.
  */
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Pressable, ScrollView, Switch, Text, View } from 'react-native';
 import Slider from '@react-native-community/slider';
 import { LinearGradient } from 'expo-linear-gradient';
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-  withTiming,
-} from 'react-native-reanimated';
 import { X } from 'lucide-react-native';
-import { CTA_GRADIENT } from '../../theme';
 
 const CITIES = ['Paris', 'Lyon', 'Marseille', 'Bordeaux', 'Lille'] as const;
 
@@ -29,29 +22,10 @@ const FiltersModal: React.FC<Props> = ({ onClose }) => {
   const [ageRange, setAgeRange] = useState<[number, number]>([18, 35]);
   const [city, setCity] = useState<(typeof CITIES)[number]>('Paris');
 
-  const backdropOpacity = useSharedValue(0);
-  const sheetY = useSharedValue(100);
-  const sheetOpacity = useSharedValue(0);
-
-  useEffect(() => {
-    backdropOpacity.value = withTiming(1, { duration: 200 });
-    sheetY.value = withSpring(0, { damping: 25, stiffness: 300 });
-    sheetOpacity.value = withTiming(1, { duration: 200 });
-  }, []);
-
-  const backdropStyle = useAnimatedStyle(() => ({ opacity: backdropOpacity.value }));
-  const sheetStyle = useAnimatedStyle(() => ({
-    opacity: sheetOpacity.value,
-    transform: [{ translateY: sheetY.value }],
-  }));
-
   return (
-    <Animated.View style={[backdropStyle, { position: 'absolute', inset: 0, zIndex: 50 }]}>
+    <View style={{ position: 'absolute', inset: 0, zIndex: 50 }}>
       <View className="absolute inset-0 z-50 flex justify-end bg-dark/40">
-        <Animated.View
-          style={sheetStyle}
-          className="w-full rounded-t-3xl border border-dark/5 bg-white p-6 shadow-xl"
-        >
+        <View className="w-full rounded-t-3xl border border-dark/5 bg-white p-6 shadow-xl">
           <View className="mb-6 flex-row items-center justify-between">
             <Text className="text-xl font-bold text-dark">Filtres</Text>
             <Pressable
@@ -173,7 +147,7 @@ const FiltersModal: React.FC<Props> = ({ onClose }) => {
             accessibilityLabel="Appliquer les filtres"
           >
             <LinearGradient
-              colors={[...CTA_GRADIENT]}
+              colors={['#e724ab', '#d479ec']}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               className="py-4"
@@ -183,9 +157,9 @@ const FiltersModal: React.FC<Props> = ({ onClose }) => {
               </Text>
             </LinearGradient>
           </Pressable>
-        </Animated.View>
+        </View>
       </View>
-    </Animated.View>
+    </View>
   );
 };
 
