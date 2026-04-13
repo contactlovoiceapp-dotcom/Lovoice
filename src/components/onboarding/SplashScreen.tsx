@@ -9,11 +9,12 @@ import Animated, {
   withRepeat,
   withTiming,
 } from 'react-native-reanimated';
+import { COLORS, FONT } from '../../theme';
 
 const LOGO = require('../../../assets/logo.png');
 
 const GLOW_SIZE = 400;
-const GLOW_BACKGROUND = 'rgba(231, 36, 171, 0.15)';
+const GLOW_BACKGROUND = 'rgba(231,38,106,0.15)';
 
 interface Props {
   onFinish: () => void;
@@ -79,7 +80,7 @@ const SplashScreen: React.FC<Props> = ({ onFinish }) => {
         alignItems: 'center',
         justifyContent: 'center',
         overflow: 'hidden',
-        backgroundColor: '#f8f5ff',
+        backgroundColor: COLORS.background,
       }}
     >
       <AmbientGlow />
@@ -94,7 +95,9 @@ const SplashScreen: React.FC<Props> = ({ onFinish }) => {
       </View>
 
       <View style={{ zIndex: 10 }}>
-        <Text className="font-medium text-dark/40">Bienvenue</Text>
+        <Text style={{ fontFamily: FONT.medium, color: COLORS.textTertiary, fontSize: 16 }}>
+          Bienvenue
+        </Text>
       </View>
     </View>
   );

@@ -1,10 +1,11 @@
 /* Core type definitions for the LOVoice application */
 
 export enum ColorTheme {
-  Solaire = 'solaire',
-  Posee = 'posee',
-  Actif = 'actif',
-  Mystere = 'mystere'
+  Sunset = 'sunset',
+  Chill = 'chill',
+  Electric = 'electric',
+  Dream = 'dream',
+  Midnight = 'midnight',
 }
 
 export interface Profile {

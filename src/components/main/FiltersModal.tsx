@@ -1,16 +1,15 @@
-/**
- * Filter bottom sheet for tuning Discover feed preferences: toggles, age range,
- * city chips, and apply action — presented as a modal overlay with motion.
- */
+/* Filter bottom sheet for tuning Discover feed preferences: toggles, age range, city chips, and apply action. */
+
 import React, { useState } from 'react';
 import { Pressable, ScrollView, Switch, Text, View } from 'react-native';
 import Slider from '@react-native-community/slider';
 import { LinearGradient } from 'expo-linear-gradient';
 import { X } from 'lucide-react-native';
 
-const CITIES = ['Paris', 'Lyon', 'Marseille', 'Bordeaux', 'Lille'] as const;
+import { COLORS, FONT, SHADOW, RADIUS, CTA_GRADIENT } from '../../theme';
 
-const SLIDER_TRACK_MAX = 'rgba(75,22,76,0.1)';
+const CITIES = ['Paris', 'Lyon', 'Marseille', 'Bordeaux', 'Lille'] as const;
+const SLIDER_MAX_TRACK = 'rgba(45,17,54,0.1)';
 
 interface Props {
   onClose: () => void;
@@ -23,55 +22,118 @@ const FiltersModal: React.FC<Props> = ({ onClose }) => {
   const [city, setCity] = useState<(typeof CITIES)[number]>('Paris');
 
   return (
-    <View style={{ position: 'absolute', inset: 0, zIndex: 50 }}>
-      <View className="absolute inset-0 z-50 flex justify-end bg-dark/40">
-        <View className="w-full rounded-t-3xl border border-dark/5 bg-white p-6 shadow-xl">
-          <View className="mb-6 flex-row items-center justify-between">
-            <Text className="text-xl font-bold text-dark">Filtres</Text>
+    <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 50 }}>
+      <View
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          zIndex: 50,
+          justifyContent: 'flex-end',
+          backgroundColor: 'rgba(45,17,54,0.4)',
+        }}
+      >
+        <View
+          style={{
+            width: '100%',
+            borderTopLeftRadius: RADIUS.xl,
+            borderTopRightRadius: RADIUS.xl,
+            borderWidth: 1,
+            borderColor: COLORS.border,
+            backgroundColor: COLORS.surface,
+            padding: 24,
+          }}
+        >
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: 24,
+            }}
+          >
+            <Text style={{ fontFamily: FONT.bold, fontSize: 20, color: COLORS.dark }}>
+              Filtres
+            </Text>
             <Pressable
               onPress={onClose}
-              className="rounded-full bg-dark/5 p-2 active:bg-dark/10"
+              style={{
+                borderRadius: RADIUS.full,
+                backgroundColor: 'rgba(45,17,54,0.05)',
+                padding: 8,
+              }}
               accessibilityRole="button"
               accessibilityLabel="Fermer les filtres"
             >
-              <X size={18} color="rgba(75, 22, 76, 0.4)" />
+              <X size={18} color={COLORS.textSecondary} />
             </Pressable>
           </View>
 
-          <View className="gap-6">
-            <View className="gap-4">
-              <View className="flex-row items-center justify-between">
-                <Text className="font-medium text-dark/70">Nouveaux vibes</Text>
+          <View style={{ gap: 24 }}>
+            <View style={{ gap: 16 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Text style={{ fontFamily: FONT.medium, fontSize: 15, color: COLORS.textSecondary }}>
+                  Nouveaux vibes
+                </Text>
                 <Switch
                   value={newVibes}
                   onValueChange={setNewVibes}
-                  trackColor={{ false: 'rgba(75,22,76,0.15)', true: '#e724ab' }}
+                  trackColor={{ false: 'rgba(45,17,54,0.15)', true: COLORS.primary }}
                   thumbColor="#ffffff"
                 />
               </View>
-              <View className="flex-row items-center justify-between">
-                <Text className="font-medium text-dark/70">Nouveaux profils</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Text style={{ fontFamily: FONT.medium, fontSize: 15, color: COLORS.textSecondary }}>
+                  Nouveaux profils
+                </Text>
                 <Switch
                   value={newProfiles}
                   onValueChange={setNewProfiles}
-                  trackColor={{ false: 'rgba(75,22,76,0.15)', true: '#e724ab' }}
+                  trackColor={{ false: 'rgba(45,17,54,0.15)', true: COLORS.primary }}
                   thumbColor="#ffffff"
                 />
               </View>
             </View>
 
             <View>
-              <View className="mb-4 flex-row items-center justify-between">
-                <Text className="font-medium text-dark/70">{"Tranche d'âge"}</Text>
-                <View className="rounded-full bg-primary/10 px-3 py-1">
-                  <Text className="text-sm font-bold text-primary">
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  marginBottom: 16,
+                }}
+              >
+                <Text style={{ fontFamily: FONT.medium, fontSize: 15, color: COLORS.textSecondary }}>
+                  {"Tranche d'âge"}
+                </Text>
+                <View
+                  style={{
+                    borderRadius: RADIUS.full,
+                    backgroundColor: COLORS.primaryMuted,
+                    paddingHorizontal: 12,
+                    paddingVertical: 4,
+                  }}
+                >
+                  <Text style={{ fontFamily: FONT.bold, fontSize: 14, color: COLORS.primary }}>
                     {ageRange[0]} - {ageRange[1]} ans
                   </Text>
                 </View>
               </View>
 
-              <View className="mb-4">
-                <Text className="mb-2 font-medium text-dark/70">Âge minimum</Text>
+              <View style={{ marginBottom: 16 }}>
+                <Text
+                  style={{
+                    fontFamily: FONT.medium,
+                    fontSize: 15,
+                    color: COLORS.textSecondary,
+                    marginBottom: 8,
+                  }}
+                >
+                  Âge minimum
+                </Text>
                 <Slider
                   minimumValue={18}
                   maximumValue={100}
@@ -84,14 +146,23 @@ const FiltersModal: React.FC<Props> = ({ onClose }) => {
                       return [Math.max(18, nextMin), max];
                     });
                   }}
-                  minimumTrackTintColor="#e724ab"
-                  maximumTrackTintColor={SLIDER_TRACK_MAX}
+                  minimumTrackTintColor={COLORS.primary}
+                  maximumTrackTintColor={SLIDER_MAX_TRACK}
                   thumbTintColor="#ffffff"
                 />
               </View>
 
               <View>
-                <Text className="mb-2 font-medium text-dark/70">Âge maximum</Text>
+                <Text
+                  style={{
+                    fontFamily: FONT.medium,
+                    fontSize: 15,
+                    color: COLORS.textSecondary,
+                    marginBottom: 8,
+                  }}
+                >
+                  Âge maximum
+                </Text>
                 <Slider
                   minimumValue={18}
                   maximumValue={100}
@@ -104,15 +175,24 @@ const FiltersModal: React.FC<Props> = ({ onClose }) => {
                       return [min, Math.min(100, nextMax)];
                     });
                   }}
-                  minimumTrackTintColor="#e724ab"
-                  maximumTrackTintColor={SLIDER_TRACK_MAX}
+                  minimumTrackTintColor={COLORS.primary}
+                  maximumTrackTintColor={SLIDER_MAX_TRACK}
                   thumbTintColor="#ffffff"
                 />
               </View>
             </View>
 
             <View>
-              <Text className="mb-2 font-medium text-dark/70">Localisation</Text>
+              <Text
+                style={{
+                  fontFamily: FONT.medium,
+                  fontSize: 15,
+                  color: COLORS.textSecondary,
+                  marginBottom: 8,
+                }}
+              >
+                Localisation
+              </Text>
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
@@ -124,12 +204,21 @@ const FiltersModal: React.FC<Props> = ({ onClose }) => {
                     <Pressable
                       key={c}
                       onPress={() => setCity(c)}
-                      className={`rounded-full px-4 py-2.5 ${selected ? 'bg-primary' : 'bg-dark/5'}`}
+                      style={{
+                        borderRadius: RADIUS.full,
+                        backgroundColor: selected ? COLORS.primary : 'rgba(45,17,54,0.05)',
+                        paddingHorizontal: 16,
+                        paddingVertical: 10,
+                      }}
                       accessibilityRole="button"
                       accessibilityState={{ selected }}
                     >
                       <Text
-                        className={`text-sm font-medium ${selected ? 'text-white' : 'text-dark/70'}`}
+                        style={{
+                          fontFamily: FONT.medium,
+                          fontSize: 14,
+                          color: selected ? '#ffffff' : COLORS.textSecondary,
+                        }}
                       >
                         {c}
                       </Text>
@@ -142,17 +231,24 @@ const FiltersModal: React.FC<Props> = ({ onClose }) => {
 
           <Pressable
             onPress={onClose}
-            className="mt-8 overflow-hidden rounded-full shadow-lg shadow-primary/30"
+            style={{ marginTop: 32, borderRadius: RADIUS.full, overflow: 'hidden', ...SHADOW.button }}
             accessibilityRole="button"
             accessibilityLabel="Appliquer les filtres"
           >
             <LinearGradient
-              colors={['#e724ab', '#d479ec']}
+              colors={[...CTA_GRADIENT]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
-              className="py-4"
+              style={{ paddingVertical: 16, alignItems: 'center' }}
             >
-              <Text className="text-center text-base font-bold text-white">
+              <Text
+                style={{
+                  fontFamily: FONT.bold,
+                  fontSize: 16,
+                  color: '#ffffff',
+                  textAlign: 'center',
+                }}
+              >
                 Appliquer les filtres
               </Text>
             </LinearGradient>

@@ -8,13 +8,12 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        background: '#f8f5ff',
+        background: '#FFF9F5',
         surface: '#ffffff',
-        'surface-light': '#f0ebf5',
-        primary: '#e724ab',
-        secondary: '#d479ec',
-        dark: '#4b164c',
-        lavender: '#dfcef9',
+        'surface-light': '#FFF5EF',
+        primary: '#E7266A',
+        secondary: '#C156D0',
+        dark: '#2D1136',
       },
       fontFamily: {
         sans: ['Outfit'],

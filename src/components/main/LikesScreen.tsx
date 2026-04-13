@@ -4,45 +4,130 @@ import React from 'react';
 import { Text, View } from 'react-native';
 import { Heart, Sparkles } from 'lucide-react-native';
 
+import { COLORS, FONT, SHADOW, RADIUS } from '../../theme';
+
+const BULLET_POINTS = [
+  'Écoute des Vibes et like celles qui te parlent.',
+  'Retrouve tous tes likes ici.',
+  'Envoie un vocal pour commencer la discussion !',
+] as const;
+
 const LikesScreen: React.FC = () => {
   return (
-    <View className="flex h-full flex-col">
-      <View className="mb-6">
-        <Text className="mb-2 text-2xl font-bold text-dark">Mes Likes</Text>
-        <Text className="text-sm text-dark/40">Les profils qui t'ont fait vibrer.</Text>
+    <View style={{ flex: 1, flexDirection: 'column' }}>
+      <View style={{ marginBottom: 24 }}>
+        <Text
+          style={{
+            fontFamily: FONT.extrabold,
+            fontSize: 26,
+            color: COLORS.dark,
+            marginBottom: 8,
+          }}
+        >
+          Mes Likes
+        </Text>
+        <Text style={{ fontFamily: FONT.regular, fontSize: 14, color: COLORS.textSecondary }}>
+          Les profils qui t'ont fait vibrer.
+        </Text>
       </View>
 
-      <View className="flex flex-1 flex-col items-center justify-center py-8">
-        <View className="mb-6 h-20 w-20 flex-row items-center justify-center rounded-full border border-primary/15 bg-primary/10">
-          <Heart size={32} className="text-primary/50" />
+      <View
+        style={{
+          flex: 1,
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          paddingVertical: 32,
+        }}
+      >
+        <View
+          style={{
+            width: 72,
+            height: 72,
+            borderRadius: 36,
+            backgroundColor: COLORS.primaryMuted,
+            borderWidth: 1,
+            borderColor: COLORS.border,
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginBottom: 24,
+          }}
+        >
+          <Heart size={30} color={COLORS.primary} />
         </View>
-        <Text className="mb-2 text-center text-xl font-bold text-dark">Aucun like</Text>
-        <Text className="mb-8 max-w-[250px] text-center text-dark/40">
-          Découvre de nouvelles Vibes et like celles qui te plaisent !
+
+        <Text
+          style={{
+            fontFamily: FONT.bold,
+            fontSize: 20,
+            color: COLORS.dark,
+            textAlign: 'center',
+            marginBottom: 8,
+          }}
+        >
+          Aucun like
+        </Text>
+        <Text
+          style={{
+            fontFamily: FONT.regular,
+            fontSize: 14,
+            color: COLORS.textSecondary,
+            textAlign: 'center',
+            maxWidth: 250,
+            marginBottom: 32,
+          }}
+        >
+          Tes futurs coups de cœur t'attendent.
         </Text>
 
-        <View className="w-full max-w-sm rounded-2xl border border-dark/5 bg-white/70 p-5">
-          <View className="mb-4 flex-row items-center gap-2">
-            <Sparkles size={16} className="text-secondary" />
-            <Text className="text-sm font-bold text-dark">Comment ça marche ?</Text>
+        <View
+          style={{
+            width: '100%',
+            maxWidth: 384,
+            borderRadius: RADIUS.lg,
+            borderWidth: 1,
+            borderColor: COLORS.border,
+            backgroundColor: COLORS.surface,
+            padding: 20,
+            ...SHADOW.card,
+          }}
+        >
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 8,
+              marginBottom: 16,
+            }}
+          >
+            <Sparkles size={16} color={COLORS.secondary} />
+            <Text
+              style={{
+                fontFamily: FONT.semibold,
+                fontSize: 14,
+                color: COLORS.dark,
+              }}
+            >
+              Comment ça marche ?
+            </Text>
           </View>
-          <View className="flex-col gap-2.5">
-            <View className="flex-row items-start gap-2">
-              <Text className="font-bold text-primary">•</Text>
-              <Text className="flex-1 text-sm text-dark/50">
-                Écoute des Vibes et like celles qui te parlent.
-              </Text>
-            </View>
-            <View className="flex-row items-start gap-2">
-              <Text className="font-bold text-primary">•</Text>
-              <Text className="flex-1 text-sm text-dark/50">Retrouve tous tes likes ici.</Text>
-            </View>
-            <View className="flex-row items-start gap-2">
-              <Text className="font-bold text-primary">•</Text>
-              <Text className="flex-1 text-sm text-dark/50">
-                Envoie un vocal pour commencer la discussion !
-              </Text>
-            </View>
+
+          <View style={{ flexDirection: 'column', gap: 10 }}>
+            {BULLET_POINTS.map((text, i) => (
+              <View key={i} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
+                <Text style={{ fontFamily: FONT.bold, color: COLORS.primary }}>•</Text>
+                <Text
+                  style={{
+                    flex: 1,
+                    fontFamily: FONT.regular,
+                    fontSize: 14,
+                    color: COLORS.textSecondary,
+                  }}
+                >
+                  {text}
+                </Text>
+              </View>
+            ))}
           </View>
         </View>
       </View>

@@ -1,67 +1,162 @@
-/**
- * Messages tab screen: search field and empty state with icebreaker suggestions
- * to encourage users to send their first voice replies.
- */
+/* Messages tab — search field and empty state with icebreaker suggestions to encourage first voice replies. */
+
 import React, { useState } from 'react';
 import { Text, TextInput, View } from 'react-native';
 import { MessageCircle, Search, Sparkles } from 'lucide-react-native';
 
-const PLACEHOLDER_TEXT_COLOR = '#4b164c4d';
+import { COLORS, FONT, SHADOW, RADIUS } from '../../theme';
+
+const ICEBREAKERS = [
+  '\u201CJ\u2019ai adoré ton énergie sur ton vocal !\u201D',
+  '\u201CTa pire honte m\u2019a fait mourir de rire 😂\u201D',
+  '\u201CC\u2019est quoi le dernier son que tu as écouté ?\u201D',
+] as const;
 
 const MessagesScreen: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
 
   return (
-    <View className="flex flex-1 flex-col">
-      <View className="mb-6">
-        <Text className="mb-4 text-2xl font-bold text-dark">Messages</Text>
-        <View className="relative w-full">
-          <Search
-            size={18}
-            className="absolute left-4 top-1/2 -translate-y-1/2 text-dark/25"
-          />
+    <View style={{ flex: 1, flexDirection: 'column' }}>
+      <View style={{ marginBottom: 24 }}>
+        <Text
+          style={{
+            fontFamily: FONT.extrabold,
+            fontSize: 26,
+            color: COLORS.dark,
+            marginBottom: 16,
+          }}
+        >
+          Messages
+        </Text>
+
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            borderRadius: RADIUS.full,
+            borderWidth: 1,
+            borderColor: COLORS.border,
+            backgroundColor: COLORS.surfaceMuted,
+            paddingHorizontal: 16,
+          }}
+        >
+          <Search size={18} color={COLORS.textTertiary} />
           <TextInput
             value={searchQuery}
             onChangeText={setSearchQuery}
             placeholder="Rechercher..."
-            placeholderTextColor={PLACEHOLDER_TEXT_COLOR}
-            className="w-full rounded-full border border-dark/10 bg-white/80 py-3 pl-12 pr-4 text-sm text-dark"
+            placeholderTextColor={COLORS.textTertiary}
+            style={{
+              flex: 1,
+              fontFamily: FONT.regular,
+              fontSize: 14,
+              letterSpacing: 0,
+              color: COLORS.dark,
+              paddingVertical: 12,
+              marginLeft: 10,
+            }}
           />
         </View>
       </View>
 
-      <View className="flex flex-1 flex-col items-center justify-center py-8">
-        <View className="mb-6 h-20 w-20 items-center justify-center rounded-full border border-dark/5 bg-dark/5">
-          <MessageCircle size={32} className="text-dark/20" />
+      <View
+        style={{
+          flex: 1,
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          paddingVertical: 32,
+        }}
+      >
+        <View
+          style={{
+            width: 72,
+            height: 72,
+            borderRadius: 36,
+            backgroundColor: COLORS.primaryMuted,
+            borderWidth: 1,
+            borderColor: COLORS.border,
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginBottom: 24,
+          }}
+        >
+          <MessageCircle size={30} color={COLORS.primary} />
         </View>
-        <Text className="mb-2 text-center text-xl font-bold text-dark">
+
+        <Text
+          style={{
+            fontFamily: FONT.bold,
+            fontSize: 20,
+            color: COLORS.dark,
+            textAlign: 'center',
+            marginBottom: 8,
+          }}
+        >
           Pas encore de messages
         </Text>
-        <Text className="mb-8 max-w-[250px] text-center text-dark/40">
-          Envoie une réponse vocale pour briser la glace !
+        <Text
+          style={{
+            fontFamily: FONT.regular,
+            fontSize: 14,
+            color: COLORS.textSecondary,
+            textAlign: 'center',
+            maxWidth: 250,
+            marginBottom: 32,
+          }}
+        >
+          Ta prochaine conversation commence ici.
         </Text>
 
-        <View className="w-full max-w-sm rounded-2xl border border-dark/5 bg-white/70 p-5">
-          <View className="mb-4 flex flex-row items-center gap-2">
-            <Sparkles size={16} className="text-secondary" />
-            <Text className="text-sm font-bold text-dark">Icebreakers</Text>
+        <View
+          style={{
+            width: '100%',
+            maxWidth: 384,
+            borderRadius: RADIUS.lg,
+            borderWidth: 1,
+            borderColor: COLORS.border,
+            backgroundColor: COLORS.surface,
+            padding: 20,
+            ...SHADOW.card,
+          }}
+        >
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 8,
+              marginBottom: 16,
+            }}
+          >
+            <Sparkles size={16} color={COLORS.secondary} />
+            <Text style={{ fontFamily: FONT.semibold, fontSize: 14, color: COLORS.dark }}>
+              Icebreakers
+            </Text>
           </View>
-          <View className="w-full gap-2.5">
-            <View className="rounded-xl border border-dark/5 bg-dark/[0.03] p-3">
-              <Text className="text-sm text-dark/50">
-                {`\u201CJ'ai adoré ton énergie sur ton vocal !\u201D`}
-              </Text>
-            </View>
-            <View className="rounded-xl border border-dark/5 bg-dark/[0.03] p-3">
-              <Text className="text-sm text-dark/50">
-                {`\u201CTa pire honte m'a fait mourir de rire 😂\u201D`}
-              </Text>
-            </View>
-            <View className="rounded-xl border border-dark/5 bg-dark/[0.03] p-3">
-              <Text className="text-sm text-dark/50">
-                {`\u201CC'est quoi le dernier son que tu as écouté ?\u201D`}
-              </Text>
-            </View>
+
+          <View style={{ width: '100%', gap: 10 }}>
+            {ICEBREAKERS.map((text, i) => (
+              <View
+                key={i}
+                style={{
+                  borderRadius: RADIUS.md,
+                  backgroundColor: 'rgba(45,17,54,0.03)',
+                  borderWidth: 1,
+                  borderColor: COLORS.borderLight,
+                  padding: 12,
+                }}
+              >
+                <Text
+                  style={{
+                    fontFamily: FONT.regular,
+                    fontSize: 14,
+                    color: COLORS.textSecondary,
+                  }}
+                >
+                  {text}
+                </Text>
+              </View>
+            ))}
           </View>
         </View>
       </View>

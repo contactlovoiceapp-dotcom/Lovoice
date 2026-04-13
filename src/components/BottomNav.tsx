@@ -4,22 +4,23 @@ import React, { useEffect } from 'react';
 import { Pressable, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
+  Easing,
   useAnimatedStyle,
   useSharedValue,
-  withSpring,
+  withTiming,
 } from 'react-native-reanimated';
 import { Compass, Heart, MessageCircle } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 
 import type { Tab } from '../types';
+import { COLORS, FONT } from '../theme';
 
 const MAX_NAV_WIDTH = 512;
 const INDICATOR_WIDTH = 32;
 const INDICATOR_HEIGHT = 3;
 const ICON_SIZE = 22;
 
-const INDICATOR_SPRING = { stiffness: 400, damping: 30 } as const;
-const TAP_SPRING = { stiffness: 400, damping: 30 } as const;
+const INDICATOR_TIMING = { duration: 200, easing: Easing.out(Easing.quad) } as const;
 
 interface BottomNavProps {
   activeTab: Tab;
@@ -50,42 +51,25 @@ function TabItem({
   isActive: boolean;
   onPress: () => void;
 }) {
-  const scale = useSharedValue(1);
-  const iconStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
-
-  const handlePressIn = () => {
-    scale.value = withSpring(0.85, TAP_SPRING);
-  };
-  const handlePressOut = () => {
-    scale.value = withSpring(1, TAP_SPRING);
-  };
-
-  const activeColor = '#e724ab';
-  const inactiveColor = 'rgba(75,22,76,0.3)';
+  const activeColor = COLORS.primary;
+  const inactiveColor = COLORS.textTertiary;
 
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ selected: isActive }}
       onPress={onPress}
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
       style={{ flex: 1, flexDirection: 'column', alignItems: 'center', gap: 2, paddingHorizontal: 20, paddingVertical: 6 }}
     >
-      <Animated.View style={iconStyle}>
-        <Icon
-          size={ICON_SIZE}
-          strokeWidth={isActive ? 2.5 : 1.8}
-          color={isActive ? activeColor : inactiveColor}
-        />
-      </Animated.View>
+      <Icon
+        size={ICON_SIZE}
+        strokeWidth={isActive ? 2.5 : 1.8}
+        color={isActive ? activeColor : inactiveColor}
+      />
       <Text
         style={{
           fontSize: 10,
-          fontWeight: '500',
-          letterSpacing: 0.5,
+          fontFamily: FONT.medium,
           color: isActive ? activeColor : inactiveColor,
         }}
       >
@@ -102,7 +86,7 @@ const BottomNav: React.FC<BottomNavProps> = ({ activeTab, setActiveTab }) => {
   const translateX = useSharedValue(indicatorOffsetX(activeTab, contentWidth));
 
   useEffect(() => {
-    translateX.value = withSpring(indicatorOffsetX(activeTab, contentWidth), INDICATOR_SPRING);
+    translateX.value = withTiming(indicatorOffsetX(activeTab, contentWidth), INDICATOR_TIMING);
   }, [activeTab, contentWidth]);
 
   const indicatorStyle = useAnimatedStyle(() => ({
@@ -118,8 +102,8 @@ const BottomNav: React.FC<BottomNavProps> = ({ activeTab, setActiveTab }) => {
         right: 0,
         zIndex: 50,
         borderTopWidth: 1,
-        borderTopColor: 'rgba(75,22,76,0.05)',
-        backgroundColor: 'rgba(255,255,255,0.9)',
+        borderTopColor: COLORS.borderLight,
+        backgroundColor: 'rgba(255,255,255,0.92)',
         paddingBottom: insets.bottom,
       }}
     >
@@ -135,7 +119,7 @@ const BottomNav: React.FC<BottomNavProps> = ({ activeTab, setActiveTab }) => {
                 width: INDICATOR_WIDTH,
                 height: INDICATOR_HEIGHT,
                 borderRadius: 999,
-                backgroundColor: '#e724ab',
+                backgroundColor: COLORS.primary,
               },
               indicatorStyle,
             ]}

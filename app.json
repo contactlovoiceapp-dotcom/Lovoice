@@ -10,7 +10,7 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#f8f5ff"
+      "backgroundColor": "#FFF9F5"
     },
     "ios": {
       "supportsTablet": false,
@@ -19,7 +19,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#f8f5ff"
+        "backgroundColor": "#FFF9F5"
       },
       "edgeToEdgeEnabled": true,
       "package": "com.shrtcut.lovoice"

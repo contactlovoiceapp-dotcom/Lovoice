@@ -11,9 +11,9 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft, ArrowRight, Phone } from 'lucide-react-native';
+import { COLORS, CTA_GRADIENT, FONT, ONBOARDING_GRADIENT, RADIUS } from '../../theme';
 
-const PLACEHOLDER_TEXT_COLOR = '#4b164c40';
-const AMBIENT_GLOW = 'rgba(231, 36, 171, 0.1)';
+const AMBIENT_GLOW_SIZE = 280;
 
 interface Props {
   onNext: () => void;
@@ -43,7 +43,7 @@ const PhoneScreen: React.FC<Props> = ({ onNext, onBack }) => {
 
   return (
     <LinearGradient
-      colors={['#f8f5ff', '#edf2fc', '#f0e8f8']}
+      colors={[...ONBOARDING_GRADIENT]}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={{ flex: 1 }}
@@ -61,11 +61,11 @@ const PhoneScreen: React.FC<Props> = ({ onNext, onBack }) => {
               position: 'absolute',
               left: '50%',
               top: '33%',
-              width: 400,
-              height: 400,
-              borderRadius: 200,
-              transform: [{ translateX: -200 }, { translateY: -200 }],
-              backgroundColor: AMBIENT_GLOW,
+              width: AMBIENT_GLOW_SIZE,
+              height: AMBIENT_GLOW_SIZE,
+              borderRadius: AMBIENT_GLOW_SIZE / 2,
+              transform: [{ translateX: -(AMBIENT_GLOW_SIZE / 2) }, { translateY: -(AMBIENT_GLOW_SIZE / 2) }],
+              backgroundColor: 'rgba(231,38,106,0.08)',
             }}
           />
         </View>
@@ -80,11 +80,11 @@ const PhoneScreen: React.FC<Props> = ({ onNext, onBack }) => {
               height: 40,
               alignItems: 'center',
               justifyContent: 'center',
-              borderRadius: 20,
-              backgroundColor: 'rgba(75,22,76,0.05)',
+              borderRadius: RADIUS.lg,
+              backgroundColor: COLORS.border,
             }}
           >
-            <ArrowLeft size={22} color="rgba(75,22,76,0.5)" />
+            <ArrowLeft size={22} color={COLORS.textSecondary} />
           </Pressable>
 
           <View style={{ marginLeft: 'auto', marginRight: 'auto', width: '100%', maxWidth: 384, flex: 1, justifyContent: 'center' }}>
@@ -97,18 +97,18 @@ const PhoneScreen: React.FC<Props> = ({ onNext, onBack }) => {
                 alignItems: 'center',
                 justifyContent: 'center',
                 borderRadius: 32,
-                backgroundColor: 'rgba(231,36,171,0.1)',
+                backgroundColor: COLORS.primaryMuted,
               }}
             >
-              <Phone size={28} color="#e724ab" />
+              <Phone size={28} color={COLORS.primary} />
             </View>
 
             {step === 'phone' ? (
               <View>
-                <Text className="mb-3 text-center text-3xl font-bold text-dark">
+                <Text style={{ marginBottom: 12, textAlign: 'center', fontSize: 28, fontFamily: FONT.bold, color: COLORS.dark }}>
                   Ton numéro
                 </Text>
-                <Text className="mb-8 text-center text-dark/40">
+                <Text style={{ marginBottom: 32, textAlign: 'center', fontFamily: FONT.regular, color: COLORS.textSecondary }}>
                   Nous t&apos;enverrons un code pour vérifier ton compte.
                 </Text>
 
@@ -118,37 +118,37 @@ const PhoneScreen: React.FC<Props> = ({ onNext, onBack }) => {
                       width: '100%',
                       flexDirection: 'row',
                       alignItems: 'center',
-                      borderRadius: 16,
+                      borderRadius: RADIUS.lg,
                       borderWidth: 1,
-                      borderColor: 'rgba(75,22,76,0.1)',
-                      backgroundColor: 'rgba(255,255,255,0.8)',
+                      borderColor: COLORS.border,
+                      backgroundColor: COLORS.surfaceMuted,
                       paddingVertical: 16,
                       paddingHorizontal: 16,
                     }}
                   >
-                    <Text className="mr-2 font-medium text-dark/40">+33</Text>
+                    <Text style={{ marginRight: 8, fontFamily: FONT.medium, color: COLORS.textTertiary }}>+33</Text>
                     <TextInput
                       value={phone}
                       onChangeText={setPhone}
                       placeholder="6 12 34 56 78"
-                      placeholderTextColor={PLACEHOLDER_TEXT_COLOR}
+                      placeholderTextColor={COLORS.textTertiary}
                       keyboardType="number-pad"
-                      style={{ flex: 1, minWidth: 0, fontSize: 18, color: '#4b164c' }}
+                      style={{ flex: 1, minWidth: 0, fontSize: 18, fontFamily: FONT.regular, color: COLORS.dark }}
                     />
                   </View>
                   <Pressable
                     accessibilityRole="button"
                     disabled={phone.length < 9}
                     onPress={handlePhoneSubmit}
-                    style={{ width: '100%', borderRadius: 999, overflow: 'hidden', opacity: phone.length < 9 ? 0.3 : 1 }}
+                    style={{ width: '100%', borderRadius: RADIUS.full, overflow: 'hidden', opacity: phone.length < 9 ? 0.3 : 1 }}
                   >
                     <LinearGradient
-                      colors={['#e724ab', '#d479ec']}
+                      colors={[...CTA_GRADIENT]}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 0 }}
                       style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 16 }}
                     >
-                      <Text className="font-bold text-white">Recevoir le code</Text>
+                      <Text style={{ fontFamily: FONT.bold, color: 'white' }}>Recevoir le code</Text>
                       <ArrowRight size={20} color="#ffffff" />
                     </LinearGradient>
                   </Pressable>
@@ -156,10 +156,10 @@ const PhoneScreen: React.FC<Props> = ({ onNext, onBack }) => {
               </View>
             ) : (
               <View>
-                <Text className="mb-3 text-center text-3xl font-bold text-dark">
+                <Text style={{ marginBottom: 12, textAlign: 'center', fontSize: 28, fontFamily: FONT.bold, color: COLORS.dark }}>
                   Code de vérification
                 </Text>
-                <Text className="mb-8 text-center text-dark/40">
+                <Text style={{ marginBottom: 32, textAlign: 'center', fontFamily: FONT.regular, color: COLORS.textSecondary }}>
                   Saisis le code envoyé au +33 {phone}
                 </Text>
 
@@ -168,38 +168,38 @@ const PhoneScreen: React.FC<Props> = ({ onNext, onBack }) => {
                     value={code}
                     onChangeText={(t) => setCode(t.replace(/\D/g, ''))}
                     placeholder="0000"
-                    placeholderTextColor={PLACEHOLDER_TEXT_COLOR}
+                    placeholderTextColor={COLORS.textTertiary}
                     keyboardType="number-pad"
                     maxLength={4}
                     autoFocus
                     style={{
                       width: '100%',
-                      borderRadius: 16,
+                      borderRadius: RADIUS.lg,
                       borderWidth: 1,
-                      borderColor: 'rgba(75,22,76,0.1)',
-                      backgroundColor: 'rgba(255,255,255,0.8)',
+                      borderColor: COLORS.border,
+                      backgroundColor: COLORS.surfaceMuted,
                       paddingVertical: 16,
                       paddingHorizontal: 16,
                       textAlign: 'center',
                       fontSize: 24,
                       letterSpacing: 16,
-                      color: '#4b164c',
                       fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+                      color: COLORS.dark,
                     }}
                   />
                   <Pressable
                     accessibilityRole="button"
                     disabled={code.length < 4}
                     onPress={handleCodeSubmit}
-                    style={{ width: '100%', borderRadius: 999, overflow: 'hidden', opacity: code.length < 4 ? 0.3 : 1 }}
+                    style={{ width: '100%', borderRadius: RADIUS.full, overflow: 'hidden', opacity: code.length < 4 ? 0.3 : 1 }}
                   >
                     <LinearGradient
-                      colors={['#e724ab', '#d479ec']}
+                      colors={[...CTA_GRADIENT]}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 0 }}
                       style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 16 }}
                     >
-                      <Text className="font-bold text-white">Vérifier</Text>
+                      <Text style={{ fontFamily: FONT.bold, color: 'white' }}>Vérifier</Text>
                       <ArrowRight size={20} color="#ffffff" />
                     </LinearGradient>
                   </Pressable>

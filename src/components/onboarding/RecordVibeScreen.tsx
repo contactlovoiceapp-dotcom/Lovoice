@@ -21,7 +21,7 @@ import Animated, {
 import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowRight, Lightbulb, Mic, Square, X } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { COLORS, CTA_GRADIENT, ONBOARDING_GRADIENT } from '../../theme';
+import { COLORS, CTA_GRADIENT, FONT, ONBOARDING_GRADIENT, RADIUS, SHADOW } from '../../theme';
 
 const INSPIRATION_QUESTIONS = [
   'Dis-moi ton talent le plus inutile mais incroyable...',
@@ -33,7 +33,6 @@ const INSPIRATION_QUESTIONS = [
 
 const MIC_SIZE = 128;
 const GLOW_SIZE = 500;
-const REACTIVE_GLOW = 'rgba(231, 36, 171, 0.2)';
 
 interface Props {
   onNext: () => void;
@@ -87,7 +86,7 @@ function ReactiveGlow({ isRecording }: { isRecording: boolean }) {
             width: GLOW_SIZE,
             height: GLOW_SIZE,
             borderRadius: GLOW_SIZE / 2,
-            backgroundColor: REACTIVE_GLOW,
+            backgroundColor: COLORS.primaryMuted,
           },
           animatedStyle,
         ]}
@@ -215,11 +214,11 @@ const RecordVibeScreen: React.FC<Props> = ({ onNext, onSkip }) => {
         <View style={{ flex: 1, flexDirection: 'column', justifyContent: 'space-between', paddingHorizontal: 24, paddingVertical: 32 }}>
           {/* Header */}
           <View style={{ width: '100%', alignSelf: 'center', paddingTop: 16, maxWidth: contentMaxWidth }}>
-            <Text className="mb-2 text-center text-3xl font-bold text-dark">
+            <Text style={{ marginBottom: 8, textAlign: 'center', fontSize: 28, fontFamily: FONT.bold, color: COLORS.dark }}>
               Ta{' '}
-              <Text className="font-serif italic text-primary">Vibe</Text>
+              <Text style={{ fontFamily: FONT.serifItalic, color: COLORS.primary }}>Vibe</Text>
             </Text>
-            <Text className="text-center font-medium text-dark/40">
+            <Text style={{ textAlign: 'center', fontFamily: FONT.medium, color: COLORS.textTertiary }}>
               Zéro pression. Juste ta voix.
             </Text>
           </View>
@@ -232,12 +231,12 @@ const RecordVibeScreen: React.FC<Props> = ({ onNext, onSkip }) => {
                   <PingRing
                     delayMs={0}
                     diameter={MIC_SIZE + 32}
-                    fillColor="rgba(231, 36, 171, 0.25)"
+                    fillColor={COLORS.primaryMuted}
                   />
                   <PingRing
                     delayMs={500}
                     diameter={MIC_SIZE + 64}
-                    fillColor="rgba(231, 36, 171, 0.1)"
+                    fillColor={COLORS.border}
                   />
                 </>
               )}
@@ -278,11 +277,15 @@ const RecordVibeScreen: React.FC<Props> = ({ onNext, onSkip }) => {
             <View style={{ marginTop: 24, height: 64, flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start' }}>
               {(isRecording || hasRecorded) && (
                 <Text
-                  className="text-3xl font-semibold tracking-tight text-dark"
-                  style={{ fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' }}
+                  style={{
+                    fontSize: 28,
+                    fontFamily: FONT.semibold,
+                    color: COLORS.dark,
+                    fontVariant: ['tabular-nums'],
+                  }}
                 >
                   {formatTime(time)}{' '}
-                  <Text className="text-lg text-dark/25">/ 1:30</Text>
+                  <Text style={{ fontSize: 18, fontFamily: FONT.regular, color: COLORS.textTertiary }}>/ 1:30</Text>
                 </Text>
               )}
 
@@ -296,8 +299,7 @@ const RecordVibeScreen: React.FC<Props> = ({ onNext, onSkip }) => {
                   style={{ marginTop: 8 }}
                 >
                   <Text
-                    className="text-sm font-medium text-dark/30"
-                    style={{ textDecorationLine: 'underline' }}
+                    style={{ fontSize: 14, fontFamily: FONT.medium, color: COLORS.textTertiary, textDecorationLine: 'underline' }}
                   >
                     Recommencer
                   </Text>
@@ -310,16 +312,16 @@ const RecordVibeScreen: React.FC<Props> = ({ onNext, onSkip }) => {
           <View style={{ width: '100%', alignSelf: 'center', gap: 12, maxWidth: contentMaxWidth }}>
             <View
               style={{
-                borderRadius: 16,
+                borderRadius: RADIUS.lg,
                 borderWidth: 1,
-                borderColor: 'rgba(75,22,76,0.05)',
-                backgroundColor: 'rgba(255,255,255,0.7)',
+                borderColor: COLORS.border,
+                backgroundColor: COLORS.surfaceMuted,
                 padding: 16,
               }}
             >
-              <Text className="text-sm leading-relaxed text-dark/45">
+              <Text style={{ fontSize: 14, lineHeight: 20, fontFamily: FONT.regular, color: COLORS.textSecondary }}>
                 {hasRecorded
-                  ? 'Vibe enregistrée ! 🎤'
+                  ? 'Vibe enregistrée !'
                   : 'Une intro, une pensée, un délire... Parle librement. (1m30 max)'}
               </Text>
 
@@ -334,13 +336,13 @@ const RecordVibeScreen: React.FC<Props> = ({ onNext, onSkip }) => {
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: 8,
-                    borderRadius: 12,
-                    backgroundColor: 'rgba(75,22,76,0.05)',
+                    borderRadius: RADIUS.md,
+                    backgroundColor: COLORS.border,
                     paddingVertical: 10,
                   }}
                 >
                   <Lightbulb size={16} color="#f59e0b" />
-                  <Text className="text-sm font-medium text-dark/50">
+                  <Text style={{ fontSize: 14, fontFamily: FONT.medium, color: COLORS.textSecondary }}>
                     Besoin d'inspiration ?
                   </Text>
                 </Pressable>
@@ -353,9 +355,10 @@ const RecordVibeScreen: React.FC<Props> = ({ onNext, onSkip }) => {
               onPress={onNext}
               style={{
                 width: '100%',
-                borderRadius: 999,
+                borderRadius: RADIUS.full,
                 overflow: 'hidden',
                 opacity: hasRecorded ? 1 : 0.2,
+                ...SHADOW.button,
               }}
             >
               <LinearGradient
@@ -364,7 +367,7 @@ const RecordVibeScreen: React.FC<Props> = ({ onNext, onSkip }) => {
                 end={{ x: 1, y: 0 }}
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 16 }}>
-                  <Text className="font-bold text-white">Continuer</Text>
+                  <Text style={{ fontFamily: FONT.bold, color: 'white' }}>Continuer</Text>
                   <ArrowRight size={20} color={COLORS.surface} />
                 </View>
               </LinearGradient>
@@ -376,7 +379,7 @@ const RecordVibeScreen: React.FC<Props> = ({ onNext, onSkip }) => {
                 onPress={onSkip}
                 style={{ width: '100%', paddingVertical: 8 }}
               >
-                <Text className="text-center text-sm font-medium text-dark/25">
+                <Text style={{ textAlign: 'center', fontSize: 14, fontFamily: FONT.medium, color: COLORS.textTertiary }}>
                   Passer pour l'instant
                 </Text>
               </Pressable>
@@ -395,7 +398,7 @@ const RecordVibeScreen: React.FC<Props> = ({ onNext, onSkip }) => {
             alignItems: 'center',
             justifyContent: 'center',
             padding: 24,
-            backgroundColor: 'rgba(75, 22, 76, 0.4)',
+            backgroundColor: 'rgba(45,17,54,0.4)',
           }}
         >
           <View
@@ -403,10 +406,10 @@ const RecordVibeScreen: React.FC<Props> = ({ onNext, onSkip }) => {
               position: 'relative',
               width: '100%',
               maxWidth: contentMaxWidth,
-              backgroundColor: 'white',
-              borderRadius: 24,
+              backgroundColor: COLORS.surface,
+              borderRadius: RADIUS.xl,
               borderWidth: 1,
-              borderColor: 'rgba(75,22,76,0.05)',
+              borderColor: COLORS.border,
               padding: 32,
             }}
           >
@@ -416,7 +419,7 @@ const RecordVibeScreen: React.FC<Props> = ({ onNext, onSkip }) => {
               onPress={() => setShowInspiration(false)}
               style={{ position: 'absolute', right: 16, top: 16, padding: 8 }}
             >
-              <X size={22} color="rgba(75, 22, 76, 0.3)" />
+              <X size={22} color={COLORS.textTertiary} />
             </Pressable>
 
             <View
@@ -433,10 +436,9 @@ const RecordVibeScreen: React.FC<Props> = ({ onNext, onSkip }) => {
               <Lightbulb size={24} color="#f59e0b" />
             </View>
 
-            <Text className="mb-4 text-xl font-bold text-dark">Idée de vibe</Text>
+            <Text style={{ marginBottom: 16, fontSize: 20, fontFamily: FONT.bold, color: COLORS.dark }}>Idée de vibe</Text>
             <Text
-              className="mb-8 font-serif text-lg font-medium italic text-dark/50"
-              style={{ minHeight: 80 }}
+              style={{ marginBottom: 32, fontFamily: FONT.serifItalic, fontSize: 18, color: COLORS.textSecondary, minHeight: 80 }}
             >
               {`\u201C${INSPIRATION_QUESTIONS[currentQuestion]}\u201D`}
             </Text>
@@ -448,14 +450,14 @@ const RecordVibeScreen: React.FC<Props> = ({ onNext, onSkip }) => {
               }
               style={{
                 width: '100%',
-                borderRadius: 999,
+                borderRadius: RADIUS.full,
                 borderWidth: 1,
-                borderColor: 'rgba(75,22,76,0.05)',
-                backgroundColor: 'rgba(75,22,76,0.05)',
+                borderColor: COLORS.border,
+                backgroundColor: COLORS.border,
                 paddingVertical: 12,
               }}
             >
-              <Text className="text-center font-bold text-dark/60">Une autre idée</Text>
+              <Text style={{ textAlign: 'center', fontFamily: FONT.bold, color: COLORS.textSecondary }}>Une autre idée</Text>
             </Pressable>
           </View>
         </View>

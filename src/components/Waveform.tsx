@@ -14,9 +14,8 @@ import Animated, {
 } from 'react-native-reanimated';
 import { ColorTheme } from '../types';
 
-const BAR_COUNT = 40;
+const BAR_COUNT = 50;
 
-/** Low / high bar height as a fraction of the container (15% / 85%) when playing. */
 const MIN_HEIGHT = 0.15;
 const TARGET_HEIGHT = 0.85;
 const OSCILLATION_DURATION_MS = 600;
@@ -24,27 +23,28 @@ const OSCILLATION_DURATION_MS = 600;
 interface WaveformProps {
   isPlaying: boolean;
   theme: ColorTheme;
+  height?: number;
 }
 
 interface WaveformBarProps {
-  /** Static height fraction (0–1) when not playing. */
   height: number;
   color: string;
   isPlaying: boolean;
-  /** Stagger offset in ms so bars read as a travelling wave. */
   delay: number;
 }
 
 function getBarColor(theme: ColorTheme): string {
   switch (theme) {
-    case ColorTheme.Solaire:
-      return '#fcd34d';
-    case ColorTheme.Posee:
-      return '#c4b5fd';
-    case ColorTheme.Actif:
-      return '#f9a8d4';
-    case ColorTheme.Mystere:
-      return '#ffffff';
+    case ColorTheme.Sunset:
+      return '#FFB347';
+    case ColorTheme.Chill:
+      return '#8B9CF7';
+    case ColorTheme.Electric:
+      return '#FF7A85';
+    case ColorTheme.Dream:
+      return '#A8DFFF';
+    case ColorTheme.Midnight:
+      return '#6C63FF';
     default:
       return 'rgba(255,255,255,0.5)';
   }
@@ -56,7 +56,6 @@ function WaveformBar({ height: staticHeight, color, isPlaying, delay }: Waveform
   useEffect(() => {
     if (isPlaying) {
       cancelAnimation(animatedHeight);
-      // Per-bar index delay staggers the wave once; the repeated part is only the high→low segment.
       animatedHeight.value = withDelay(
         delay,
         withRepeat(
@@ -100,7 +99,7 @@ function WaveformBar({ height: staticHeight, color, isPlaying, delay }: Waveform
   );
 }
 
-const Waveform: React.FC<WaveformProps> = ({ isPlaying, theme }) => {
+const Waveform: React.FC<WaveformProps> = ({ isPlaying, theme, height = 80 }) => {
   const bars = useMemo(
     () => Array.from({ length: BAR_COUNT }, () => 0.15 + Math.random() * 0.85),
     [],
@@ -114,14 +113,14 @@ const Waveform: React.FC<WaveformProps> = ({ isPlaying, theme }) => {
         flexDirection: 'row',
         alignItems: 'flex-end',
         gap: 1.5,
-        height: 80,
+        height,
         width: '100%',
       }}
     >
-      {bars.map((height, i) => (
+      {bars.map((h, i) => (
         <WaveformBar
           key={i}
-          height={height}
+          height={h}
           color={barColor}
           isPlaying={isPlaying}
           delay={i * 40}

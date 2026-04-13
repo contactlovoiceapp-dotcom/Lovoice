@@ -38,7 +38,7 @@ import {
 } from 'lucide-react-native';
 
 import { Profile, ColorTheme, Tab, AppState } from './src/types';
-import { COLORS, CTA_GRADIENT } from './src/theme';
+import { COLORS, CTA_GRADIENT, FONT, SHADOW } from './src/theme';
 import { generateNewProfile } from './src/services/geminiService';
 
 import SplashScreen from './src/components/onboarding/SplashScreen';
@@ -68,7 +68,7 @@ const INITIAL_PROFILES: Profile[] = [
     transcript:
       "Alors, j'avais invité mes beaux-parents pour la première fois. J'ai voulu faire le malin avec un bœuf bourguignon. Sauf que j'ai confondu le sel et le sucre...",
     emojis: ['😂', '🌯', '🏄‍♂️'],
-    theme: ColorTheme.Solaire,
+    theme: ColorTheme.Sunset,
     isPlaying: false,
     audioDurationSec: 15,
   },
@@ -81,7 +81,7 @@ const INITIAL_PROFILES: Profile[] = [
     transcript:
       "Je crois que c'est de voir des gens âgés se tenir la main dans la rue. Ça me donne toujours l'espoir que l'amour peut vraiment durer toute une vie.",
     emojis: ['😌', '📚', '☕️'],
-    theme: ColorTheme.Posee,
+    theme: ColorTheme.Dream,
     isPlaying: false,
     audioDurationSec: 12,
   },
@@ -94,7 +94,7 @@ const INITIAL_PROFILES: Profile[] = [
     transcript:
       "Salut ! Moi c'est Théo. Je suis passionné de voyages et de photographie. Si tu aimes les randos le week-end et les discussions refaire le monde jusqu'à pas d'heure...",
     emojis: ['✈️', '🎒', '🌍'],
-    theme: ColorTheme.Actif,
+    theme: ColorTheme.Electric,
     isPlaying: false,
     audioDurationSec: 10,
   },
@@ -107,9 +107,22 @@ const INITIAL_PROFILES: Profile[] = [
     transcript:
       "Bon, promettez-moi de ne pas juger. J'écoute du Taylor Swift en boucle, même en soirée, et je pleure devant les vidéos de chats.",
     emojis: ['🌙', '🎵', '🍷'],
-    theme: ColorTheme.Mystere,
+    theme: ColorTheme.Midnight,
     isPlaying: false,
     audioDurationSec: 18,
+  },
+  {
+    id: '5',
+    name: 'Camille',
+    age: 27,
+    city: 'Bordeaux',
+    promptTitle: 'Ma playlist du dimanche matin ☀️',
+    transcript:
+      "Le dimanche matin, c'est sacré. Café, croissant, et ma playlist qui va du jazz à l'électro. Un peu comme moi, un mélange improbable.",
+    emojis: ['🎶', '☕', '🌻'],
+    theme: ColorTheme.Chill,
+    isPlaying: false,
+    audioDurationSec: 14,
   },
 ];
 
@@ -215,9 +228,9 @@ function AppContent() {
           paddingHorizontal: 16,
           paddingTop: insets.top + 8,
           paddingBottom: 8,
-          backgroundColor: isDiscover ? 'transparent' : 'rgba(248,245,255,0.95)',
+          backgroundColor: isDiscover ? 'transparent' : 'rgba(255,249,245,0.95)',
           borderBottomWidth: isDiscover ? 0 : 1,
-          borderBottomColor: 'rgba(75,22,76,0.05)',
+          borderBottomColor: COLORS.borderLight,
         }}
       >
         <Image source={LOGO} style={{ height: 40, width: 100 }} resizeMode="contain" />
@@ -234,8 +247,8 @@ function AppContent() {
                 borderWidth: 1,
                 paddingHorizontal: 12,
                 paddingVertical: 6,
-                borderColor: autoplay ? 'rgba(231,36,171,0.5)' : 'rgba(255,255,255,0.1)',
-                backgroundColor: autoplay ? 'rgba(231,36,171,0.2)' : 'rgba(255,255,255,0.1)',
+                borderColor: autoplay ? 'rgba(231,38,106,0.5)' : 'rgba(255,255,255,0.15)',
+                backgroundColor: autoplay ? 'rgba(231,38,106,0.2)' : 'rgba(255,255,255,0.1)',
               }}
             >
               {autoplay ? (
@@ -246,7 +259,7 @@ function AppContent() {
               <Text
                 style={{
                   fontSize: 12,
-                  fontWeight: '600',
+                  fontFamily: FONT.semibold,
                   color: autoplay ? COLORS.primary : 'rgba(255,255,255,0.4)',
                 }}
               >
@@ -260,12 +273,12 @@ function AppContent() {
             style={{
               borderRadius: 999,
               padding: 8,
-              backgroundColor: isDiscover ? 'rgba(255,255,255,0.1)' : 'rgba(75,22,76,0.05)',
+              backgroundColor: isDiscover ? 'rgba(255,255,255,0.1)' : 'rgba(45,17,54,0.05)',
             }}
           >
             <SlidersHorizontal
               size={18}
-              color={isDiscover ? 'rgba(255,255,255,0.5)' : 'rgba(75,22,76,0.4)'}
+              color={isDiscover ? 'rgba(255,255,255,0.5)' : COLORS.textTertiary}
             />
           </Pressable>
 
@@ -282,14 +295,14 @@ function AppContent() {
               alignItems: 'center',
               justifyContent: 'center',
               borderWidth: 1.5,
-              borderColor: isDiscover ? 'rgba(255,255,255,0.3)' : 'rgba(75,22,76,0.15)',
-              backgroundColor: isDiscover ? 'rgba(255,255,255,0.08)' : 'rgba(75,22,76,0.05)',
+              borderColor: isDiscover ? 'rgba(255,255,255,0.3)' : COLORS.border,
+              backgroundColor: isDiscover ? 'rgba(255,255,255,0.08)' : 'rgba(45,17,54,0.05)',
             }}
           >
             <User
               size={16}
               strokeWidth={1.8}
-              color={isDiscover ? 'rgba(255,255,255,0.6)' : 'rgba(75,22,76,0.4)'}
+              color={isDiscover ? 'rgba(255,255,255,0.6)' : COLORS.textTertiary}
             />
           </Pressable>
         </View>
@@ -331,21 +344,21 @@ function AppContent() {
                       gap: 8,
                       borderRadius: 999,
                       borderWidth: 1,
-                      borderColor: 'rgba(75,22,76,0.1)',
-                      backgroundColor: 'rgba(75,22,76,0.05)',
+                      borderColor: COLORS.border,
+                      backgroundColor: 'rgba(45,17,54,0.05)',
                       paddingHorizontal: 24,
                       paddingVertical: 12,
                       opacity: isGenerating ? 0.4 : 1,
                     }}
                   >
                     {isGenerating ? (
-                      <Text style={{ fontSize: 14, fontWeight: '500', color: 'rgba(75,22,76,0.5)' }}>
+                      <Text style={{ fontSize: 14, fontFamily: FONT.medium, color: COLORS.textSecondary }}>
                         Recherche de vibes...
                       </Text>
                     ) : (
                       <>
                         <Sparkles size={16} color={COLORS.secondary} />
-                        <Text style={{ fontSize: 14, fontWeight: '500', color: 'rgba(75,22,76,0.5)' }}>
+                        <Text style={{ fontSize: 14, fontFamily: FONT.medium, color: COLORS.textSecondary }}>
                           Découvrir plus de vibes
                         </Text>
                       </>
@@ -356,13 +369,13 @@ function AppContent() {
             />
           ) : (
             <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 }}>
-              <View style={{ marginBottom: 24, height: 96, width: 96, alignItems: 'center', justifyContent: 'center', borderRadius: 48, backgroundColor: 'rgba(231,36,171,0.1)' }}>
+              <View style={{ marginBottom: 24, height: 96, width: 96, alignItems: 'center', justifyContent: 'center', borderRadius: 48, backgroundColor: COLORS.primaryMuted }}>
                 <Sparkles size={40} color={COLORS.primary} />
               </View>
-              <Text style={{ marginBottom: 8, textAlign: 'center', fontSize: 24, fontWeight: '700', color: COLORS.dark }}>
+              <Text style={{ marginBottom: 8, textAlign: 'center', fontSize: 24, fontFamily: FONT.bold, color: COLORS.dark }}>
                 Plus de vibes !
               </Text>
-              <Text style={{ marginBottom: 32, maxWidth: 250, textAlign: 'center', color: 'rgba(75,22,76,0.4)' }}>
+              <Text style={{ marginBottom: 32, maxWidth: 250, textAlign: 'center', fontFamily: FONT.regular, color: COLORS.textSecondary }}>
                 Tu as écouté toutes les Vibes du coin. Élargis tes filtres ou
                 reviens plus tard.
               </Text>
@@ -373,7 +386,7 @@ function AppContent() {
                   end={{ x: 1, y: 0 }}
                   style={{ borderRadius: 999, paddingHorizontal: 32, paddingVertical: 12 }}
                 >
-                  <Text style={{ textAlign: 'center', fontWeight: '700', color: 'white' }}>
+                  <Text style={{ textAlign: 'center', fontFamily: FONT.bold, color: 'white' }}>
                     Modifier mes filtres
                   </Text>
                 </LinearGradient>
