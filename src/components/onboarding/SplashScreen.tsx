@@ -1,4 +1,4 @@
-/* Brand splash shown on app launch: logo, welcome text, and ambient glow before navigation continues. */
+/* Brand splash shown on app launch: logo, tagline, and ambient glow before navigation continues. */
 
 import React, { useEffect } from 'react';
 import { Image, Text, View, useWindowDimensions } from 'react-native';
@@ -6,6 +6,7 @@ import Animated, {
   Easing,
   useAnimatedStyle,
   useSharedValue,
+  withDelay,
   withRepeat,
   withTiming,
 } from 'react-native-reanimated';
@@ -63,11 +64,34 @@ function AmbientGlow() {
   );
 }
 
+function TaglineFade() {
+  const opacity = useSharedValue(0);
+  const translateY = useSharedValue(8);
+
+  useEffect(() => {
+    opacity.value = withDelay(600, withTiming(1, { duration: 700, easing: Easing.out(Easing.ease) }));
+    translateY.value = withDelay(600, withTiming(0, { duration: 700, easing: Easing.out(Easing.ease) }));
+  }, []);
+
+  const animStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ translateY: translateY.value }],
+  }));
+
+  return (
+    <Animated.View style={[{ zIndex: 10, alignItems: 'center', marginTop: 20 }, animStyle]}>
+      <Text style={{ fontFamily: FONT.serifItalic, fontSize: 18, color: COLORS.textSecondary, letterSpacing: 0.2 }}>
+        Bienvenue
+      </Text>
+    </Animated.View>
+  );
+}
+
 const SplashScreen: React.FC<Props> = ({ onFinish }) => {
   const { width, height } = useWindowDimensions();
 
   useEffect(() => {
-    const timer = setTimeout(onFinish, 2500);
+    const timer = setTimeout(onFinish, 2800);
     return () => clearTimeout(timer);
   }, [onFinish]);
 
@@ -85,7 +109,7 @@ const SplashScreen: React.FC<Props> = ({ onFinish }) => {
     >
       <AmbientGlow />
 
-      <View style={{ zIndex: 10, marginBottom: 16 }}>
+      <View style={{ zIndex: 10 }}>
         <Image
           source={LOGO}
           accessibilityLabel="LOVoice"
@@ -94,11 +118,7 @@ const SplashScreen: React.FC<Props> = ({ onFinish }) => {
         />
       </View>
 
-      <View style={{ zIndex: 10 }}>
-        <Text style={{ fontFamily: FONT.medium, color: COLORS.textTertiary, fontSize: 16 }}>
-          Bienvenue
-        </Text>
-      </View>
+      <TaglineFade />
     </View>
   );
 };
