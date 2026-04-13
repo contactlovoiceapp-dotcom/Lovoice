@@ -276,14 +276,20 @@ function AppContent() {
                 : navigateTo('onboarding_record')
             }
             style={{
-              borderRadius: 999,
-              padding: 8,
-              backgroundColor: isDiscover ? 'rgba(255,255,255,0.1)' : 'rgba(75,22,76,0.05)',
+              width: 34,
+              height: 34,
+              borderRadius: 17,
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderWidth: 1.5,
+              borderColor: isDiscover ? 'rgba(255,255,255,0.3)' : 'rgba(75,22,76,0.15)',
+              backgroundColor: isDiscover ? 'rgba(255,255,255,0.08)' : 'rgba(75,22,76,0.05)',
             }}
           >
             <User
-              size={18}
-              color={isDiscover ? 'rgba(255,255,255,0.5)' : 'rgba(75,22,76,0.4)'}
+              size={16}
+              strokeWidth={1.8}
+              color={isDiscover ? 'rgba(255,255,255,0.6)' : 'rgba(75,22,76,0.4)'}
             />
           </Pressable>
         </View>
