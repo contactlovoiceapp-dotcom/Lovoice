@@ -1,4 +1,4 @@
-/* Profile setup and editing screen — used in onboarding and from the main app header (Expo / NativeWind / Reanimated). */
+/* Profile setup and editing screen — used in onboarding and from the main app header. */
 
 import React, { useEffect, useMemo, useState } from 'react';
 import {
@@ -47,37 +47,17 @@ const ENERGY_OPTIONS: {
   label: string;
   colors: readonly [string, string];
 }[] = [
-  {
-    id: ColorTheme.Solaire,
-    label: 'Solaire',
-    colors: ['#fbbf24', '#f97316'],
-  },
-  {
-    id: ColorTheme.Posee,
-    label: 'Posée',
-    colors: ['#a78bfa', '#9333ea'],
-  },
-  {
-    id: ColorTheme.Actif,
-    label: 'Actif',
-    colors: ['#ec4899', '#c026d3'],
-  },
-  {
-    id: ColorTheme.Mystere,
-    label: 'Mystère',
-    colors: ['#9ca3af', '#374151'],
-  },
+  { id: ColorTheme.Solaire, label: 'Solaire', colors: ['#fbbf24', '#f97316'] },
+  { id: ColorTheme.Posee, label: 'Posée', colors: ['#a78bfa', '#9333ea'] },
+  { id: ColorTheme.Actif, label: 'Actif', colors: ['#ec4899', '#c026d3'] },
+  { id: ColorTheme.Mystere, label: 'Mystère', colors: ['#9ca3af', '#374151'] },
 ];
 
 function getEnergyGradient(theme: ColorTheme): readonly [string, string] {
-  return (
-    ENERGY_OPTIONS.find((e) => e.id === theme)?.colors ?? [
-      '#fbbf24',
-      '#f97316',
-    ]
-  );
+  return ENERGY_OPTIONS.find((e) => e.id === theme)?.colors ?? ['#fbbf24', '#f97316'];
 }
 
+/** Decorative animated waveform bar — invisible if animation fails. */
 function MiniWaveBar({
   isPlaying,
   containerHeight,
@@ -162,36 +142,43 @@ const MyVibeScreen: React.FC<Props> = ({
       colors={[...ONBOARDING_GRADIENT]}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
-      className="flex-1"
+      style={{ flex: 1 }}
     >
       <View
         pointerEvents="none"
-        className="absolute -right-[33%] -top-[33%] h-[400px] w-[400px] rounded-full"
-        style={{ backgroundColor: 'rgba(231, 36, 171, 0.1)' }}
+        style={{
+          position: 'absolute',
+          right: '-33%',
+          top: '-33%',
+          width: 400,
+          height: 400,
+          borderRadius: 200,
+          backgroundColor: 'rgba(231, 36, 171, 0.1)',
+        }}
       />
 
       <KeyboardAvoidingView
-        className="flex-1"
+        style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}
       >
-        <SafeAreaView className="relative z-10 flex-1 px-4 py-6" edges={['top']}>
-          <View className="mb-6 flex-row items-center justify-between">
+        <SafeAreaView style={{ position: 'relative', zIndex: 10, flex: 1, paddingHorizontal: 16, paddingVertical: 24 }} edges={['top']}>
+          <View style={{ marginBottom: 24, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Retour"
               onPress={onBack}
-              className="rounded-full bg-dark/5 p-2"
+              style={{ borderRadius: 999, backgroundColor: 'rgba(75,22,76,0.05)', padding: 8 }}
             >
               <ArrowLeft size={22} color="rgba(75, 22, 76, 0.5)" />
             </Pressable>
             <Text className="text-xl font-bold text-dark">Ton Profil</Text>
-            <View className="w-10" />
+            <View style={{ width: 40 }} />
           </View>
 
-          <View className="flex-1">
+          <View style={{ flex: 1 }}>
             <ScrollView
-              className="flex-1"
+              style={{ flex: 1 }}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
               contentContainerStyle={{
@@ -204,8 +191,16 @@ const MyVibeScreen: React.FC<Props> = ({
               }}
             >
               {hasRecordedVibe && (
-                <View className="rounded-2xl border border-dark/5 bg-white/70 p-5">
-                  <View className="mb-4 flex-row items-start justify-between">
+                <View
+                  style={{
+                    borderRadius: 16,
+                    borderWidth: 1,
+                    borderColor: 'rgba(75,22,76,0.05)',
+                    backgroundColor: 'rgba(255,255,255,0.7)',
+                    padding: 20,
+                  }}
+                >
+                  <View style={{ marginBottom: 16, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
                     <View>
                       <Text className="font-bold text-dark">Ton vocal</Text>
                       <Text className="text-sm text-dark/30">À l&apos;instant</Text>
@@ -214,99 +209,79 @@ const MyVibeScreen: React.FC<Props> = ({
                       accessibilityRole="button"
                       accessibilityLabel="Supprimer le vocal"
                       onPress={() => onDeleteVibe?.()}
-                      className="p-2"
+                      style={{ padding: 8 }}
                     >
                       <Trash2 size={18} color="rgba(75, 22, 76, 0.2)" />
                     </Pressable>
                   </View>
 
-                  <View className="mb-5 flex-row items-center gap-4">
+                  <View style={{ marginBottom: 20, flexDirection: 'row', alignItems: 'center', gap: 16 }}>
                     <Pressable
                       accessibilityRole="button"
-                      accessibilityLabel={
-                        isPlaying ? 'Mettre en pause' : 'Lecture'
-                      }
+                      accessibilityLabel={isPlaying ? 'Mettre en pause' : 'Lecture'}
                       onPress={() => setIsPlaying((p) => !p)}
-                      className="h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full shadow-lg shadow-primary/30"
+                      style={{ width: 48, height: 48, flexShrink: 0, borderRadius: 24, overflow: 'hidden' }}
                     >
                       <LinearGradient
                         colors={[...playColors]}
                         start={{ x: 0, y: 0 }}
                         end={{ x: 1, y: 1 }}
-                        style={{
-                          width: 48,
-                          height: 48,
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                        }}
+                        style={{ width: 48, height: 48, alignItems: 'center', justifyContent: 'center' }}
                       >
                         {isPlaying ? (
-                          <Pause
-                            size={18}
-                            color={COLORS.surface}
-                            fill={COLORS.surface}
-                          />
+                          <Pause size={18} color={COLORS.surface} fill={COLORS.surface} />
                         ) : (
-                          <Play
-                            size={18}
-                            color={COLORS.surface}
-                            fill={COLORS.surface}
-                            style={{ marginLeft: 2 }}
-                          />
+                          <Play size={18} color={COLORS.surface} fill={COLORS.surface} style={{ marginLeft: 2 }} />
                         )}
                       </LinearGradient>
                     </Pressable>
 
-                    <View
-                      className="flex-1 flex-row items-end overflow-hidden"
-                      style={{ height: WAVE_CONTAINER_HEIGHT, gap: 2 }}
-                    >
+                    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'flex-end', overflow: 'hidden', height: WAVE_CONTAINER_HEIGHT, gap: 2 }}>
                       {Array.from({ length: WAVE_BAR_COUNT }, (_, i) => (
-                        <MiniWaveBar
-                          key={i}
-                          isPlaying={isPlaying}
-                          containerHeight={WAVE_CONTAINER_HEIGHT}
-                        />
+                        <MiniWaveBar key={i} isPlaying={isPlaying} containerHeight={WAVE_CONTAINER_HEIGHT} />
                       ))}
                     </View>
 
                     <Text
                       className="text-xs text-dark/25"
-                      style={{
-                        fontFamily:
-                          Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-                      }}
+                      style={{ fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' }}
                     >
                       0:01
                     </Text>
                   </View>
 
-                  <View className="border-t border-dark/5 pt-4">
+                  <View style={{ borderTopWidth: 1, borderTopColor: 'rgba(75,22,76,0.05)', paddingTop: 16 }}>
                     <Text className="mb-1 text-sm font-bold text-dark">
                       Titre de ta vibe{' '}
-                      <Text className="text-xs font-normal text-dark/25">
-                        (Facultatif)
-                      </Text>
+                      <Text className="text-xs font-normal text-dark/25">(Facultatif)</Text>
                     </Text>
                     <Text className="mb-3 text-xs text-dark/30">
                       Une phrase courte pour teaser ton vocal.
                     </Text>
-                    <View className="relative">
+                    <View style={{ position: 'relative' }}>
                       <TextInput
                         value={catchphrase}
                         onChangeText={setCatchphrase}
                         placeholder="Ex: Ma pire honte en cuisine 🍳..."
                         placeholderTextColor={PLACEHOLDER_TEXT}
                         maxLength={60}
-                        className="rounded-xl border border-dark/10 bg-white/80 py-3 pl-4 pr-12 text-sm text-dark"
+                        style={{
+                          borderRadius: 12,
+                          borderWidth: 1,
+                          borderColor: 'rgba(75,22,76,0.1)',
+                          backgroundColor: 'rgba(255,255,255,0.8)',
+                          paddingVertical: 12,
+                          paddingLeft: 16,
+                          paddingRight: 48,
+                          fontSize: 14,
+                          color: '#4b164c',
+                        }}
                       />
                       <View
                         pointerEvents="none"
-                        className="absolute bottom-0 right-4 top-0 justify-center"
+                        style={{ position: 'absolute', bottom: 0, right: 16, top: 0, justifyContent: 'center' }}
                       >
-                        <Text className="text-xs text-dark/15">
-                          {catchphrase.length}/60
-                        </Text>
+                        <Text className="text-xs text-dark/15">{catchphrase.length}/60</Text>
                       </View>
                     </View>
                   </View>
@@ -315,11 +290,11 @@ const MyVibeScreen: React.FC<Props> = ({
 
               <View>
                 <Text className="mb-4 font-bold text-dark">Ton énergie</Text>
-                <View className="flex-row justify-center gap-5">
+                <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 20 }}>
                   {ENERGY_OPTIONS.map((opt) => {
                     const selected = energy === opt.id;
                     return (
-                      <View key={opt.id} className="items-center gap-2">
+                      <View key={opt.id} style={{ alignItems: 'center', gap: 8 }}>
                         <Pressable
                           accessibilityRole="button"
                           accessibilityState={{ selected }}
@@ -337,16 +312,11 @@ const MyVibeScreen: React.FC<Props> = ({
                             colors={[...opt.colors]}
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 1 }}
-                            style={{
-                              width: 56,
-                              height: 56,
-                            }}
+                            style={{ width: 56, height: 56 }}
                           />
                         </Pressable>
                         <Text
-                          className={`text-xs font-medium ${
-                            selected ? 'text-primary' : 'text-dark/30'
-                          }`}
+                          className={`text-xs font-medium ${selected ? 'text-primary' : 'text-dark/30'}`}
                         >
                           {opt.label}
                         </Text>
@@ -356,44 +326,59 @@ const MyVibeScreen: React.FC<Props> = ({
                 </View>
               </View>
 
-              <View className="gap-4">
+              <View style={{ gap: 16 }}>
                 <Text className="font-bold text-dark">Tes infos</Text>
                 <View>
-                  <Text className="mb-1.5 ml-1 text-sm font-medium text-dark/40">
-                    Prénom
-                  </Text>
+                  <Text className="mb-1.5 ml-1 text-sm font-medium text-dark/40">Prénom</Text>
                   <TextInput
                     value={name}
                     onChangeText={setName}
                     placeholder="Alex"
                     placeholderTextColor={PLACEHOLDER_TEXT}
-                    className="rounded-xl border border-dark/10 bg-white/80 p-3 text-dark"
+                    style={{
+                      borderRadius: 12,
+                      borderWidth: 1,
+                      borderColor: 'rgba(75,22,76,0.1)',
+                      backgroundColor: 'rgba(255,255,255,0.8)',
+                      padding: 12,
+                      color: '#4b164c',
+                    }}
                   />
                 </View>
-                <View className="flex-row gap-4">
-                  <View className="flex-1">
-                    <Text className="mb-1.5 ml-1 text-sm font-medium text-dark/40">
-                      Âge
-                    </Text>
+                <View style={{ flexDirection: 'row', gap: 16 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text className="mb-1.5 ml-1 text-sm font-medium text-dark/40">Âge</Text>
                     <TextInput
                       value={age}
                       onChangeText={setAge}
                       placeholder="28"
                       placeholderTextColor={PLACEHOLDER_TEXT}
                       keyboardType="number-pad"
-                      className="rounded-xl border border-dark/10 bg-white/80 p-3 text-dark"
+                      style={{
+                        borderRadius: 12,
+                        borderWidth: 1,
+                        borderColor: 'rgba(75,22,76,0.1)',
+                        backgroundColor: 'rgba(255,255,255,0.8)',
+                        padding: 12,
+                        color: '#4b164c',
+                      }}
                     />
                   </View>
                   <View style={{ flex: 2 }}>
-                    <Text className="mb-1.5 ml-1 text-sm font-medium text-dark/40">
-                      Ville
-                    </Text>
+                    <Text className="mb-1.5 ml-1 text-sm font-medium text-dark/40">Ville</Text>
                     <TextInput
                       value={city}
                       onChangeText={setCity}
                       placeholder="Paris"
                       placeholderTextColor={PLACEHOLDER_TEXT}
-                      className="rounded-xl border border-dark/10 bg-white/80 p-3 text-dark"
+                      style={{
+                        borderRadius: 12,
+                        borderWidth: 1,
+                        borderColor: 'rgba(75,22,76,0.1)',
+                        backgroundColor: 'rgba(255,255,255,0.8)',
+                        padding: 12,
+                        color: '#4b164c',
+                      }}
                     />
                   </View>
                 </View>
@@ -402,15 +387,24 @@ const MyVibeScreen: React.FC<Props> = ({
               <View>
                 <Text className="mb-4 font-bold text-dark">
                   Tes 3 Emojis{' '}
-                  <Text className="text-sm font-normal text-dark/25">
-                    (Facultatif)
-                  </Text>
+                  <Text className="text-sm font-normal text-dark/25">(Facultatif)</Text>
                 </Text>
-                <View className="flex-row gap-4">
+                <View style={{ flexDirection: 'row', gap: 16 }}>
                   {[0, 1, 2].map((index) => (
                     <View
                       key={index}
-                      className="relative h-14 w-14 items-center justify-center overflow-hidden rounded-full border border-dark/10 bg-white/80"
+                      style={{
+                        position: 'relative',
+                        width: 56,
+                        height: 56,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        overflow: 'hidden',
+                        borderRadius: 28,
+                        borderWidth: 1,
+                        borderColor: 'rgba(75,22,76,0.1)',
+                        backgroundColor: 'rgba(255,255,255,0.8)',
+                      }}
                     >
                       <TextInput
                         value={emojis[index]}
@@ -418,7 +412,16 @@ const MyVibeScreen: React.FC<Props> = ({
                         placeholder="+"
                         placeholderTextColor="rgba(75, 22, 76, 0.15)"
                         maxLength={2}
-                        className="absolute inset-0 h-full w-full bg-transparent text-center text-2xl text-dark"
+                        style={{
+                          position: 'absolute',
+                          inset: 0,
+                          width: '100%',
+                          height: '100%',
+                          backgroundColor: 'transparent',
+                          textAlign: 'center',
+                          fontSize: 24,
+                          color: '#4b164c',
+                        }}
                       />
                     </View>
                   ))}
@@ -428,30 +431,41 @@ const MyVibeScreen: React.FC<Props> = ({
           </View>
 
           <View
-            className="absolute bottom-0 left-0 right-0 z-20 px-4"
-            style={{ paddingBottom: Math.max(insets.bottom, 16) }}
+            style={{
+              position: 'absolute',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              zIndex: 20,
+              paddingHorizontal: 16,
+              paddingBottom: Math.max(insets.bottom, 16),
+            }}
           >
             <LinearGradient
               colors={['transparent', 'rgba(248,245,255,0.9)', '#f8f5ff']}
               start={{ x: 0, y: 0 }}
               end={{ x: 0, y: 1 }}
-              style={{ paddingHorizontal: 0, paddingTop: 24, paddingBottom: 8 }}
+              style={{ paddingTop: 24, paddingBottom: 8 }}
             >
               <Pressable
                 accessibilityRole="button"
                 disabled={!isFormValid}
                 onPress={onSend}
-                className={`w-full self-center overflow-hidden rounded-full shadow-lg shadow-primary/30 ${
-                  isFormValid ? '' : 'opacity-20'
-                }`}
-                style={{ maxWidth: contentMaxWidth }}
+                style={{
+                  width: '100%',
+                  alignSelf: 'center',
+                  borderRadius: 999,
+                  overflow: 'hidden',
+                  maxWidth: contentMaxWidth,
+                  opacity: isFormValid ? 1 : 0.2,
+                }}
               >
                 <LinearGradient
                   colors={[...CTA_GRADIENT]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
                 >
-                  <View className="flex-row items-center justify-center gap-2 py-4">
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 16 }}>
                     <Text className="font-bold text-white">
                       {isOnboarding ? 'Lancer ma Vibe' : 'Sauvegarder'}
                     </Text>

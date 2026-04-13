@@ -200,11 +200,19 @@ function AppContent() {
   );
 
   const renderMainScreen = () => (
-    <View className="flex-1 bg-background">
+    <View style={{ flex: 1, backgroundColor: COLORS.background }}>
       {/* Header */}
       <View
-        className="absolute top-0 left-0 right-0 z-40 flex-row items-center justify-between px-4"
         style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 40,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          paddingHorizontal: 16,
           paddingTop: insets.top + 8,
           paddingBottom: 8,
           backgroundColor: isDiscover ? 'transparent' : 'rgba(248,245,255,0.95)',
@@ -214,15 +222,21 @@ function AppContent() {
       >
         <Image source={LOGO} style={{ height: 40, width: 100 }} resizeMode="contain" />
 
-        <View className="flex-row items-center gap-2">
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           {isDiscover && (
             <Pressable
               onPress={() => setAutoplay(!autoplay)}
-              className={`flex-row items-center gap-1.5 rounded-full border px-3 py-1.5 ${
-                autoplay
-                  ? 'border-primary/50 bg-primary/20'
-                  : 'border-white/10 bg-white/10'
-              }`}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 6,
+                borderRadius: 999,
+                borderWidth: 1,
+                paddingHorizontal: 12,
+                paddingVertical: 6,
+                borderColor: autoplay ? 'rgba(231,36,171,0.5)' : 'rgba(255,255,255,0.1)',
+                backgroundColor: autoplay ? 'rgba(231,36,171,0.2)' : 'rgba(255,255,255,0.1)',
+              }}
             >
               {autoplay ? (
                 <PlayCircle size={14} color={COLORS.primary} />
@@ -230,9 +244,11 @@ function AppContent() {
                 <StopCircle size={14} color="rgba(255,255,255,0.4)" />
               )}
               <Text
-                className={`text-xs font-semibold ${
-                  autoplay ? 'text-primary' : 'text-white/40'
-                }`}
+                style={{
+                  fontSize: 12,
+                  fontWeight: '600',
+                  color: autoplay ? COLORS.primary : 'rgba(255,255,255,0.4)',
+                }}
               >
                 Auto {autoplay ? 'ON' : 'OFF'}
               </Text>
@@ -241,9 +257,11 @@ function AppContent() {
 
           <Pressable
             onPress={() => setShowFilters(true)}
-            className={`rounded-full p-2 ${
-              isDiscover ? 'bg-white/10' : 'bg-dark/5'
-            }`}
+            style={{
+              borderRadius: 999,
+              padding: 8,
+              backgroundColor: isDiscover ? 'rgba(255,255,255,0.1)' : 'rgba(75,22,76,0.05)',
+            }}
           >
             <SlidersHorizontal
               size={18}
@@ -257,9 +275,11 @@ function AppContent() {
                 ? setActiveTab('my-vibes')
                 : navigateTo('onboarding_record')
             }
-            className={`rounded-full p-2 ${
-              isDiscover ? 'bg-white/10' : 'bg-dark/5'
-            }`}
+            style={{
+              borderRadius: 999,
+              padding: 8,
+              backgroundColor: isDiscover ? 'rgba(255,255,255,0.1)' : 'rgba(75,22,76,0.05)',
+            }}
           >
             <User
               size={18}
@@ -289,23 +309,37 @@ function AppContent() {
               })}
               ListFooterComponent={
                 <View
-                  style={{ height: windowHeight * 0.4 }}
-                  className="items-center justify-center bg-background"
+                  style={{
+                    height: windowHeight * 0.4,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: COLORS.background,
+                  }}
                 >
                   <Pressable
                     onPress={handleLoadMore}
                     disabled={isGenerating}
-                    className="flex-row items-center gap-2 rounded-full border border-dark/10 bg-dark/5 px-6 py-3"
-                    style={{ opacity: isGenerating ? 0.4 : 1 }}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 8,
+                      borderRadius: 999,
+                      borderWidth: 1,
+                      borderColor: 'rgba(75,22,76,0.1)',
+                      backgroundColor: 'rgba(75,22,76,0.05)',
+                      paddingHorizontal: 24,
+                      paddingVertical: 12,
+                      opacity: isGenerating ? 0.4 : 1,
+                    }}
                   >
                     {isGenerating ? (
-                      <Text className="text-sm font-medium text-dark/50">
+                      <Text style={{ fontSize: 14, fontWeight: '500', color: 'rgba(75,22,76,0.5)' }}>
                         Recherche de vibes...
                       </Text>
                     ) : (
                       <>
                         <Sparkles size={16} color={COLORS.secondary} />
-                        <Text className="text-sm font-medium text-dark/50">
+                        <Text style={{ fontSize: 14, fontWeight: '500', color: 'rgba(75,22,76,0.5)' }}>
                           Découvrir plus de vibes
                         </Text>
                       </>
@@ -315,14 +349,14 @@ function AppContent() {
               }
             />
           ) : (
-            <View className="flex-1 items-center justify-center px-6">
-              <View className="mb-6 h-24 w-24 items-center justify-center rounded-full bg-primary/10">
+            <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 }}>
+              <View style={{ marginBottom: 24, height: 96, width: 96, alignItems: 'center', justifyContent: 'center', borderRadius: 48, backgroundColor: 'rgba(231,36,171,0.1)' }}>
                 <Sparkles size={40} color={COLORS.primary} />
               </View>
-              <Text className="mb-2 text-center text-2xl font-bold text-dark">
+              <Text style={{ marginBottom: 8, textAlign: 'center', fontSize: 24, fontWeight: '700', color: COLORS.dark }}>
                 Plus de vibes !
               </Text>
-              <Text className="mb-8 max-w-[250px] text-center text-dark/40">
+              <Text style={{ marginBottom: 32, maxWidth: 250, textAlign: 'center', color: 'rgba(75,22,76,0.4)' }}>
                 Tu as écouté toutes les Vibes du coin. Élargis tes filtres ou
                 reviens plus tard.
               </Text>
@@ -331,9 +365,9 @@ function AppContent() {
                   colors={[...CTA_GRADIENT]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
-                  className="rounded-full px-8 py-3"
+                  style={{ borderRadius: 999, paddingHorizontal: 32, paddingVertical: 12 }}
                 >
-                  <Text className="text-center font-bold text-white">
+                  <Text style={{ textAlign: 'center', fontWeight: '700', color: 'white' }}>
                     Modifier mes filtres
                   </Text>
                 </LinearGradient>
@@ -344,16 +378,13 @@ function AppContent() {
       )}
 
       {activeTab === 'likes' && (
-        <View
-          className="flex-1 px-4 pb-28"
-          style={{ paddingTop: insets.top + 56 }}
-        >
+        <View style={{ flex: 1, paddingHorizontal: 16, paddingBottom: 112, paddingTop: insets.top + 56 }}>
           <LikesScreen />
         </View>
       )}
 
       {activeTab === 'my-vibes' && (
-        <View className="absolute inset-0 z-50 bg-background">
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 50, backgroundColor: COLORS.background }}>
           <MyVibeScreen
             onBack={() => setActiveTab('discover')}
             onSend={() => setActiveTab('discover')}
@@ -363,10 +394,7 @@ function AppContent() {
       )}
 
       {activeTab === 'messages' && (
-        <View
-          className="flex-1 px-4 pb-28"
-          style={{ paddingTop: insets.top + 56 }}
-        >
+        <View style={{ flex: 1, paddingHorizontal: 16, paddingBottom: 112, paddingTop: insets.top + 56 }}>
           <MessagesScreen />
         </View>
       )}
@@ -431,7 +459,7 @@ function AppContent() {
   };
 
   return (
-    <View className="flex-1 bg-background">
+    <View style={{ flex: 1, backgroundColor: COLORS.background }}>
       <StatusBar style={isDiscover && appState === 'main' ? 'light' : 'dark'} />
       {renderScreen()}
     </View>

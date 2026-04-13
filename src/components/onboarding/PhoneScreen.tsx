@@ -129,13 +129,11 @@ const PhoneScreen: React.FC<Props> = ({ onNext, onBack }) => {
                     <Text className="mr-2 font-medium text-dark/40">+33</Text>
                     <TextInput
                       value={phone}
-                      onChangeText={(t) => setPhone(t.replace(/\D/g, ''))}
+                      onChangeText={setPhone}
                       placeholder="6 12 34 56 78"
                       placeholderTextColor={PLACEHOLDER_TEXT_COLOR}
-                      keyboardType="phone-pad"
-                      autoFocus
-                      style={{ flex: 1, minWidth: 0, fontSize: 18 }}
-                      className="text-dark"
+                      keyboardType="number-pad"
+                      style={{ flex: 1, minWidth: 0, fontSize: 18, color: '#4b164c' }}
                     />
                   </View>
                   <Pressable
@@ -185,8 +183,9 @@ const PhoneScreen: React.FC<Props> = ({ onNext, onBack }) => {
                       textAlign: 'center',
                       fontSize: 24,
                       letterSpacing: 16,
+                      color: '#4b164c',
+                      fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
                     }}
-                    className="font-mono text-dark"
                   />
                   <Pressable
                     accessibilityRole="button"

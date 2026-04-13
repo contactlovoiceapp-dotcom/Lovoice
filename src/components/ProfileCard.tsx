@@ -10,6 +10,7 @@ import {
   View,
   useWindowDimensions,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
   Easing,
   cancelAnimation,
@@ -82,8 +83,16 @@ function PulseRing() {
   return (
     <Animated.View
       pointerEvents="none"
-      style={animStyle}
-      className="w-24 h-24 rounded-full border-2 border-white/20"
+      style={[
+        {
+          width: 96,
+          height: 96,
+          borderRadius: 48,
+          borderWidth: 2,
+          borderColor: 'rgba(255,255,255,0.2)',
+        },
+        animStyle,
+      ]}
     />
   );
 }
@@ -227,6 +236,8 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
 }) => {
   const { theme, isPlaying, audioDurationSec } = profile;
   const { width: windowWidth } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const bottomNavHeight = 56 + insets.bottom + 16;
 
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [elapsed, setElapsed] = useState(0);
@@ -303,45 +314,74 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
   };
 
   return (
-    <View className="flex-1">
+    <View style={{ flex: 1 }}>
       {/* ── Card background ─────────────────────────────────────────── */}
       <LinearGradient
         colors={[...themeData.colors]}
-        className="flex-1 overflow-hidden"
+        style={{ flex: 1 }}
       >
         {/* Ambient glow */}
         {isPlaying && (
           <View
             pointerEvents="none"
-            className="absolute inset-x-0 items-center"
-            style={{ top: '33%', marginTop: -glowSize / 2 }}
+            style={{
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              top: '33%',
+              marginTop: -glowSize / 2,
+              alignItems: 'center',
+            }}
           >
             <AmbientGlow color={themeData.glowColor} size={glowSize} />
           </View>
         )}
 
         {/* More / report button */}
-        <View className="absolute top-16 right-4 z-20">
+        <View style={{ position: 'absolute', top: 64, right: 16, zIndex: 20 }}>
           <Pressable
             onPress={() => setShowReportModal(true)}
-            className="p-2 rounded-full bg-white/10"
+            style={{
+              padding: 8,
+              borderRadius: 999,
+              backgroundColor: 'rgba(255,255,255,0.1)',
+            }}
           >
-            <MoreHorizontal size={18} className="text-white/40" />
+            <MoreHorizontal size={18} color="rgba(255,255,255,0.4)" />
           </Pressable>
         </View>
 
         {/* ── Center: catchphrase + play + waveform ─────────────────── */}
-        <View className="relative z-10 flex-1 items-center justify-center pt-20 pb-4">
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>
           {/* Prompt title */}
           <EntranceView delay={0} fromY={20} style={{ marginBottom: 40, paddingHorizontal: 24, maxWidth: 384 }}>
             {profile.promptTitle ? (
-              <Text className="font-serif text-3xl font-bold text-white text-center leading-snug tracking-tight">
+              <Text
+                style={{
+                  fontFamily: 'PlayfairDisplay_700Bold',
+                  fontSize: 28,
+                  lineHeight: 36,
+                  color: 'white',
+                  textAlign: 'center',
+                  letterSpacing: -0.5,
+                }}
+              >
                 {'\u201C'}
                 {profile.promptTitle}
                 {'\u201D'}
               </Text>
             ) : (
-              <Text className="font-serif italic text-3xl text-white/60 text-center leading-snug tracking-tight">
+              <Text
+                style={{
+                  fontFamily: 'PlayfairDisplay_400Regular_Italic',
+                  fontSize: 28,
+                  lineHeight: 36,
+                  color: 'rgba(255,255,255,0.6)',
+                  textAlign: 'center',
+                  letterSpacing: -0.5,
+                  fontStyle: 'italic',
+                }}
+              >
                 Écoute ma vibe…
               </Text>
             )}
@@ -383,8 +423,13 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
             {!isPlaying && !hasListened && elapsed === 0 && (
               <View
                 pointerEvents="none"
-                className="absolute items-center justify-center"
-                style={{ width: svgSize, height: svgSize }}
+                style={{
+                  position: 'absolute',
+                  width: svgSize,
+                  height: svgSize,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
               >
                 <PulseRing />
               </View>
@@ -392,16 +437,25 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
 
             <Pressable
               onPress={handlePlayPress}
-              className="w-24 h-24 rounded-full bg-white/15 border border-white/20 items-center justify-center"
+              style={{
+                width: 96,
+                height: 96,
+                borderRadius: 48,
+                backgroundColor: 'rgba(255,255,255,0.15)',
+                borderWidth: 1,
+                borderColor: 'rgba(255,255,255,0.2)',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
             >
               {!hasRecordedVibe ? (
-                <Lock size={32} className="text-white/80" />
+                <Lock size={32} color="rgba(255,255,255,0.8)" />
               ) : hasListened && !isPlaying ? (
-                <RotateCcw size={28} className="text-white/90" />
+                <RotateCcw size={28} color="rgba(255,255,255,0.9)" />
               ) : isPlaying ? (
-                <Pause size={32} fill="white" className="text-white" />
+                <Pause size={32} fill="white" color="white" />
               ) : (
-                <Play size={32} fill="white" className="text-white" />
+                <Play size={32} fill="white" color="white" />
               )}
             </Pressable>
           </EntranceView>
@@ -412,7 +466,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
           </EntranceView>
 
           {/* Timer */}
-          <Text className="mt-3 font-mono text-sm text-white/40">
+          <Text style={{ marginTop: 12, fontSize: 14, color: 'rgba(255,255,255,0.4)', fontVariant: ['tabular-nums'] }}>
             {elapsed > 0
               ? `${formatTime(elapsed)} / ${formatTime(audioDurationSec)}`
               : formatTime(audioDurationSec)}
@@ -420,32 +474,40 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
         </View>
 
         {/* ── Bottom: info + actions ────────────────────────────────── */}
-        <View className="relative z-10 px-6 pb-24 gap-5">
+        <View style={{ zIndex: 10, paddingHorizontal: 24, paddingBottom: bottomNavHeight, gap: 16 }}>
           <FadeWhen visible={hasListened && !isPlaying}>
-            <Text className="text-center font-serif italic text-lg text-white/60">
+            <Text
+              style={{
+                textAlign: 'center',
+                fontFamily: 'PlayfairDisplay_400Regular_Italic',
+                fontSize: 18,
+                color: 'rgba(255,255,255,0.6)',
+                fontStyle: 'italic',
+              }}
+            >
               Ça vibre ?
             </Text>
           </FadeWhen>
 
           <View>
-            <View className="flex-row items-baseline gap-3">
-              <Text className="text-2xl font-bold text-white">
+            <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 12 }}>
+              <Text style={{ fontSize: 24, fontWeight: '700', color: 'white' }}>
                 {profile.name}, {profile.age}
               </Text>
-              <View className="flex-row gap-1">
+              <View style={{ flexDirection: 'row', gap: 4 }}>
                 {profile.emojis.map((emoji, idx) => (
-                  <Text key={idx} className="text-base">
+                  <Text key={idx} style={{ fontSize: 16 }}>
                     {emoji}
                   </Text>
                 ))}
               </View>
             </View>
-            <Text className="text-sm text-white/50 font-medium mt-0.5">
+            <Text style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)', fontWeight: '500', marginTop: 2 }}>
               {profile.city}
             </Text>
           </View>
 
-          <View className="flex-row items-center gap-4">
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
             {/* Like */}
             <Pressable
               onPress={handleLike}
@@ -455,20 +517,30 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
               onPressOut={() => {
                 likeScale.value = withSpring(1, TAP_SPRING);
               }}
-              className="flex-1"
+              style={{ flex: 1 }}
             >
               <Animated.View
-                style={likeAnimStyle}
-                className={`h-14 rounded-full flex-row items-center justify-center gap-2 ${
-                  liked ? 'bg-red-500' : 'bg-white/10 border border-white/15'
-                }`}
+                style={[
+                  {
+                    height: 56,
+                    borderRadius: 999,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                    backgroundColor: liked ? '#ef4444' : 'rgba(255,255,255,0.1)',
+                    borderWidth: liked ? 0 : 1,
+                    borderColor: 'rgba(255,255,255,0.15)',
+                  },
+                  likeAnimStyle,
+                ]}
               >
                 <Heart
                   size={22}
-                  className="text-white"
+                  color="white"
                   fill={liked ? 'white' : 'none'}
                 />
-                <Text className="font-semibold text-base text-white">
+                <Text style={{ fontWeight: '600', fontSize: 16, color: 'white' }}>
                   {liked ? 'Liké !' : 'Liker'}
                 </Text>
               </Animated.View>
@@ -483,17 +555,24 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
               onPressOut={() => {
                 replyScale.value = withSpring(1, TAP_SPRING);
               }}
-              className="flex-1"
+              style={{ flex: 1 }}
             >
               <Animated.View style={replyAnimStyle}>
                 <LinearGradient
                   colors={[...CTA_GRADIENT]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
-                  className="h-14 rounded-full flex-row items-center justify-center gap-2"
+                  style={{
+                    height: 56,
+                    borderRadius: 999,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                  }}
                 >
-                  <Mic size={22} className="text-white" />
-                  <Text className="font-semibold text-base text-white">
+                  <Mic size={22} color="white" />
+                  <Text style={{ fontWeight: '600', fontSize: 16, color: 'white' }}>
                     Répondre
                   </Text>
                 </LinearGradient>
@@ -505,11 +584,11 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
 
       {/* ── Reply Modal ─────────────────────────────────────────────── */}
       <ModalOverlay visible={showReplyModal} onClose={() => setShowReplyModal(false)}>
-        <View className="w-12 h-12 bg-primary/10 rounded-full items-center justify-center mb-4">
-          <Mic size={24} className="text-primary" />
+        <View style={{ width: 48, height: 48, backgroundColor: 'rgba(231,36,171,0.1)', borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
+          <Mic size={24} color="#e724ab" />
         </View>
-        <Text className="text-xl font-bold mb-2 text-dark">Un seul message.</Text>
-        <Text className="text-dark/50 mb-6">
+        <Text style={{ fontSize: 20, fontWeight: '700', marginBottom: 8, color: '#4b164c' }}>Un seul message.</Text>
+        <Text style={{ color: 'rgba(75,22,76,0.5)', marginBottom: 24 }}>
           Envoie un vocal à {profile.name}. {profile.name} l'écoute et décide de te répondre,
           ou non. Un seul message, pour que chacun reste libre.
         </Text>
@@ -518,28 +597,38 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
             colors={[...CTA_GRADIENT]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
-            className="rounded-full py-3.5 flex-row items-center justify-center gap-2"
+            style={{ borderRadius: 999, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}
           >
-            <Mic size={18} className="text-white" />
-            <Text className="text-white font-bold">Enregistrer ma réponse</Text>
+            <Mic size={18} color="white" />
+            <Text style={{ color: 'white', fontWeight: '700' }}>Enregistrer ma réponse</Text>
           </LinearGradient>
         </Pressable>
       </ModalOverlay>
 
       {/* ── Report Modal ────────────────────────────────────────────── */}
       <ModalOverlay visible={showReportModal} onClose={() => setShowReportModal(false)}>
-        <Text className="text-xl font-bold mb-4 text-dark">Signaler {profile.name}</Text>
+        <Text style={{ fontSize: 20, fontWeight: '700', marginBottom: 16, color: '#4b164c' }}>Signaler {profile.name}</Text>
         <TextInput
           value={reportReason}
           onChangeText={setReportReason}
           placeholder="Pourquoi signales-tu ce profil ?"
           placeholderTextColor="rgba(75, 22, 76, 0.3)"
           multiline
-          className="w-full bg-dark/5 border border-dark/10 rounded-2xl p-4 text-dark mb-3"
-          style={{ minHeight: 100, textAlignVertical: 'top' }}
+          style={{
+            width: '100%',
+            backgroundColor: 'rgba(75,22,76,0.05)',
+            borderWidth: 1,
+            borderColor: 'rgba(75,22,76,0.1)',
+            borderRadius: 16,
+            padding: 16,
+            color: '#4b164c',
+            marginBottom: 12,
+            minHeight: 100,
+            textAlignVertical: 'top',
+          }}
         />
-        <View className="bg-red-500/10 border border-red-500/15 rounded-xl p-3 mb-6">
-          <Text className="text-red-600 text-xs">
+        <View style={{ backgroundColor: 'rgba(239,68,68,0.1)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.15)', borderRadius: 12, padding: 12, marginBottom: 24 }}>
+          <Text style={{ color: '#dc2626', fontSize: 12 }}>
             Le signalement supprimera ce profil de ton fil et enverra un mail à la modération.
           </Text>
         </View>
@@ -548,36 +637,36 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
           disabled={!reportReason.trim()}
           style={{ opacity: reportReason.trim() ? 1 : 0.4 }}
         >
-          <View className="bg-red-500 rounded-full py-3.5 flex-row items-center justify-center gap-2">
-            <Send size={18} className="text-white" />
-            <Text className="text-white font-bold">Envoyer le signalement</Text>
+          <View style={{ backgroundColor: '#ef4444', borderRadius: 999, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+            <Send size={18} color="white" />
+            <Text style={{ color: 'white', fontWeight: '700' }}>Envoyer le signalement</Text>
           </View>
         </Pressable>
       </ModalOverlay>
 
       {/* ── Locked Modal ────────────────────────────────────────────── */}
       <ModalOverlay visible={showLockedModal} onClose={() => setShowLockedModal(false)} centered>
-        <View className="w-20 h-20 bg-primary/10 rounded-full items-center justify-center mb-5">
-          <Lock size={36} className="text-primary" />
+        <View style={{ width: 80, height: 80, backgroundColor: 'rgba(231,36,171,0.1)', borderRadius: 40, alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
+          <Lock size={36} color="#e724ab" />
         </View>
-        <Text className="text-2xl font-bold mb-3 text-dark font-serif text-center">
+        <Text style={{ fontSize: 24, fontWeight: '700', marginBottom: 12, color: '#4b164c', fontFamily: 'PlayfairDisplay_700Bold', textAlign: 'center' }}>
           Prêt·e à les entendre ?
         </Text>
-        <Text className="text-dark/45 mb-8 text-center">
+        <Text style={{ color: 'rgba(75,22,76,0.45)', marginBottom: 32, textAlign: 'center' }}>
           Enregistre ta voix pour débloquer les autres vocaux. 30 secondes. Juste toi.
         </Text>
-        <Pressable onPress={() => { setShowLockedModal(false); onRecordVibe?.(); }} className="w-full">
+        <Pressable onPress={() => { setShowLockedModal(false); onRecordVibe?.(); }} style={{ width: '100%' }}>
           <LinearGradient
             colors={[...CTA_GRADIENT]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
-            className="rounded-full py-4 items-center"
+            style={{ borderRadius: 999, paddingVertical: 16, alignItems: 'center' }}
           >
-            <Text className="text-white font-bold">Enregistrer ma Voix</Text>
+            <Text style={{ color: 'white', fontWeight: '700' }}>Enregistrer ma Voix</Text>
           </LinearGradient>
         </Pressable>
-        <Pressable onPress={() => setShowLockedModal(false)} className="w-full mt-4 py-2 items-center">
-          <Text className="text-dark/30 font-medium">Plus tard</Text>
+        <Pressable onPress={() => setShowLockedModal(false)} style={{ width: '100%', marginTop: 16, paddingVertical: 8, alignItems: 'center' }}>
+          <Text style={{ color: 'rgba(75,22,76,0.3)', fontWeight: '500' }}>Plus tard</Text>
         </Pressable>
       </ModalOverlay>
     </View>

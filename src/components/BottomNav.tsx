@@ -62,6 +62,9 @@ function TabItem({
     scale.value = withSpring(1, TAP_SPRING);
   };
 
+  const activeColor = '#e724ab';
+  const inactiveColor = 'rgba(75,22,76,0.3)';
+
   return (
     <Pressable
       accessibilityRole="button"
@@ -69,17 +72,22 @@ function TabItem({
       onPress={onPress}
       onPressIn={handlePressIn}
       onPressOut={handlePressOut}
-      className="flex-1 flex-col items-center gap-0.5 px-5 py-1.5"
+      style={{ flex: 1, flexDirection: 'column', alignItems: 'center', gap: 2, paddingHorizontal: 20, paddingVertical: 6 }}
     >
       <Animated.View style={iconStyle}>
         <Icon
           size={ICON_SIZE}
           strokeWidth={isActive ? 2.5 : 1.8}
-          className={isActive ? 'text-primary' : 'text-dark/30'}
+          color={isActive ? activeColor : inactiveColor}
         />
       </Animated.View>
       <Text
-        className={`text-[10px] font-medium tracking-wide ${isActive ? 'text-primary' : 'text-dark/30'}`}
+        style={{
+          fontSize: 10,
+          fontWeight: '500',
+          letterSpacing: 0.5,
+          color: isActive ? activeColor : inactiveColor,
+        }}
       >
         {label}
       </Text>
@@ -103,16 +111,32 @@ const BottomNav: React.FC<BottomNavProps> = ({ activeTab, setActiveTab }) => {
 
   return (
     <View
-      className="absolute bottom-0 left-0 right-0 z-50 border-t border-dark/5 bg-white/90"
-      style={{ paddingBottom: insets.bottom }}
+      style={{
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        zIndex: 50,
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(75,22,76,0.05)',
+        backgroundColor: 'rgba(255,255,255,0.9)',
+        paddingBottom: insets.bottom,
+      }}
     >
-      <View className="w-full max-w-lg self-center" style={{ width: contentWidth }}>
-        <View className="relative h-14 flex-row items-center justify-around">
+      <View style={{ width: contentWidth, alignSelf: 'center' }}>
+        <View style={{ position: 'relative', height: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around' }}>
           <Animated.View
             pointerEvents="none"
-            className="absolute -top-px rounded-full bg-primary"
             style={[
-              { width: INDICATOR_WIDTH, height: INDICATOR_HEIGHT, left: 0 },
+              {
+                position: 'absolute',
+                top: -1,
+                left: 0,
+                width: INDICATOR_WIDTH,
+                height: INDICATOR_HEIGHT,
+                borderRadius: 999,
+                backgroundColor: '#e724ab',
+              },
               indicatorStyle,
             ]}
           />
