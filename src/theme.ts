@@ -37,12 +37,6 @@ export const THEME_GRADIENTS = {
     glowColor: '#F5515F',
     accent: '#F5515F',
   },
-  dream: {
-    colors: ['#89CFF0', '#B8A9E8', '#C8A2C8'] as const,
-    ringColor: '#A8DFFF',
-    glowColor: '#89CFF0',
-    accent: '#89CFF0',
-  },
   midnight: {
     colors: ['#302B63', '#24243E', '#0F0C29'] as const,
     ringColor: '#6C63FF',

@@ -4,7 +4,6 @@ export enum ColorTheme {
   Sunset = 'sunset',
   Chill = 'chill',
   Electric = 'electric',
-  Dream = 'dream',
   Midnight = 'midnight',
 }
 

@@ -297,7 +297,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
 
   const progress =
     audioDurationSec > 0 ? (elapsed / audioDurationSec) * 100 : 0;
-  const themeData = THEME_GRADIENTS[theme];
+  const themeData = THEME_GRADIENTS[theme] ?? THEME_GRADIENTS.sunset;
   const ringRadius = (PLAY_BTN_SIZE + RING_PADDING) / 2;
   const ringCircumference = ringRadius * 2 * Math.PI;
   const ringOffset =

@@ -91,6 +91,21 @@ export const COPY = {
     ] as const,
   },
 
+  moods: {
+    sunset: 'Joyeux',
+    chill: 'Zen',
+    electric: 'Curieux',
+    midnight: 'Mystère',
+  },
+
+  gender: {
+    label: 'Je suis',
+    placeholder: 'Sélectionner',
+    female: 'Une femme',
+    male: 'Un homme',
+    other: 'Plus',
+  },
+
   profile: {
     title: 'Ton Profil',
     voiceCard: 'Ton vocal',

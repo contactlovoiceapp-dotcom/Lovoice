@@ -82,7 +82,7 @@ const INITIAL_PROFILES: Profile[] = [
     transcript:
       "Je crois que c'est de voir des gens âgés se tenir la main dans la rue. Ça me donne toujours l'espoir que l'amour peut vraiment durer toute une vie.",
     emojis: ['😌', '📚', '☕️'],
-    theme: ColorTheme.Dream,
+    theme: ColorTheme.Chill,
     isPlaying: false,
     audioDurationSec: 12,
   },

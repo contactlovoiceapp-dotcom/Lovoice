@@ -41,8 +41,6 @@ function getBarColor(theme: ColorTheme): string {
       return '#8B9CF7';
     case ColorTheme.Electric:
       return '#FF7A85';
-    case ColorTheme.Dream:
-      return '#A8DFFF';
     case ColorTheme.Midnight:
       return '#6C63FF';
     default:

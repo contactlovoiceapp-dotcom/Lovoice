@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -20,7 +21,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ArrowLeft, ArrowRight, Pause, Play, Trash2 } from 'lucide-react-native';
+import { ArrowLeft, ArrowRight, ChevronDown, Pause, Play, Trash2 } from 'lucide-react-native';
 import {
   SafeAreaView,
   useSafeAreaInsets,
@@ -45,13 +46,11 @@ const MOOD_OPTIONS: {
   id: ColorTheme;
   label: string;
   colors: readonly [string, string];
-  emoji: string;
 }[] = [
-  { id: ColorTheme.Sunset, label: 'Sunset', colors: ['#FF8A3D', '#FF6B35'], emoji: '🌅' },
-  { id: ColorTheme.Chill, label: 'Chill', colors: ['#667EEA', '#764BA2'], emoji: '🎧' },
-  { id: ColorTheme.Electric, label: 'Electric', colors: ['#F5515F', '#C9302C'], emoji: '⚡' },
-  { id: ColorTheme.Dream, label: 'Dream', colors: ['#89CFF0', '#B8A9E8'], emoji: '✨' },
-  { id: ColorTheme.Midnight, label: 'Midnight', colors: ['#302B63', '#24243E'], emoji: '🌙' },
+  { id: ColorTheme.Sunset, label: COPY.moods.sunset, colors: ['#FF8A3D', '#FF6B35'] },
+  { id: ColorTheme.Chill, label: COPY.moods.chill, colors: ['#667EEA', '#764BA2'] },
+  { id: ColorTheme.Electric, label: COPY.moods.electric, colors: ['#F5515F', '#C9302C'] },
+  { id: ColorTheme.Midnight, label: COPY.moods.midnight, colors: ['#302B63', '#24243E'] },
 ];
 
 function getMoodGradient(theme: ColorTheme): readonly [string, string] {
@@ -124,6 +123,8 @@ const MyVibeScreen: React.FC<Props> = ({
   const [age, setAge] = useState('');
   const [city, setCity] = useState('');
   const [emojis, setEmojis] = useState(['', '', '']);
+  const [gender, setGender] = useState('');
+  const [showGenderPicker, setShowGenderPicker] = useState(false);
 
   const { width: windowWidth } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -136,7 +137,7 @@ const MyVibeScreen: React.FC<Props> = ({
   };
 
   const isFormValid =
-    name.trim() !== '' && age.trim() !== '' && city.trim() !== '';
+    name.trim() !== '' && age.trim() !== '' && city.trim() !== '' && gender !== '';
 
   const playColors = getMoodGradient(mood);
   const activeMoodAccent = playColors[0];
@@ -314,52 +315,6 @@ const MyVibeScreen: React.FC<Props> = ({
                 </View>
               )}
 
-              <View>
-                <Text style={{ fontFamily: FONT.bold, fontSize: 16, color: COLORS.dark, marginBottom: 16 }}>
-                  {COPY.profile.moodLabel}
-                </Text>
-                <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 16 }}>
-                  {MOOD_OPTIONS.map((opt) => {
-                    const selected = mood === opt.id;
-                    return (
-                      <View key={opt.id} style={{ alignItems: 'center', gap: 6 }}>
-                        <Pressable
-                          accessibilityRole="button"
-                          accessibilityState={{ selected }}
-                          onPress={() => setMood(opt.id)}
-                          style={{
-                            transform: [{ scale: selected ? 1.15 : 1 }],
-                            borderWidth: selected ? 2.5 : 0,
-                            borderColor: COLORS.primary,
-                            borderRadius: RADIUS.full,
-                            overflow: 'hidden',
-                            opacity: selected ? 1 : 0.45,
-                          }}
-                        >
-                          <LinearGradient
-                            colors={[...opt.colors]}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 1 }}
-                            style={{ width: 52, height: 52, alignItems: 'center', justifyContent: 'center' }}
-                          >
-                            <Text style={{ fontSize: 22 }}>{opt.emoji}</Text>
-                          </LinearGradient>
-                        </Pressable>
-                        <Text
-                          style={{
-                            fontFamily: FONT.medium,
-                            fontSize: 11,
-                            color: selected ? COLORS.primary : COLORS.textTertiary,
-                          }}
-                        >
-                          {opt.label}
-                        </Text>
-                      </View>
-                    );
-                  })}
-                </View>
-              </View>
-
               <View style={{ gap: 16 }}>
                 <Text style={{ fontFamily: FONT.bold, fontSize: 16, color: COLORS.dark }}>
                   {COPY.profile.infoLabel}
@@ -384,6 +339,35 @@ const MyVibeScreen: React.FC<Props> = ({
                       color: COLORS.dark,
                     }}
                   />
+                </View>
+                <View>
+                  <Text style={{ fontFamily: FONT.medium, fontSize: 13, color: COLORS.textSecondary, marginBottom: 6, marginLeft: 4 }}>
+                    {COPY.gender.label}
+                  </Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => setShowGenderPicker(true)}
+                    style={{
+                      borderRadius: RADIUS.md,
+                      borderWidth: 1,
+                      borderColor: COLORS.border,
+                      backgroundColor: COLORS.surfaceMuted,
+                      padding: 12,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontFamily: FONT.regular,
+                        color: gender ? COLORS.dark : COLORS.textTertiary,
+                      }}
+                    >
+                      {gender || COPY.gender.placeholder}
+                    </Text>
+                    <ChevronDown size={18} color={COLORS.textTertiary} />
+                  </Pressable>
                 </View>
                 <View style={{ flexDirection: 'row', gap: 16 }}>
                   <View style={{ flex: 1 }}>
@@ -429,6 +413,50 @@ const MyVibeScreen: React.FC<Props> = ({
                       }}
                     />
                   </View>
+                </View>
+              </View>
+
+              <View>
+                <Text style={{ fontFamily: FONT.bold, fontSize: 16, color: COLORS.dark, marginBottom: 16 }}>
+                  {COPY.profile.moodLabel}
+                </Text>
+                <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 16 }}>
+                  {MOOD_OPTIONS.map((opt) => {
+                    const selected = mood === opt.id;
+                    return (
+                      <View key={opt.id} style={{ alignItems: 'center', gap: 6 }}>
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityState={{ selected }}
+                          onPress={() => setMood(opt.id)}
+                          style={{
+                            transform: [{ scale: selected ? 1.15 : 1 }],
+                            borderWidth: selected ? 2.5 : 0,
+                            borderColor: COLORS.primary,
+                            borderRadius: RADIUS.full,
+                            overflow: 'hidden',
+                            opacity: selected ? 1 : 0.45,
+                          }}
+                        >
+                          <LinearGradient
+                            colors={[...opt.colors]}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                            style={{ width: 52, height: 52 }}
+                          />
+                        </Pressable>
+                        <Text
+                          style={{
+                            fontFamily: FONT.medium,
+                            fontSize: 11,
+                            color: selected ? COLORS.primary : COLORS.textTertiary,
+                          }}
+                        >
+                          {opt.label}
+                        </Text>
+                      </View>
+                    );
+                  })}
                 </View>
               </View>
 
@@ -529,6 +557,80 @@ const MyVibeScreen: React.FC<Props> = ({
           </View>
         </SafeAreaView>
       </KeyboardAvoidingView>
+
+      <Modal
+        visible={showGenderPicker}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowGenderPicker(false)}
+      >
+        <Pressable
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' }}
+          onPress={() => setShowGenderPicker(false)}
+        >
+          <View
+            onStartShouldSetResponder={() => true}
+            style={{
+              backgroundColor: COLORS.surface,
+              borderTopLeftRadius: RADIUS.xl,
+              borderTopRightRadius: RADIUS.xl,
+              paddingTop: 24,
+              paddingBottom: Math.max(insets.bottom, 24),
+              paddingHorizontal: 24,
+            }}
+          >
+            <Text style={{ fontFamily: FONT.bold, fontSize: 18, color: COLORS.dark, marginBottom: 20 }}>
+              {COPY.gender.label}
+            </Text>
+            {([
+              { value: COPY.gender.female, label: COPY.gender.female },
+              { value: COPY.gender.male, label: COPY.gender.male },
+              { value: COPY.gender.other, label: COPY.gender.other },
+            ] as const).map((opt) => (
+              <Pressable
+                key={opt.value}
+                accessibilityRole="button"
+                onPress={() => {
+                  setGender(opt.value);
+                  setShowGenderPicker(false);
+                }}
+                style={{
+                  paddingVertical: 14,
+                  borderBottomWidth: 1,
+                  borderBottomColor: COLORS.border,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <Text
+                  style={{
+                    fontFamily: gender === opt.value ? FONT.bold : FONT.regular,
+                    fontSize: 16,
+                    color: gender === opt.value ? COLORS.primary : COLORS.dark,
+                  }}
+                >
+                  {opt.label}
+                </Text>
+                {gender === opt.value && (
+                  <View
+                    style={{
+                      width: 20,
+                      height: 20,
+                      borderRadius: 10,
+                      backgroundColor: COLORS.primary,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Text style={{ color: COLORS.surface, fontSize: 12, fontFamily: FONT.bold }}>✓</Text>
+                  </View>
+                )}
+              </Pressable>
+            ))}
+          </View>
+        </Pressable>
+      </Modal>
     </LinearGradient>
   );
 };

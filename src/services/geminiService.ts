@@ -8,7 +8,6 @@ const THEME_MAP: Record<string, ColorTheme> = {
   sunset: ColorTheme.Sunset,
   chill: ColorTheme.Chill,
   electric: ColorTheme.Electric,
-  dream: ColorTheme.Dream,
   midnight: ColorTheme.Midnight,
 };
 
@@ -24,7 +23,7 @@ export const generateNewProfile = async (): Promise<Profile | null> => {
             {
               parts: [
                 {
-                  text: 'Generate a creative, french-speaking dating profile for an audio-first app called Lovoice. Include: name (string), age (integer), city (string, like "Paris 11e"), promptTitle (string, catchy teaser in French), emojis (array of 3 strings), theme (one of: "sunset","chill","electric","dream","midnight"). Return ONLY valid JSON, no markdown.',
+                  text: 'Generate a creative, french-speaking dating profile for an audio-first app called Lovoice. Include: name (string), age (integer), city (string, like "Paris 11e"), promptTitle (string, catchy teaser in French), emojis (array of 3 strings), theme (one of: "sunset","chill","electric","midnight"). Return ONLY valid JSON, no markdown.',
                 },
               ],
             },
