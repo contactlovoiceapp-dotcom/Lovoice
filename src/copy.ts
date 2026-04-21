@@ -48,7 +48,7 @@ export const COPY = {
       {
         emoji: '💜',
         title: "L'authenticité",
-        desc: "Pas de photo à perfectionner. Juste ta voix et ce qu'elle dit de toi.",
+        desc: "Ici, pas de photo à perfectionner. Juste ta voix et ce qu'elle dit de toi.",
       },
     ] as const,
     acceptCheckbox:
@@ -95,10 +95,10 @@ export const COPY = {
     title: 'Ton Profil',
     voiceCard: 'Ton vocal',
     voiceTimestamp: "À l'instant",
-    catchphraseLabel: 'Titre de ta voix ',
+    catchphraseLabel: 'Titre de ta Voix ',
     catchphraseHint: 'Une phrase courte pour teaser ton vocal.',
     catchphrasePlaceholder: 'Ex: Ma pire honte en cuisine 🍳...',
-    moodLabel: 'Ton Mood',
+    moodLabel: 'Ton mood',
     infoLabel: 'Tes infos',
     nameLabel: 'Prénom',
     namePlaceholder: 'Alex',
@@ -107,7 +107,7 @@ export const COPY = {
     cityLabel: 'Ville',
     cityPlaceholder: 'Paris',
     emojisLabel: 'Tes 3 Emojis ',
-    submitOnboarding: 'Lancer ma Voix',
+    submitOnboarding: 'Valider mon profil',
   },
 
   feed: {
