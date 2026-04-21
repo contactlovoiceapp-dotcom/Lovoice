@@ -15,8 +15,8 @@ Legend:
 - 🟢 = can be done with mocked data, no external account needed
 - 🟡 = needs Supabase project + keys
 - 🔴 = needs additional third-party (Twilio / AssemblyAI / Hive / Sentry / PostHog / EAS)
-- ⭐ = **committed in V1 MVP** (8 k€ budget)
-- ✳️ = **optional / post-MVP** (not in the 8 k€ budget — to do later in V1 if time allows, or in a subsequent version)
+- ⭐ = **committed in V1 MVP**
+- ✳️ = **optional / post-MVP** (to do later in V1 if time allows, or in a subsequent version)
 
 The V1 MVP commitment covers all features described in this roadmap **except**:
 - automatic voice transcription (AssemblyAI),
@@ -213,36 +213,92 @@ Reactive moderation (block + report + manual takedown by the operator) is part o
 
 ---
 
-## Phase 6 — Likes, blocks, reports (+ manual moderation tooling) 🟡 ⭐
+## Phase 6 — Likes, blocks, reports (+ moderation backend) 🟡 ⭐
 
-**Goal**: users can like a voice, block a user, report a voice or a user. Notifications are created. The operator gets the minimum tooling needed to moderate reactively (since auto-moderation is deferred).
+**Goal**: users can like a voice, block a user, report a voice or a user. Notifications are created. The server-side moderation primitives that the back-office (Phase 6.bis) will consume are in place.
 
 ### Scope
 1. Implement `like(voice_id)` / `unlike(voice_id)` mutations.
 2. Heart button in `ProfileCard` with optimistic update.
 3. SQL trigger on `likes` insert → insert into `notifications` with `kind='like'`.
 4. Block flow from a long-press on the card or from a profile detail sheet. Confirmation modal.
-5. Report flow: list of reasons (harassment, hate, inappropriate, spam, other) + free text.
+5. Report flow: list of reasons (harassment, hate, inappropriate, spam, other) + free text. Inserts a `reports` row with `status = 'pending'`.
 6. Filtering: feed query already excludes blocked users (already in §8). Verify likes/messages are blocked too.
-7. **Manual moderation tooling** (V1 MVP — required because auto-moderation is deferred):
-   - SQL view `pending_reports` exposing report rows joined with `voices`/`messages`/`profiles` for fast triage in Supabase Studio.
-   - Edge Function `moderate(target_kind, target_id, decision, reason)` callable by service role only — sets `status = 'rejected'` and inserts a `kind='system'` notification for the author with the reason. Idempotent.
-   - SQL helper `ban_user(user_id, reason)` setting `is_banned = true` and revoking the user's session.
-   - Documented runbook (in `docs/CLIENT_SETUP.md` when it exists, else inline in this phase's PR) for the operator: how to triage, how to issue a takedown, how to handle an appeal email.
-8. PostHog events for like/block/report — **optional**, only wire if PostHog is enabled (Phase 10 optional block).
+7. **Moderation backend primitives** (consumed by Phase 6.bis — no UI in the mobile app):
+   - Migration: `admin_users` and `audit_log` tables (see ARCHITECTURE.md §2.10 / §2.11), `is_admin()` helper, admin RLS policies on `voices` / `messages` / `reports` / `profiles` / Storage (see ARCHITECTURE.md §3).
+   - Edge Functions, all gated by `is_admin()` server-side and writing to `audit_log`:
+     - `dismiss_report({ report_id, reason? })`,
+     - `moderate({ target_kind, target_id, reason })` — sets `status = 'rejected'`, stores `moderation_reason`, inserts a `kind='system'` notification for the author, marks related reports as `actioned`. Idempotent.
+     - `ban_user({ user_id, reason })`,
+     - `unban_user({ user_id })`,
+     - `delete_account_admin({ user_id, reason })`.
+8. PostHog events for like/block/report — **optional**, only wire if PostHog is enabled (Phase 10.bis).
 
 ### Deliverables
 - Like adds a notification for the recipient.
 - Block hides both directions (you don't see them, they don't see you).
 - Report writes a row + sends an internal alert (plain DB row in V1; Slack webhook is post-MVP).
-- Operator can take down a reported voice or message in under 1 minute via the SQL view + `moderate()` Edge Function.
+- All five admin Edge Functions deployed and unit-tested (Deno test runner against local Supabase). Calling them without an admin JWT returns 401.
 
 ### Acceptance
 - Liking a voice twice does not create two notifications (unique index `(liker_id, voice_id)`).
 - A blocked user cannot send you a new message.
+- Calling `moderate()` from a non-admin JWT is rejected with 401 and no row is touched.
+- Every successful admin Edge Function call appends one row to `audit_log`.
 
 ### Suggested commit
-`feat(social): likes, blocks, and reports with notification triggers`
+`feat(social): likes, blocks, reports and moderation backend primitives`
+
+---
+
+## Phase 6.bis — Admin back-office (companion Next.js web app) 🟢 ⭐
+
+**Goal**: the operator (non-technical) can triage reports, take down content, and ban users from a clean web interface — no SQL, no Supabase Studio.
+
+This phase produces a **separate Next.js repository** (suggested name `lovoice-admin`) that consumes the same Supabase project as the mobile app. See `docs/ARCHITECTURE.md` §13 for the full design.
+
+### Pre-requisites
+- Phase 6 merged (admin Edge Functions and RLS policies live).
+- A Vercel account (free) connected to the new `lovoice-admin` repo, EU region (`fra1`).
+- At least one admin email seeded in `admin_users` (the operator's email).
+
+### Scope
+1. **Bootstrap the repo**:
+   - `npx create-next-app@latest lovoice-admin --typescript --tailwind --app --eslint`,
+   - configure TypeScript strict mode (same level as the mobile app),
+   - install: `@supabase/supabase-js`, `@supabase/ssr`, `@tanstack/react-query`, `lucide-react`, `date-fns`. Nothing else.
+   - copy `src/types/database.ts` from the mobile repo into `src/types/database.ts`. Document in the README that the file must be regenerated together whenever a Supabase migration ships.
+2. **Supabase client** in `src/lib/supabase.ts` using `@supabase/ssr` for cookie-based session handling. Public anon key only — service role key is **never** added to env.
+3. **Auth**:
+   - `/login` page: email input → `signInWithOtp({ email, options: { emailRedirectTo: '<URL>/reports' } })`.
+   - `app/(admin)/layout.tsx`: server component that reads the session, calls `is_admin()`, and redirects to `/login` with an error if false.
+4. **`/reports` page** (default route after login):
+   - Server-side fetch of `pending_reports` view (a SQL view created in this phase that joins `reports` with `voices` / `messages` / `profiles`). Pagination 25/page.
+   - Each row: avatars, reason, free text, an `<audio controls>` on a freshly-created signed URL (1h TTL), three buttons.
+   - Buttons call the corresponding Edge Function (`dismiss_report`, `moderate`, `ban_user`). Confirmation modal on `moderate` and `ban_user`.
+   - Toast on success/error. React Query invalidation on the reports list after each action.
+   - Auto-refresh every 30s.
+5. **`/users/[id]` page**: profile detail (display fields, current voice with player, last 10 messages of theirs, last 10 reports against them). Buttons: **Bannir** / **Lever le ban** (according to current state) / **Supprimer le compte**.
+6. **`/banned` page**: list of `profiles` where `is_banned = true`, with reason and an Unban button.
+7. **`/audit` page**: paginated read-only view of `audit_log`, filterable by `actor_id`, `action`, `target_kind`. Last 90 days only.
+8. **Provisioning script**: `scripts/seed-admin.sql` documented in the back-office README — a one-shot insert into `admin_users` (run by the developer the first time, then by the operator herself for any new admin).
+9. **UX polish**: French copy throughout, dark mode toggle, accessible labels, mobile-responsive layout (the operator might consult on her phone occasionally).
+10. **Smoke test plan** (manual, documented in the back-office README): login flow, take down a test report, ban a test user, unban, delete a test account, check `audit_log`.
+
+### Deliverables
+- `lovoice-admin` repo deployed on Vercel at a stable URL (`admin.lovoice.app` or similar).
+- Operator can log in with her email and complete the full moderation loop point-and-click.
+- Every action she performs leaves a trace in `audit_log`.
+- Zero SQL written by the operator.
+
+### Acceptance
+- Login by an email NOT in `admin_users` is rejected with a clear error and the user is signed out.
+- Calling any of the five admin Edge Functions from the browser DevTools console with a stolen non-admin JWT returns 401.
+- The service-role key does not appear in any built bundle (verified by grep on the `.next` build output).
+- Lighthouse score on `/reports` ≥ 90 (perf and a11y).
+
+### Suggested commit (in the `lovoice-admin` repo)
+`feat(admin): initial back-office for reports, bans and audit log`
 
 ---
 
@@ -304,7 +360,7 @@ Reactive moderation (block + report + manual takedown by the operator) is part o
 
 ## Phase 9 — Auto-moderation pipeline (transcription + safety) 🔴 (AssemblyAI + Hive) ✳️ optional / post-MVP
 
-**Status**: **NOT in the V1 MVP commitment / 8 k€ budget.** Ship only if MVP budget and time allow, otherwise schedule for V1.x. Until this phase ships, content safety is handled by reactive moderation (Phase 6 + `docs/ARCHITECTURE.md` §4.3.a).
+**Status**: **NOT in the V1 MVP commitment.** Ship only if MVP time allows, otherwise schedule for V1.x. Until this phase ships, content safety is handled by reactive moderation (Phase 6 + `docs/ARCHITECTURE.md` §4.3.a).
 
 **Goal**: every uploaded voice and voice message is automatically transcribed and moderated before being visible.
 
@@ -321,7 +377,7 @@ Reactive moderation (block + report + manual takedown by the operator) is part o
 6. OpenAI Moderation as cheap secondary check on transcript.
 7. Decision logic per ARCHITECTURE §4.3.b.
 8. On rejection: hide content, notify author with reason, allow appeal (a button creates a `manual_review` request — replaces the email-based appeal of the MVP).
-9. Manual-review queue endpoint (admin-only, behind a service role) — reuses the `moderate()` Edge Function shipped in Phase 6.
+9. **Back-office extension** (in the `lovoice-admin` repo): add a new `/manual-review` route that lists items with `status = 'manual_review'` and reuses the same row component and the same `moderate()` action as `/reports`. Add a transcript column on both routes (reads `voices.transcript` / `messages.transcript`). No new Edge Function needed.
 
 ### Deliverables
 - A clean voice goes from `pending` to `approved` within 60s of upload.
@@ -330,7 +386,7 @@ Reactive moderation (block + report + manual takedown by the operator) is part o
 
 ### Acceptance
 - No voice with `status != 'approved'` ever appears in `get_feed()`.
-- Moderation cost stays under 50 $/month at the projected volume (logged via PostHog event if PostHog is enabled, else via Supabase logs).
+- Moderation throughput keeps up with upload throughput at the projected volume (no growing backlog in `moderation_jobs`).
 
 ### Suggested commit
 `feat(moderation): async transcription and safety pipeline for voices and messages`
@@ -365,7 +421,7 @@ Reactive moderation (block + report + manual takedown by the operator) is part o
 
 ## Phase 10.bis — Product analytics 🔴 (PostHog) ✳️ optional / post-MVP
 
-**Status**: **NOT in the V1 MVP commitment / 8 k€ budget.** Ship in V1 if time allows, otherwise schedule later.
+**Status**: **NOT in the V1 MVP commitment.** Ship in V1 if time allows, otherwise schedule later.
 
 ### Pre-requisites
 - Client has a PostHog Cloud EU account with DPA signed.
@@ -377,6 +433,7 @@ Reactive moderation (block + report + manual takedown by the operator) is part o
 3. PII scrubbing pass: ensure no phone, transcript or message body ever ends up in a property.
 4. Identify users with their `profiles.id` (never the phone).
 5. Validate end-to-end: events show up in PostHog within 1 minute on a real device.
+6. **Back-office extension** (in the `lovoice-admin` repo): add a `/stats` route that embeds the operator's chosen PostHog insights as iframes (PostHog supports public iframe sharing per insight). Read-only, no new Edge Function.
 
 ### Suggested commit
 `feat(analytics): posthog integration with PII-safe event tracking`
@@ -415,15 +472,16 @@ Reactive moderation (block + report + manual takedown by the operator) is part o
 | 3 — Profile onboarding | ⭐ MVP | 1.5 days |
 | 4 — Voice recording + upload | ⭐ MVP | 3 days |
 | 5 — Discover feed playback | ⭐ MVP | 3 days |
-| 6 — Likes / blocks / reports + manual mod tooling | ⭐ MVP | 2 days |
+| 6 — Likes / blocks / reports + moderation backend | ⭐ MVP | 2 days |
+| 6.bis — Admin back-office (Next.js) | ⭐ MVP | 2 days |
 | 7 — Messaging realtime | ⭐ MVP | 4 days |
 | 8 — Notifications + push | ⭐ MVP | 1.5 days |
 | 10 — RGPD + Sentry + rate limiting | ⭐ MVP | 2 days |
 | 11 — Store submission | ⭐ MVP | 2 days |
-| **MVP subtotal (committed in 8 k€)** | | **≈ 23.5 working days** |
-| 9 — Auto-moderation pipeline | ✳️ optional | 2 days |
-| 10.bis — PostHog analytics | ✳️ optional | 0.5 day |
-| **Optional subtotal** | | **≈ 2.5 working days** |
+| **MVP subtotal (committed)** | | **≈ 25.5 working days** |
+| 9 — Auto-moderation pipeline (+ back-office tab) | ✳️ optional | 2.5 days |
+| 10.bis — PostHog analytics (+ back-office stats tab) | ✳️ optional | 1 day |
+| **Optional subtotal** | | **≈ 3.5 working days** |
 
 ---
 

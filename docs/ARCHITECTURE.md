@@ -17,22 +17,27 @@ Read it together with `README.md` (constraints) and `docs/ROADMAP.md` (current p
 │   Mobile app (Expo)     │         │      Supabase (EU)           │
 │  ─────────────────────  │  HTTPS  │  ──────────────────────────  │
 │  expo-router            ├────────▶│  Auth (phone OTP via Twilio) │
-│  expo-audio (rec/play)  │         │  Postgres + PostGIS + RLS    │
-│  React Query + Zustand  │◀── WS ──┤  Realtime (chat, presence)   │
-│  expo-notifications     │         │  Storage (voices / messages)  │
-└──────────┬──────────────┘         │  Edge Functions (Deno)       │
-           │                        └──────────────┬───────────────┘
-           │ direct upload (signed PUT)            │ webhooks / calls
-           ▼                                       ▼
-   ┌──────────────────┐               ┌─────────────────────────────┐
-   │ Storage buckets  │               │  Twilio Verify (SMS)        │
-   │  - voices        │               │  Expo Push Service          │
-   │  - messages      │               │  Sentry                     │
-   └──────────────────┘               │  ─────────── optional ───── │
-                                      │  AssemblyAI (transcribe)    │
-                                      │  Hive (audio + text mod)    │
-                                      │  PostHog (EU, analytics)    │
-                                      └─────────────────────────────┘
+│  expo-audio (rec/play)  │         │  + Auth (email magic link    │
+│  React Query + Zustand  │◀── WS ──┤    for admins)               │
+│  expo-notifications     │         │  Postgres + PostGIS + RLS    │
+└──────────┬──────────────┘         │  Realtime (chat, presence)   │
+           │                        │  Storage (voices / messages) │
+           │                        │  Edge Functions (Deno)       │
+           │                ┌──────▶└──────────────┬───────────────┘
+           │                │HTTPS                 │ webhooks / calls
+           │                │                      ▼
+           │  ┌─────────────┴──────┐    ┌─────────────────────────────┐
+           │  │  Admin back-office │    │  Twilio Verify (SMS)        │
+           │  │  (Next.js, Vercel) │    │  Expo Push Service          │
+           │  │  email magic link  │    │  Sentry                     │
+           │  └────────────────────┘    │  ─────────── optional ───── │
+           │ direct upload (signed PUT) │  AssemblyAI (transcribe)    │
+           ▼                            │  Hive (audio + text mod)    │
+   ┌──────────────────┐                 │  PostHog (EU, analytics)    │
+   │ Storage buckets  │                 └─────────────────────────────┘
+   │  - voices        │
+   │  - messages      │
+   └──────────────────┘
 ```
 
 > **V1 MVP scope:** only the services above the dashed line are wired in V1. AssemblyAI, Hive and PostHog are documented end-to-end below but are **optional** (see `README.md` §3 and `docs/ROADMAP.md`). The schema, Edge Functions and storage layout are designed so that enabling them later is a drop-in change with no migration.
@@ -134,7 +139,9 @@ Unique on `(user_a, user_b)`.
 | `created_at` | `timestamptz` default `now()` | |
 
 ### 2.8 `blocks` and `reports`
-Standard pair: `blocks(blocker_id, blocked_id)`, `reports(reporter_id, target_user_id, target_voice_id, reason, created_at)`.
+Standard pair: `blocks(blocker_id, blocked_id)`, `reports(reporter_id, target_user_id, target_voice_id, target_message_id, reason, free_text, status, resolved_by, resolved_at, created_at)`.
+
+`reports.status` is `'pending' | 'dismissed' | 'actioned'` and is set by the back-office. `resolved_by` references `admin_users.id`.
 
 ### 2.9 `feed_seen`
 Tracks voices the user already saw, to avoid showing them again.
@@ -145,6 +152,32 @@ Tracks voices the user already saw, to avoid showing them again.
 | `voice_id` | `uuid` | |
 | `seen_at` | `timestamptz` | |
 | PK | `(user_id, voice_id)` | |
+
+### 2.10 `admin_users`
+The single source of truth for back-office access. A row in this table is what makes a Supabase `auth.users` account "an admin"; nothing else does. Mobile-app users (phone OTP) and admin-app users (email magic link) live in the same `auth.users` table and are distinguished only by the presence of an `admin_users` row.
+
+| column | type | notes |
+|---|---|---|
+| `id` | `uuid` PK FK → `auth.users(id)` on delete cascade | |
+| `email` | `text` not null unique | |
+| `display_name` | `text` not null | shown in audit log |
+| `created_at` | `timestamptz` default `now()` | |
+| `last_seen_at` | `timestamptz` | |
+
+RLS on this table: only service role can read it (the list of admins is sensitive). The `is_admin()` helper below is `security definer` so the back-office can probe its own status without reading the table directly.
+
+### 2.11 `audit_log`
+Every back-office action and every account-deletion writes a row here. Used for compliance and debugging.
+
+| column | type | notes |
+|---|---|---|
+| `id` | `uuid` PK | |
+| `actor_id` | `uuid` | references `admin_users(id)` for admin actions, `profiles(id)` for user self-service deletion |
+| `action` | `text` | e.g. `voice.reject`, `user.ban`, `account.delete` |
+| `target_kind` | `text` | `voice`, `message`, `profile`, `report` |
+| `target_id` | `uuid` | |
+| `reason` | `text` | nullable |
+| `created_at` | `timestamptz` default `now()` | |
 
 ---
 
@@ -200,9 +233,38 @@ create policy "send_own_messages" on messages
 
 -- likes: insert only by self, read of who liked you = via aggregated function only
 -- notifications: read only your own
+
+-- admin helper, used by every back-office policy and Edge Function
+create or replace function is_admin() returns boolean
+  language sql stable security definer
+  set search_path = public
+  as $$ select exists (select 1 from admin_users where id = auth.uid()) $$;
+
+-- admin overrides: admins read everything, including pending/rejected
+create policy "admins_read_all_voices" on voices
+  for select to authenticated using (is_admin());
+
+create policy "admins_read_all_messages" on messages
+  for select to authenticated using (is_admin());
+
+create policy "admins_read_reports" on reports
+  for select to authenticated using (is_admin());
+
+create policy "admins_read_profiles" on profiles
+  for select to authenticated using (is_admin());
+
+-- writes from the back-office never use direct table updates;
+-- they all go through Edge Functions (moderate, ban_user, dismiss_report)
+-- that re-check is_admin() server-side.
 ```
 
-Storage policies follow the same logic: `voices` bucket allows reading any approved file, `messages` bucket allows reading only files belonging to a conversation the user is part of (path convention `messages/{conversation_id}/{message_id}.m4a` checked in policy).
+Storage policies follow the same logic: `voices` bucket allows reading any approved file, `messages` bucket allows reading only files belonging to a conversation the user is part of (path convention `messages/{conversation_id}/{message_id}.m4a` checked in policy). An additional policy grants admins read access to both buckets:
+
+```sql
+create policy "admins_read_audio" on storage.objects
+  for select to authenticated
+  using (is_admin() and bucket_id in ('voices', 'messages'));
+```
 
 ---
 
@@ -245,19 +307,20 @@ Storage policies follow the same logic: `voices` bucket allows reading any appro
 
 ### 4.3 Moderation
 
-#### 4.3.a V1 MVP — reactive moderation
+#### 4.3.a V1 MVP — reactive moderation via the back-office
 
-In V1 MVP we do **not** run any automatic moderation. Content goes live the moment `commit_upload` returns. Safety relies on the social loop:
+In V1 MVP we do **not** run any automatic moderation. Content goes live the moment `commit_upload` returns. Safety relies on the social loop, fully driven by the operator from the **admin back-office** (Phase 6.bis, see §13):
 
-1. Any user can **report** a voice or a voice message via the report flow (Phase 6). A row is inserted in `reports` and an internal alert is written (DB row in V1; Slack webhook later).
-2. The operator triages reports manually using a small admin SQL view / Supabase Studio. Resolution is one of:
-   - dismiss the report → no change,
-   - takedown → `update voices set status = 'rejected', moderation_reason = $1 where id = $2;` (or same on `messages`). RLS hides the row from the feed and from chat the next time it is fetched.
-   - ban the author → `update profiles set is_banned = true where id = $1;`.
-3. The author of a rejected voice receives a notification (`kind = 'system'`) with the reason, and can appeal by replying to the support email (no in-app appeal UI in V1 MVP).
-4. Rejected rows are kept in DB for 30 days for audit, then hard-deleted with their storage object (cron job).
+1. Any user can **report** a voice or a voice message via the report flow (Phase 6). A row is inserted in `reports` with `status = 'pending'`.
+2. The operator opens the back-office `/reports` page. She sees the report, listens to the audio inline, and clicks one of:
+   - **Ignorer** → calls Edge Function `dismiss_report(report_id, reason?)` → sets `reports.status = 'dismissed'`.
+   - **Retirer le contenu** → calls Edge Function `moderate(target_kind, target_id, decision='reject', reason)` → sets the target's `status = 'rejected'`, writes `moderation_reason`, inserts a `kind='system'` notification for the author, sets `reports.status = 'actioned'`.
+   - **Bannir l'utilisateur** → calls Edge Function `ban_user(user_id, reason)` → sets `profiles.is_banned = true` and revokes the user's Supabase session.
+3. Every action writes a row to `audit_log` (server-side, inside the Edge Function — never trusted from the client).
+4. The author of a rejected voice receives the system notification with the reason. Appeals are handled by email in V1 (no in-app appeal UI).
+5. Rejected rows are kept in DB for 30 days for audit, then hard-deleted with their storage object (cron job).
 
-This trade-off is explicit: at the validation cohort scale (5–10 k users) the operator can absorb the manual moderation load, and shipping the MVP without paid moderation vendors keeps us inside the 8 k€ budget. The schema and Edge Functions are already shaped for the auto-pipeline so enabling it later is additive.
+This trade-off is explicit: at the validation cohort scale (5–10 k users) the operator can absorb the manual moderation load, and shipping the MVP without paid moderation vendors keeps the V1 scope tight. The schema and Edge Functions are already shaped for the auto-pipeline so enabling it later is additive — the back-office gains a new "À valider" tab that consumes the `manual_review` queue (see §4.3.b and §13).
 
 #### 4.3.b Optional / post-MVP — async auto-moderation
 
@@ -382,6 +445,7 @@ Optional / post-MVP:
 - **Secrets**:
   - Mobile public keys, V1 MVP: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SENTRY_DSN` → `app.config.ts` + EAS env vars.
   - Mobile public keys, optional / post-MVP: `POSTHOG_KEY` (added when PostHog is enabled).
+  - Admin back-office public keys, V1 MVP: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` → Vercel env vars. **The service role key is never exposed to the back-office front-end.**
   - Server secrets, V1 MVP: `TWILIO_*`, `EXPO_ACCESS_TOKEN` → Supabase Edge Function secrets (`supabase secrets set`).
   - Server secrets, optional / post-MVP: `ASSEMBLYAI_KEY`, `HIVE_KEY`, `OPENAI_API_KEY` (added when the auto-moderation pipeline is enabled).
   - **No secret ever committed.** `.env*` files in `.gitignore`.
@@ -394,3 +458,67 @@ Optional / post-MVP:
 - **Integration**: Edge Functions tested with Deno's test runner against local Supabase.
 - **E2E**: skipped in V1. Manual test plan documented per phase.
 - **Device matrix**: iPhone 12+ (iOS 16+), Pixel 6+ (Android 12+). Test silent-mode playback on every audio change.
+- **Back-office**: smoke-tested manually after each deploy (login, view a report, take down, ban, unban). No automated tests in V1.
+
+---
+
+## 13. Admin back-office (companion Next.js web app)
+
+The back-office is a separate Next.js project that gives the operator a point-and-click interface to moderate content. It is the **only** moderation surface — no SQL, no Supabase Studio access for the operator.
+
+### 13.1 Stack and hosting
+
+- **Next.js 14** App Router, TypeScript strict, Tailwind CSS.
+- **`@supabase/supabase-js`** with the **anon key only**. The Supabase JS client uses the admin's session JWT, and the row-level security policies grant elevated read access via `is_admin()` (see §3).
+- **Hosted on Vercel**, EU region (`fra1`), free tier.
+- **Repo**: separate from the mobile repo (suggested name `lovoice-admin`). The generated Supabase types (`database.ts`) are copied from the mobile repo and regenerated together whenever a migration ships.
+- **Deps cap**: same frugality rule as the mobile app. Allowed in V1: `next`, `react`, `tailwindcss`, `@supabase/supabase-js`, `@supabase/ssr`, `lucide-react` (icons), `date-fns`. Anything else needs justification.
+
+### 13.2 Authentication
+
+- Supabase Auth, **email + magic link**. The email used must match a row in `admin_users`.
+- A middleware (`app/(admin)/layout.tsx`) calls `is_admin()` once on mount; if false, the user is signed out and redirected to `/login` with an error toast. This is a UX guard only — every Edge Function still re-checks `is_admin()` server-side.
+- Admins are provisioned by hand via a one-shot SQL migration `seed_admin_users.sql` (kept out of git — applied via `supabase db push` from the operator's machine, or by the developer on her behalf).
+
+### 13.3 Pages (V1 MVP scope)
+
+| Route | Purpose |
+|---|---|
+| `/login` | Email input, sends a magic link via `supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: '/reports' } })`. |
+| `/reports` | Paginated table of `reports` where `status = 'pending'`, joined with the target voice/message and the reporter+author profiles. Each row shows: avatars, reason, free text, an inline `<audio>` player on a freshly-fetched signed URL, and the three action buttons (Ignorer / Retirer / Bannir). Confirmation modal on Retirer and Bannir. Auto-refresh every 30s via React Query. |
+| `/users/[id]` | Profile detail: display fields, current voice (with player), recent activity (last 10 messages, last 10 reports filed against them). Buttons: **Bannir** / **Lever le ban** / **Supprimer le compte** (the last calls the existing `delete_account` Edge Function). |
+| `/banned` | List of currently banned users, with the reason and an **Unban** button. |
+| `/audit` | Read-only paginated view of `audit_log` for the last 90 days, filterable by `actor_id`, `action`, `target_kind`. |
+
+### 13.4 Edge Functions consumed
+
+The back-office never writes to tables directly. Every action goes through an Edge Function (Supabase Functions, Deno) that:
+1. Verifies the caller's JWT,
+2. Re-checks `is_admin()`,
+3. Performs the change,
+4. Writes a row to `audit_log`,
+5. Returns a structured JSON result.
+
+Functions used by the V1 back-office:
+
+| Function | Body | Purpose |
+|---|---|---|
+| `dismiss_report` | `{ report_id, reason? }` | Mark report as `dismissed`. |
+| `moderate` | `{ target_kind: 'voice' \| 'message', target_id, reason }` | Set target `status = 'rejected'`, store reason, notify author, mark related reports as `actioned`. Idempotent. |
+| `ban_user` | `{ user_id, reason }` | Set `is_banned = true`, revoke session via `auth.admin.signOut`. |
+| `unban_user` | `{ user_id }` | Set `is_banned = false`. |
+| `delete_account_admin` | `{ user_id, reason }` | Same purge logic as the user-initiated `delete_account` (§9), but invoked by an admin. |
+
+### 13.5 Audio playback in the back-office
+
+Audio files live in private buckets (`voices`, `messages`). The back-office obtains a signed URL on demand via `supabase.storage.from('voices').createSignedUrl(path, 3600)`. The new `admins_read_audio` storage policy (§3) authorizes this read because the admin's JWT carries an `auth.uid()` that resolves to a row in `admin_users`. The browser's native `<audio controls>` element is sufficient — no custom player needed.
+
+### 13.6 Evolution path with the optional phases
+
+The back-office is designed so each optional phase **adds** capabilities, never replaces existing ones:
+
+- **When AssemblyAI ships (Phase 9)**: the report row in `/reports` gains a transcript column (`voices.transcript` / `messages.transcript`). No structural change.
+- **When Hive ships (Phase 9)**: a new tab `/manual-review` lists items with `status = 'manual_review'`. It reuses the same row component as `/reports`. The decision actions are the same three Edge Functions. The only new thing is the source query.
+- **When PostHog ships (Phase 10.bis)**: a new tab `/stats` embeds PostHog dashboards in iframes (PostHog supports iframe sharing of insights). No back-end change.
+
+This is why Option A (custom Next.js) was chosen over Retool or an in-app admin: every future feature lands as **a new route** in the same codebase, with shared components and shared types.

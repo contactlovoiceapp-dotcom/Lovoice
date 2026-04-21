@@ -10,6 +10,10 @@
 > Then read `docs/ARCHITECTURE.md` and the relevant phase in `docs/ROADMAP.md`.
 > Never deviate from the architecture or constraints below without explicit user approval.
 
+The product ships in **two deliverables**:
+1. **The mobile app** (this repo) — what end users install on iOS/Android.
+2. **A small admin back-office web app** (separate Next.js repo, see Phase 6.bis in `docs/ROADMAP.md`) — a CRUD interface used exclusively by the operator (the client) to triage reports and moderate content. The client is **non-technical**: she must never have to write SQL or open Supabase Studio. All moderation actions happen in this web app, point-and-click only.
+
 ---
 
 ## 1. Product summary
@@ -35,7 +39,7 @@ Voice is the core medium. Recording and playback **must feel instant and reliabl
 - V1 goal: **validate the market** with 5–10k users.
 - Geography: France, Belgium, Switzerland (phone verification restricted to +33 / +32 / +41).
 - Single developer (the user) + LLM pair-programming.
-- **Infra budget cap: ~150 $/month at 10k MAU. Hard ceiling 500 $/month.**
+- Infra must stay frugal: prefer managed services with generous free tiers and pay-as-you-go pricing over fixed-cost platforms. Any new third-party introduced in a phase must be justified against this constraint.
 
 ---
 
@@ -50,7 +54,15 @@ Voice is the core medium. Recording and playback **must feel instant and reliabl
 - **`expo-notifications`** for push.
 - State: React Query (`@tanstack/react-query`) for server state, Zustand for local UI state. No Redux.
 
-### Backend — committed in V1 MVP (8 k€ budget)
+### Admin back-office (companion web app, separate repo) — committed in V1 MVP
+- **Next.js 14** (App Router), **TypeScript strict**, **Tailwind CSS**.
+- **`@supabase/supabase-js`** client, anon key only — no service-role in the browser, ever.
+- Auth: **Supabase Auth, email + magic link**, gated by an `admin_users` table (see `docs/ARCHITECTURE.md`).
+- All write actions (takedowns, bans) go through Edge Functions that re-check `is_admin()` server-side.
+- Hosted on **Vercel** (EU region `fra1`), free tier.
+- Repo: separate from this one (suggested name `lovoice-admin`), shares the generated Supabase types via copy or a small published package.
+
+### Backend — committed in V1 MVP
 - **Supabase** (EU region — Frankfurt) hosts everything:
   - **Postgres** (with PostGIS for geo) — single source of truth.
   - **Auth** — phone OTP via Twilio Verify provider.
@@ -61,8 +73,8 @@ Voice is the core medium. Recording and playback **must feel instant and reliabl
 - **Expo Push Service** — push notifications (free, sufficient at this scale).
 - **Sentry** — crash & error reporting (mobile + Edge Functions).
 
-### Backend — optional / post-MVP (not in 8 k€ budget)
-These features are **not** part of the V1 commitment. They will be added either later in V1 if time and budget allow, or in a subsequent version. The vendors below are the recommended implementations when the work is scheduled — they are validated against our EU residency and pricing constraints.
+### Backend — optional / post-MVP
+These features are **not** part of the V1 commitment. They will be added either later in V1 if time allows, or in a subsequent version. The vendors below are the recommended implementations when the work is scheduled — they were selected against our EU residency and frugality constraints.
 
 - **AssemblyAI** — automatic voice transcription (FR). Used to fill `voices.transcript` and `messages` transcripts.
 - **Hive Moderation** — automatic audio + text moderation pipeline (see `docs/ARCHITECTURE.md` §4.3).
@@ -104,7 +116,7 @@ These rules apply to **every line of code** written for this project.
 1. **Privacy first.** RLS is enabled on every table from day 1. No table is ever readable without RLS policies. A user can only read their own data and what is explicitly shared with them.
 2. **No client-side trust.** Anything security-relevant (limits, ownership, moderation status) is enforced on the server (RLS + Edge Functions). The client is treated as hostile.
 3. **No proxy upload.** Audio files go **directly client → Supabase Storage** via signed upload URLs. The backend never streams audio bytes.
-4. **Reactive moderation in V1 MVP.** New voices and voice messages are visible immediately after upload (`status = 'approved'` by default). Safety relies on the block + report flow plus manual takedown by the operator (a rejected row sets `status = 'rejected'` and the content disappears from the feed and chats). The async pre-moderation pipeline (default `pending` until cleared by AssemblyAI + Hive) remains the **target design** and is documented in `docs/ARCHITECTURE.md` §4.3 — it is scheduled as an optional phase in `docs/ROADMAP.md` and must ship before scaling beyond the validation cohort. The `status` column and its enum (`pending`, `approved`, `rejected`, `manual_review`) are kept in the schema from day 1 so the auto-moderation pipeline can be plugged in without a migration.
+4. **Reactive moderation in V1 MVP, via a dedicated back-office.** New voices and voice messages are visible immediately after upload (`status = 'approved'` by default). Safety relies on the block + report flow plus manual takedown by the operator from the admin back-office (a rejected row sets `status = 'rejected'` and the content disappears from the feed and chats). **The operator is non-technical: every moderation action must be reachable point-and-click in the back-office. No SQL, no Supabase Studio access for moderation.** The async pre-moderation pipeline (default `pending` until cleared by AssemblyAI + Hive) remains the **target design** and is documented in `docs/ARCHITECTURE.md` §4.3 — it is scheduled as an optional phase in `docs/ROADMAP.md` and must ship before scaling beyond the validation cohort. The `status` column and its enum (`pending`, `approved`, `rejected`, `manual_review`) are kept in the schema from day 1 so the auto-moderation pipeline can be plugged in without a migration; the back-office gains a `manual_review` tab at that point.
 5. **Account deletion is real.** A "delete my account" Edge Function purges users + voices + messages + storage objects + push tokens. Required by Apple and RGPD.
 6. **EU data residency.** Supabase project must be in `eu-central-1` (Frankfurt). Any third-party processor must offer an EU DPA.
 7. **No PII in logs.** Sentry/PostHog scrub phone numbers, transcripts, message contents.
@@ -113,6 +125,7 @@ These rules apply to **every line of code** written for this project.
 10. **No `expo-av`.** Use `expo-audio`. If you see `expo-av` referenced anywhere in code, it is wrong.
 11. **No `any` in TypeScript.** Generate Supabase types with `supabase gen types typescript` and use them.
 12. **One feature = one PR-sized phase.** See `docs/ROADMAP.md`. Don't mix concerns across phases.
+13. **Admin / user separation.** The `admin_users` table is the single source of truth for who can moderate. The `is_admin()` SQL helper is used in every admin-facing RLS policy and re-checked inside every admin Edge Function. The service-role key is **never** shipped to the back-office front-end — admin actions go through Edge Functions that verify the caller's JWT against `admin_users`.
 
 ---
 
@@ -147,6 +160,25 @@ LOVOICE_EXPO/
 │   └── seed.sql
 ├── assets/
 └── eas.json                   ← EAS Build profiles (introduced in Phase 1)
+```
+
+The admin back-office lives in a **sibling repository** (suggested name `lovoice-admin/`), created in Phase 6.bis. It consumes the same Supabase project. Its target structure:
+
+```
+lovoice-admin/
+├── README.md
+├── app/                       ← Next.js App Router
+│   ├── (auth)/login/
+│   ├── (admin)/reports/
+│   ├── (admin)/users/[id]/
+│   ├── (admin)/banned/
+│   └── layout.tsx
+├── src/
+│   ├── lib/supabase.ts
+│   ├── components/
+│   └── types/database.ts      ← copied from the mobile repo, regenerated together
+├── public/
+└── next.config.ts
 ```
 
 The current `App.tsx` and `src/components/onboarding/*` are **prototype code with mocked data**. They will be progressively refactored or deleted as phases progress. Treat them as visual reference, not as architecture.
@@ -191,5 +223,6 @@ npx supabase functions serve <name>  # run Edge Function locally
 | What are the rules I must follow? | this README, section 4 |
 | How is the data modeled? | `docs/ARCHITECTURE.md` |
 | How does audio upload work? | `docs/ARCHITECTURE.md` |
+| How does the admin back-office work? | `docs/ARCHITECTURE.md` §13 |
 | What am I supposed to build right now? | `docs/ROADMAP.md` (current phase) |
 | What does the client need to provide? | `docs/CLIENT_SETUP.md` |
