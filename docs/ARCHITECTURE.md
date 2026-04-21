@@ -24,14 +24,18 @@ Read it together with `README.md` (constraints) and `docs/ROADMAP.md` (current p
            │                        └──────────────┬───────────────┘
            │ direct upload (signed PUT)            │ webhooks / calls
            ▼                                       ▼
-   ┌──────────────────┐               ┌─────────────────────────┐
-   │ Storage buckets  │               │  AssemblyAI (transcribe)│
-   │  - voices         │               │  Hive (audio + text mod)│
-   │  - messages      │               │  Twilio Verify (SMS)    │
-   └──────────────────┘               │  Expo Push Service      │
-                                      │  Sentry / PostHog (EU)  │
-                                      └─────────────────────────┘
+   ┌──────────────────┐               ┌─────────────────────────────┐
+   │ Storage buckets  │               │  Twilio Verify (SMS)        │
+   │  - voices        │               │  Expo Push Service          │
+   │  - messages      │               │  Sentry                     │
+   └──────────────────┘               │  ─────────── optional ───── │
+                                      │  AssemblyAI (transcribe)    │
+                                      │  Hive (audio + text mod)    │
+                                      │  PostHog (EU, analytics)    │
+                                      └─────────────────────────────┘
 ```
+
+> **V1 MVP scope:** only the services above the dashed line are wired in V1. AssemblyAI, Hive and PostHog are documented end-to-end below but are **optional** (see `README.md` §3 and `docs/ROADMAP.md`). The schema, Edge Functions and storage layout are designed so that enabling them later is a drop-in change with no migration.
 
 ---
 
@@ -69,9 +73,9 @@ The voice introduction. A user can have multiple voices but only **one `is_activ
 | `prompt_id` | `uuid` FK → `prompts(id)` | nullable (free-form voice) |
 | `storage_path` | `text` | `voices/{user_id}/{voice_id}.m4a` |
 | `duration_ms` | `integer` check (≤ 300_000) | |
-| `transcript` | `text` | filled async by AssemblyAI |
+| `transcript` | `text` | nullable; filled by AssemblyAI when auto-transcription is enabled (optional, post-MVP) |
 | `theme` | `text` | UI color theme |
-| `status` | `text` default `'pending'` check in (`pending`,`approved`,`rejected`,`manual_review`) | |
+| `status` | `text` default `'approved'` check in (`pending`,`approved`,`rejected`,`manual_review`) | V1 MVP defaults to `'approved'` (reactive moderation). When the auto-moderation pipeline ships, the default flips to `'pending'` — see §4.3. |
 | `moderation_reason` | `text` | filled by Hive |
 | `is_active` | `boolean` default false | partial unique index per user |
 | `created_at` | `timestamptz` default `now()` | |
@@ -113,7 +117,7 @@ Unique on `(user_a, user_b)`.
 | `body_text` | `text` | nullable; required if kind=text |
 | `voice_path` | `text` | nullable; required if kind=voice |
 | `voice_duration_ms` | `integer` | |
-| `status` | `text` default `'pending'` | same enum as voices |
+| `status` | `text` default `'approved'` | same enum as `voices`; default flips to `'pending'` once auto-moderation is enabled |
 | `created_at` | `timestamptz` default `now()` | |
 | `read_at` | `timestamptz` | |
 
@@ -235,10 +239,31 @@ Storage policies follow the same logic: `voices` bucket allows reading any appro
 2. Client `PUT` the file directly to `signed_url` with `Content-Type: audio/mp4`.
 3. On success, client calls Edge Function `commit_upload({ kind, object_path, duration_ms, prompt_id?, conversation_id?, body_text? })` which:
    - HEAD-checks the object exists and `Content-Length ≤ 6_000_000`,
-   - inserts the `voices` or `messages` row with `status = 'pending'`,
-   - enqueues a moderation job (insert into `moderation_jobs` table → cron-triggered Edge Function picks it up).
+   - inserts the `voices` or `messages` row.
+   - **V1 MVP:** the row is inserted with `status = 'approved'` (default) and is immediately visible. No moderation job is enqueued.
+   - **With auto-moderation enabled (post-MVP):** the row is inserted with `status = 'pending'` and a row is added to `moderation_jobs`, which the cron-triggered Edge Function picks up (see §4.3).
 
-### 4.3 Moderation (server, async)
+### 4.3 Moderation
+
+#### 4.3.a V1 MVP — reactive moderation
+
+In V1 MVP we do **not** run any automatic moderation. Content goes live the moment `commit_upload` returns. Safety relies on the social loop:
+
+1. Any user can **report** a voice or a voice message via the report flow (Phase 6). A row is inserted in `reports` and an internal alert is written (DB row in V1; Slack webhook later).
+2. The operator triages reports manually using a small admin SQL view / Supabase Studio. Resolution is one of:
+   - dismiss the report → no change,
+   - takedown → `update voices set status = 'rejected', moderation_reason = $1 where id = $2;` (or same on `messages`). RLS hides the row from the feed and from chat the next time it is fetched.
+   - ban the author → `update profiles set is_banned = true where id = $1;`.
+3. The author of a rejected voice receives a notification (`kind = 'system'`) with the reason, and can appeal by replying to the support email (no in-app appeal UI in V1 MVP).
+4. Rejected rows are kept in DB for 30 days for audit, then hard-deleted with their storage object (cron job).
+
+This trade-off is explicit: at the validation cohort scale (5–10 k users) the operator can absorb the manual moderation load, and shipping the MVP without paid moderation vendors keeps us inside the 8 k€ budget. The schema and Edge Functions are already shaped for the auto-pipeline so enabling it later is additive.
+
+#### 4.3.b Optional / post-MVP — async auto-moderation
+
+This is the target design. It is **not** part of the V1 MVP commitment.
+
+When enabled, `commit_upload` switches the default row status to `'pending'` and enqueues a `moderation_jobs` row. Then:
 
 1. Cron job (Supabase scheduled function, every 30s) picks up `moderation_jobs` rows in `pending` state.
 2. Calls **AssemblyAI** to transcribe (FR). Stores transcript on the row.
@@ -340,9 +365,14 @@ Edge Function `delete_account` (called by authenticated user):
 
 ## 10. Observability
 
+V1 MVP — committed:
+
 - **Sentry RN**: capture unhandled errors, audio recording failures, upload failures. Scrub `phone`, `body_text`, `transcript` from breadcrumbs.
 - **Sentry server**: each Edge Function wrapped in a try/catch that captures with context.
-- **PostHog (EU)**: track events `voice_recorded`, `voice_played` (with %_listened), `voice_liked`, `message_sent` (kind), `conversation_opened`, `signup_completed`. **No content, only counts.**
+
+Optional / post-MVP:
+
+- **PostHog (EU)**: track events `voice_recorded`, `voice_played` (with %_listened), `voice_liked`, `message_sent` (kind), `conversation_opened`, `signup_completed`. **No content, only counts.** Until PostHog is wired, product insight comes from Sentry plus ad-hoc Supabase SQL queries on `voices`, `likes`, `messages`, `notifications`.
 
 ---
 
@@ -350,8 +380,10 @@ Edge Function `delete_account` (called by authenticated user):
 
 - **Migrations**: every schema change is a versioned SQL file in `supabase/migrations/`. Apply via `supabase db push` (CI) or `supabase migration up` (local).
 - **Secrets**:
-  - Mobile public keys (`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `POSTHOG_KEY`, `SENTRY_DSN`) → `app.config.ts` + EAS env vars.
-  - Server secrets (`TWILIO_*`, `ASSEMBLYAI_KEY`, `HIVE_KEY`, `EXPO_ACCESS_TOKEN`) → Supabase Edge Function secrets (`supabase secrets set`).
+  - Mobile public keys, V1 MVP: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SENTRY_DSN` → `app.config.ts` + EAS env vars.
+  - Mobile public keys, optional / post-MVP: `POSTHOG_KEY` (added when PostHog is enabled).
+  - Server secrets, V1 MVP: `TWILIO_*`, `EXPO_ACCESS_TOKEN` → Supabase Edge Function secrets (`supabase secrets set`).
+  - Server secrets, optional / post-MVP: `ASSEMBLYAI_KEY`, `HIVE_KEY`, `OPENAI_API_KEY` (added when the auto-moderation pipeline is enabled).
   - **No secret ever committed.** `.env*` files in `.gitignore`.
 
 ---

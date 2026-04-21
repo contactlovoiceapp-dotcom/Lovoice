@@ -50,19 +50,25 @@ Voice is the core medium. Recording and playback **must feel instant and reliabl
 - **`expo-notifications`** for push.
 - State: React Query (`@tanstack/react-query`) for server state, Zustand for local UI state. No Redux.
 
-### Backend
+### Backend — committed in V1 MVP (8 k€ budget)
 - **Supabase** (EU region — Frankfurt) hosts everything:
   - **Postgres** (with PostGIS for geo) — single source of truth.
   - **Auth** — phone OTP via Twilio Verify provider.
   - **Storage** — two buckets: `voices` (public-read via signed URLs) and `messages` (private, RLS-gated).
   - **Realtime** — WebSocket subscriptions on `messages` table for chat, plus Broadcast/Presence for typing indicators.
-  - **Edge Functions** (Deno) — for any server logic that cannot live in a SQL trigger (upload commit, moderation pipeline, push dispatch, account deletion).
+  - **Edge Functions** (Deno) — for any server logic that cannot live in a SQL trigger (upload commit, push dispatch, account deletion).
 - **Twilio Verify** — SMS OTP (FR / BE / CH only).
-- **AssemblyAI** — voice transcription (FR).
-- **Hive Moderation** — audio + text moderation.
 - **Expo Push Service** — push notifications (free, sufficient at this scale).
 - **Sentry** — crash & error reporting (mobile + Edge Functions).
-- **PostHog (EU)** — product analytics.
+
+### Backend — optional / post-MVP (not in 8 k€ budget)
+These features are **not** part of the V1 commitment. They will be added either later in V1 if time and budget allow, or in a subsequent version. The vendors below are the recommended implementations when the work is scheduled — they are validated against our EU residency and pricing constraints.
+
+- **AssemblyAI** — automatic voice transcription (FR). Used to fill `voices.transcript` and `messages` transcripts.
+- **Hive Moderation** — automatic audio + text moderation pipeline (see `docs/ARCHITECTURE.md` §4.3).
+- **PostHog (EU)** — product analytics for retention and funnel analysis.
+
+In V1 MVP, content safety relies on **reactive moderation** (block + report + manual takedown by the operator) and product insight relies on Sentry + raw Supabase queries. See constraint #4 below.
 
 ### Audio format
 - **AAC in `.m4a` container, mono, 32 kbps, 22050 Hz.** Always.
@@ -98,7 +104,7 @@ These rules apply to **every line of code** written for this project.
 1. **Privacy first.** RLS is enabled on every table from day 1. No table is ever readable without RLS policies. A user can only read their own data and what is explicitly shared with them.
 2. **No client-side trust.** Anything security-relevant (limits, ownership, moderation status) is enforced on the server (RLS + Edge Functions). The client is treated as hostile.
 3. **No proxy upload.** Audio files go **directly client → Supabase Storage** via signed upload URLs. The backend never streams audio bytes.
-4. **Async moderation.** A voice or voice message is never visible to other users until `status = 'approved'`. Default status is `pending`.
+4. **Reactive moderation in V1 MVP.** New voices and voice messages are visible immediately after upload (`status = 'approved'` by default). Safety relies on the block + report flow plus manual takedown by the operator (a rejected row sets `status = 'rejected'` and the content disappears from the feed and chats). The async pre-moderation pipeline (default `pending` until cleared by AssemblyAI + Hive) remains the **target design** and is documented in `docs/ARCHITECTURE.md` §4.3 — it is scheduled as an optional phase in `docs/ROADMAP.md` and must ship before scaling beyond the validation cohort. The `status` column and its enum (`pending`, `approved`, `rejected`, `manual_review`) are kept in the schema from day 1 so the auto-moderation pipeline can be plugged in without a migration.
 5. **Account deletion is real.** A "delete my account" Edge Function purges users + voices + messages + storage objects + push tokens. Required by Apple and RGPD.
 6. **EU data residency.** Supabase project must be in `eu-central-1` (Frankfurt). Any third-party processor must offer an EU DPA.
 7. **No PII in logs.** Sentry/PostHog scrub phone numbers, transcripts, message contents.

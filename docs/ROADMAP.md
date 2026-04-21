@@ -15,10 +15,19 @@ Legend:
 - 🟢 = can be done with mocked data, no external account needed
 - 🟡 = needs Supabase project + keys
 - 🔴 = needs additional third-party (Twilio / AssemblyAI / Hive / Sentry / PostHog / EAS)
+- ⭐ = **committed in V1 MVP** (8 k€ budget)
+- ✳️ = **optional / post-MVP** (not in the 8 k€ budget — to do later in V1 if time allows, or in a subsequent version)
+
+The V1 MVP commitment covers all features described in this roadmap **except**:
+- automatic voice transcription (AssemblyAI),
+- automatic moderation (Hive — see `docs/ARCHITECTURE.md` §4.3.b),
+- product analytics (PostHog).
+
+Reactive moderation (block + report + manual takedown by the operator) is part of the MVP commitment and replaces auto-moderation until the optional phase ships. See `docs/ARCHITECTURE.md` §4.3.a.
 
 ---
 
-## Phase 0 — Foundation refactor & UX/UI finalization 🟢
+## Phase 0 — Foundation refactor & UX/UI finalization 🟢 ⭐
 
 **Goal**: clean the prototype, finish the visual UX with the client, and put the codebase in a state where every following phase can plug in cleanly.
 
@@ -61,7 +70,7 @@ Legend:
 
 ---
 
-## Phase 1 — Backend bootstrap (Supabase + EAS + envs) 🟡
+## Phase 1 — Backend bootstrap (Supabase + EAS + envs) 🟡 ⭐
 
 **Goal**: the cloud project exists, the mobile app is connected to it, and the deployment pipeline works.
 
@@ -93,7 +102,7 @@ Legend:
 
 ---
 
-## Phase 2 — Phone authentication (FR/BE/CH only) 🔴 (Twilio)
+## Phase 2 — Phone authentication (FR/BE/CH only) 🔴 (Twilio) ⭐
 
 **Goal**: a user can sign in or sign up with their phone number, restricted to FR/BE/CH.
 
@@ -121,7 +130,7 @@ Legend:
 
 ---
 
-## Phase 3 — Profile onboarding 🟡
+## Phase 3 — Profile onboarding 🟡 ⭐
 
 **Goal**: after auth, the user creates their profile (name, birthdate, gender, looking-for, city, optional location).
 
@@ -146,7 +155,7 @@ Legend:
 
 ---
 
-## Phase 4 — Voice recording + voice upload 🟡
+## Phase 4 — Voice recording + voice upload 🟡 ⭐
 
 **Goal**: user can record, re-record, listen back, and publish their voice.
 
@@ -155,7 +164,7 @@ Legend:
 2. Build `useVoiceRecorder` hook: start, stop, pause, resume, metering at 50 ms, hard cap at 300_000 ms.
 3. Build `useVoicePlayer` hook (single-instance variant for preview).
 4. `app/(auth)/onboarding/record.tsx` (and a reachable `app/(main)/profile/record.tsx`): live waveform, timer, prompt picker (`prompts` table seeded), record / stop / replay / re-record.
-5. Implement Edge Function `request_upload` and `commit_upload` per ARCHITECTURE §4.2. Sign client-side using the helper from `@supabase/storage-js`.
+5. Implement Edge Function `request_upload` and `commit_upload` per ARCHITECTURE §4.2. Sign client-side using the helper from `@supabase/storage-js`. **In V1 MVP, `commit_upload` inserts the row with `status = 'approved'` and does NOT enqueue a moderation job** (the auto-moderation pipeline is the optional Phase 9). The code path that would enqueue the job is gated by an env flag (`AUTO_MODERATION_ENABLED`) so Phase 9 is a flip, not a refactor.
 6. Client uploads via signed PUT directly to Storage.
 7. After commit, set `voices.is_active = true` for the latest, `false` for previous.
 8. Display the user's current voice on the profile screen with replay.
@@ -163,7 +172,7 @@ Legend:
 ### Deliverables
 - A user can record, listen, re-record, and publish a voice.
 - Storage object exists at `voices/{user_id}/{voice_id}.m4a`.
-- DB row `voices` created with `status = 'pending'`.
+- DB row `voices` created with `status = 'approved'` (V1 MVP) — and immediately visible in the feed.
 
 ### Acceptance
 - Recording auto-stops at 5:00.
@@ -175,7 +184,7 @@ Legend:
 
 ---
 
-## Phase 5 — Discover feed (playback + autoplay + preload) 🟡
+## Phase 5 — Discover feed (playback + autoplay + preload) 🟡 ⭐
 
 **Goal**: the TikTok-style feed loads real voices from Supabase and plays them with zero perceived latency.
 
@@ -184,7 +193,7 @@ Legend:
 2. React Query `useInfiniteQuery` with cursor on `created_at`.
 3. Build the **3-instance ring buffer player** in `src/lib/feedPlayer.ts`. Preload `current+1` and `current+2` on `prepareAsync` using signed URLs.
 4. Update `ProfileCard` to consume the ring (no own `Audio.Sound`).
-5. Track played-% and emit a `voice_played` PostHog event when ≥ 50% listened.
+5. Track played-% locally (used to gate `feed_seen` insertion). Emitting a `voice_played` PostHog event when ≥ 50% listened is **optional** — only wire it if Phase 10's PostHog block is shipped.
 6. On scroll, insert into `feed_seen` (debounced batch every 5 voices).
 7. Empty-feed state: re-suggest filter widening.
 8. Filters modal: gender, age range, max distance km. Persisted in Zustand + reflected in query params.
@@ -204,9 +213,9 @@ Legend:
 
 ---
 
-## Phase 6 — Likes, blocks, reports 🟡
+## Phase 6 — Likes, blocks, reports (+ manual moderation tooling) 🟡 ⭐
 
-**Goal**: users can like a voice, block a user, report a voice or a user. Notifications are created.
+**Goal**: users can like a voice, block a user, report a voice or a user. Notifications are created. The operator gets the minimum tooling needed to moderate reactively (since auto-moderation is deferred).
 
 ### Scope
 1. Implement `like(voice_id)` / `unlike(voice_id)` mutations.
@@ -215,12 +224,18 @@ Legend:
 4. Block flow from a long-press on the card or from a profile detail sheet. Confirmation modal.
 5. Report flow: list of reasons (harassment, hate, inappropriate, spam, other) + free text.
 6. Filtering: feed query already excludes blocked users (already in §8). Verify likes/messages are blocked too.
-7. PostHog events for like/block/report.
+7. **Manual moderation tooling** (V1 MVP — required because auto-moderation is deferred):
+   - SQL view `pending_reports` exposing report rows joined with `voices`/`messages`/`profiles` for fast triage in Supabase Studio.
+   - Edge Function `moderate(target_kind, target_id, decision, reason)` callable by service role only — sets `status = 'rejected'` and inserts a `kind='system'` notification for the author with the reason. Idempotent.
+   - SQL helper `ban_user(user_id, reason)` setting `is_banned = true` and revoking the user's session.
+   - Documented runbook (in `docs/CLIENT_SETUP.md` when it exists, else inline in this phase's PR) for the operator: how to triage, how to issue a takedown, how to handle an appeal email.
+8. PostHog events for like/block/report — **optional**, only wire if PostHog is enabled (Phase 10 optional block).
 
 ### Deliverables
 - Like adds a notification for the recipient.
 - Block hides both directions (you don't see them, they don't see you).
-- Report writes a row + sends an internal alert (Supabase Edge Function logs to a dedicated channel — Slack webhook in V1.1, plain DB row in V1).
+- Report writes a row + sends an internal alert (plain DB row in V1; Slack webhook is post-MVP).
+- Operator can take down a reported voice or message in under 1 minute via the SQL view + `moderate()` Edge Function.
 
 ### Acceptance
 - Liking a voice twice does not create two notifications (unique index `(liker_id, voice_id)`).
@@ -231,7 +246,7 @@ Legend:
 
 ---
 
-## Phase 7 — Messaging (text + voice, Realtime) 🟡
+## Phase 7 — Messaging (text + voice, Realtime) 🟡 ⭐
 
 **Goal**: full chat with text and voice messages, real-time updates, read receipts.
 
@@ -261,7 +276,7 @@ Legend:
 
 ---
 
-## Phase 8 — Notifications screen + push 🔴 (Expo Push)
+## Phase 8 — Notifications screen + push 🔴 (Expo Push) ⭐
 
 **Goal**: in-app notifications page + push notifications for likes and new messages.
 
@@ -287,19 +302,26 @@ Legend:
 
 ---
 
-## Phase 9 — Moderation pipeline (transcription + safety) 🔴 (AssemblyAI + Hive)
+## Phase 9 — Auto-moderation pipeline (transcription + safety) 🔴 (AssemblyAI + Hive) ✳️ optional / post-MVP
+
+**Status**: **NOT in the V1 MVP commitment / 8 k€ budget.** Ship only if MVP budget and time allow, otherwise schedule for V1.x. Until this phase ships, content safety is handled by reactive moderation (Phase 6 + `docs/ARCHITECTURE.md` §4.3.a).
 
 **Goal**: every uploaded voice and voice message is automatically transcribed and moderated before being visible.
 
+### Pre-requisites
+- Client has AssemblyAI and Hive accounts with EU DPA signed.
+- `ASSEMBLYAI_KEY`, `HIVE_KEY`, `OPENAI_API_KEY` are set as Edge Function secrets.
+
 ### Scope
-1. Create `moderation_jobs` table + Edge Function `process_moderation_jobs` scheduled every 30s (Supabase scheduled cron).
-2. AssemblyAI integration: submit, poll, store transcript on the parent row.
-3. Hive Audio + Hive Text integrations.
-4. OpenAI Moderation as cheap secondary check on transcript.
-5. Decision logic per ARCHITECTURE §4.3.
-6. On approval: dispatch notifications (replay the like notification logic for the author? No — only on rejection notify the author).
-7. On rejection: hide content, notify author with reason, allow appeal (a button creates a `manual_review` request).
-8. Manual-review queue endpoint (admin-only, behind a service role) — basic for V1.
+1. Flip `voices.status` and `messages.status` defaults from `'approved'` back to `'pending'` (one migration).
+2. Toggle the env flag `AUTO_MODERATION_ENABLED = true` so `commit_upload` enqueues moderation jobs (the code path was prepared in Phase 4).
+3. Create `moderation_jobs` table + Edge Function `process_moderation_jobs` scheduled every 30s (Supabase scheduled cron).
+4. AssemblyAI integration: submit, poll, store transcript on the parent row.
+5. Hive Audio + Hive Text integrations.
+6. OpenAI Moderation as cheap secondary check on transcript.
+7. Decision logic per ARCHITECTURE §4.3.b.
+8. On rejection: hide content, notify author with reason, allow appeal (a button creates a `manual_review` request — replaces the email-based appeal of the MVP).
+9. Manual-review queue endpoint (admin-only, behind a service role) — reuses the `moderate()` Edge Function shipped in Phase 6.
 
 ### Deliverables
 - A clean voice goes from `pending` to `approved` within 60s of upload.
@@ -308,41 +330,60 @@ Legend:
 
 ### Acceptance
 - No voice with `status != 'approved'` ever appears in `get_feed()`.
-- Moderation cost stays under 50 $/month at the projected volume (logged via PostHog event).
+- Moderation cost stays under 50 $/month at the projected volume (logged via PostHog event if PostHog is enabled, else via Supabase logs).
 
 ### Suggested commit
 `feat(moderation): async transcription and safety pipeline for voices and messages`
 
 ---
 
-## Phase 10 — RGPD, security hardening, observability 🔴 (Sentry + PostHog)
+## Phase 10 — RGPD, security hardening, observability 🔴 (Sentry) ⭐
 
 **Goal**: app is store-ready and compliant.
 
-### Scope
+### Scope (V1 MVP — committed)
 1. Edge Function `delete_account` per ARCHITECTURE §9. Reachable from a Profile → Danger Zone screen.
 2. Data export (RGPD right to portability): Edge Function `export_my_data` returns a JSON of all the user's data + signed URLs to their audio files (1h TTL).
 3. CGU + Privacy Policy hosted (Notion / Webflow) and linked from the app.
 4. **Sentry** wired (mobile + Edge Functions) with PII scrubbing.
-5. **PostHog (EU)** wired with the events listed in ARCHITECTURE §10.
-6. Rate limiting on Edge Functions: per-user buckets in Postgres (`rate_limits` table) for `request_upload`, `commit_upload`, `like`, `report`. Reasonable limits (e.g. 30 uploads/day, 100 likes/hour).
-7. Audit table `audit_log(actor_id, action, target, created_at)` for security-sensitive actions (block, report, delete).
+5. Rate limiting on Edge Functions: per-user buckets in Postgres (`rate_limits` table) for `request_upload`, `commit_upload`, `like`, `report`. Reasonable limits (e.g. 30 uploads/day, 100 likes/hour).
+6. Audit table `audit_log(actor_id, action, target, created_at)` for security-sensitive actions (block, report, delete, moderate).
 
 ### Deliverables
 - Account deletion fully purges user data.
 - Data export downloads a complete archive.
-- Sentry receives a test crash; PostHog receives test events.
+- Sentry receives a test crash from mobile and from an Edge Function.
 
 ### Acceptance
 - Test that after `delete_account`, no row referencing the user remains except anonymized message tombstones.
 - App passes Apple's 5.1.1(v) account-deletion requirement.
 
 ### Suggested commit
-`feat(compliance): account deletion, data export, observability and rate limiting`
+`feat(compliance): account deletion, data export, sentry and rate limiting`
 
 ---
 
-## Phase 11 — Production build + store submission 🔴 (EAS + App Store + Play Store)
+## Phase 10.bis — Product analytics 🔴 (PostHog) ✳️ optional / post-MVP
+
+**Status**: **NOT in the V1 MVP commitment / 8 k€ budget.** Ship in V1 if time allows, otherwise schedule later.
+
+### Pre-requisites
+- Client has a PostHog Cloud EU account with DPA signed.
+- `POSTHOG_KEY` set in EAS env.
+
+### Scope
+1. Install `posthog-react-native` and initialize in `src/lib/analytics.ts` with EU host.
+2. Wire the events listed in ARCHITECTURE §10: `voice_recorded`, `voice_played` (with `pct_listened`), `voice_liked`, `message_sent` (with `kind`), `conversation_opened`, `signup_completed`, `block`, `report`. **No content fields, only counts and IDs.**
+3. PII scrubbing pass: ensure no phone, transcript or message body ever ends up in a property.
+4. Identify users with their `profiles.id` (never the phone).
+5. Validate end-to-end: events show up in PostHog within 1 minute on a real device.
+
+### Suggested commit
+`feat(analytics): posthog integration with PII-safe event tracking`
+
+---
+
+## Phase 11 — Production build + store submission 🔴 (EAS + App Store + Play Store) ⭐
 
 **Goal**: app is in TestFlight and Google Play Internal Testing.
 
@@ -366,21 +407,23 @@ Legend:
 
 ## Estimated effort (single dev + LLM)
 
-| Phase | Estimate |
-|---|---|
-| 0 — Foundation refactor | 2 days |
-| 1 — Backend bootstrap | 1.5 days |
-| 2 — Phone auth | 1 day |
-| 3 — Profile onboarding | 1.5 days |
-| 4 — Voice recording + upload | 3 days |
-| 5 — Discover feed playback | 3 days |
-| 6 — Likes / blocks / reports | 1.5 days |
-| 7 — Messaging realtime | 4 days |
-| 8 — Notifications + push | 1.5 days |
-| 9 — Moderation pipeline | 2 days |
-| 10 — RGPD + observability | 2 days |
-| 11 — Store submission | 2 days |
-| **Total** | **≈ 25 working days** |
+| Phase | Scope | Estimate |
+|---|---|---|
+| 0 — Foundation refactor | ⭐ MVP | 2 days |
+| 1 — Backend bootstrap | ⭐ MVP | 1.5 days |
+| 2 — Phone auth | ⭐ MVP | 1 day |
+| 3 — Profile onboarding | ⭐ MVP | 1.5 days |
+| 4 — Voice recording + upload | ⭐ MVP | 3 days |
+| 5 — Discover feed playback | ⭐ MVP | 3 days |
+| 6 — Likes / blocks / reports + manual mod tooling | ⭐ MVP | 2 days |
+| 7 — Messaging realtime | ⭐ MVP | 4 days |
+| 8 — Notifications + push | ⭐ MVP | 1.5 days |
+| 10 — RGPD + Sentry + rate limiting | ⭐ MVP | 2 days |
+| 11 — Store submission | ⭐ MVP | 2 days |
+| **MVP subtotal (committed in 8 k€)** | | **≈ 23.5 working days** |
+| 9 — Auto-moderation pipeline | ✳️ optional | 2 days |
+| 10.bis — PostHog analytics | ✳️ optional | 0.5 day |
+| **Optional subtotal** | | **≈ 2.5 working days** |
 
 ---
 
