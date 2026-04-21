@@ -36,6 +36,7 @@ import {
 
 import type { Profile } from '../types';
 import { COLORS, CTA_GRADIENT, FONT, SHADOW, THEME_GRADIENTS } from '../theme';
+import { COPY } from '../copy';
 import Waveform from './Waveform';
 
 interface ProfileCardProps {
@@ -363,7 +364,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
                     fontStyle: 'italic',
                   }}
                 >
-                  Écoute ma vibe…
+                  {COPY.feed.fallbackPrompt}
                 </Text>
               )}
             </EntranceView>
@@ -471,7 +472,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
                 fontStyle: 'italic',
               }}
             >
-              Ça vibre ?
+              {COPY.feed.afterListen}
             </Text>
           </FadeWhen>
 
@@ -535,7 +536,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
                   fill={liked ? 'white' : 'none'}
                 />
                 <Text style={{ fontFamily: FONT.semibold, fontSize: 16, color: 'white' }}>
-                  {liked ? 'Liké !' : 'Liker'}
+                  {liked ? COPY.actions.liked : COPY.actions.like}
                 </Text>
               </Animated.View>
             </Pressable>
@@ -567,7 +568,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
                 >
                   <Mic size={22} color="white" />
                   <Text style={{ fontFamily: FONT.semibold, fontSize: 16, color: 'white' }}>
-                    Répondre
+                    {COPY.actions.reply}
                   </Text>
                 </LinearGradient>
               </Animated.View>
@@ -582,10 +583,9 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
         <View style={{ width: 48, height: 48, backgroundColor: COLORS.primaryMuted, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
           <Mic size={24} color={COLORS.primary} />
         </View>
-        <Text style={{ fontSize: 20, fontFamily: FONT.bold, marginBottom: 8, color: COLORS.dark }}>Un seul message.</Text>
+        <Text style={{ fontSize: 20, fontFamily: FONT.bold, marginBottom: 8, color: COLORS.dark }}>{COPY.replyModal.title}</Text>
         <Text style={{ color: COLORS.textSecondary, marginBottom: 24 }}>
-          Envoie un vocal à {profile.name}. {profile.name} l'écoute et décide de te répondre,
-          ou non. Un seul message, pour que chacun reste libre.
+          {COPY.replyModal.body(profile.name)}
         </Text>
         <Pressable onPress={() => setShowReplyModal(false)}>
           <LinearGradient
@@ -595,18 +595,18 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
             style={{ borderRadius: 999, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}
           >
             <Mic size={18} color="white" />
-            <Text style={{ color: 'white', fontFamily: FONT.bold }}>Enregistrer ma réponse</Text>
+            <Text style={{ color: 'white', fontFamily: FONT.bold }}>{COPY.replyModal.cta}</Text>
           </LinearGradient>
         </Pressable>
       </ModalOverlay>
 
       {/* ── Report Modal ────────────────────────────────────────────── */}
       <ModalOverlay visible={showReportModal} onClose={() => setShowReportModal(false)}>
-        <Text style={{ fontSize: 20, fontFamily: FONT.bold, marginBottom: 16, color: COLORS.dark }}>Signaler {profile.name}</Text>
+        <Text style={{ fontSize: 20, fontFamily: FONT.bold, marginBottom: 16, color: COLORS.dark }}>{COPY.reportModal.title(profile.name)}</Text>
         <TextInput
           value={reportReason}
           onChangeText={setReportReason}
-          placeholder="Pourquoi signales-tu ce profil ?"
+          placeholder={COPY.reportModal.placeholder}
           placeholderTextColor={COLORS.textTertiary}
           multiline
           style={{
@@ -624,7 +624,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
         />
         <View style={{ backgroundColor: 'rgba(239,68,68,0.1)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.15)', borderRadius: 12, padding: 12, marginBottom: 24 }}>
           <Text style={{ color: '#dc2626', fontSize: 12 }}>
-            Le signalement supprimera ce profil de ton fil et enverra un mail à la modération.
+            {COPY.reportModal.warning}
           </Text>
         </View>
         <Pressable
@@ -634,7 +634,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
         >
           <View style={{ backgroundColor: '#ef4444', borderRadius: 999, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
             <Send size={18} color="white" />
-            <Text style={{ color: 'white', fontFamily: FONT.bold }}>Envoyer le signalement</Text>
+            <Text style={{ color: 'white', fontFamily: FONT.bold }}>{COPY.reportModal.submit}</Text>
           </View>
         </Pressable>
       </ModalOverlay>
@@ -645,10 +645,10 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
           <Lock size={36} color={COLORS.primary} />
         </View>
         <Text style={{ fontSize: 24, fontFamily: FONT.serifBold, marginBottom: 12, color: COLORS.dark, textAlign: 'center' }}>
-          Prêt·e à les entendre ?
+          {COPY.lockedModal.title}
         </Text>
         <Text style={{ color: COLORS.textSecondary, marginBottom: 32, textAlign: 'center' }}>
-          Enregistre ta voix pour débloquer les autres vocaux. 30 secondes. Juste toi.
+          {COPY.lockedModal.body}
         </Text>
         <Pressable onPress={() => { setShowLockedModal(false); onRecordVibe?.(); }} style={{ width: '100%' }}>
           <LinearGradient
@@ -657,11 +657,11 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
             end={{ x: 1, y: 0 }}
             style={{ borderRadius: 999, paddingVertical: 16, alignItems: 'center' }}
           >
-            <Text style={{ color: 'white', fontFamily: FONT.bold }}>Enregistrer ma Voix</Text>
+            <Text style={{ color: 'white', fontFamily: FONT.bold }}>{COPY.lockedModal.cta}</Text>
           </LinearGradient>
         </Pressable>
         <Pressable onPress={() => setShowLockedModal(false)} style={{ width: '100%', marginTop: 16, paddingVertical: 8, alignItems: 'center' }}>
-          <Text style={{ color: COLORS.textTertiary, fontFamily: FONT.medium }}>Plus tard</Text>
+          <Text style={{ color: COLORS.textTertiary, fontFamily: FONT.medium }}>{COPY.common.later}</Text>
         </Pressable>
       </ModalOverlay>
     </View>

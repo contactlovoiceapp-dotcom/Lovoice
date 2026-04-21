@@ -12,26 +12,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowRight, Check } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS, CTA_GRADIENT, FONT, ONBOARDING_GRADIENT, RADIUS, SHADOW } from '../../theme';
+import { COPY } from '../../copy';
 
 const LOGO = require('../../../assets/logo.png');
-
-const VALUES = [
-  {
-    emoji: '🎧',
-    title: 'La voix avant tout',
-    desc: "Ici, on écoute avant de regarder. Ta voix, ton énergie, c'est ce qui compte.",
-  },
-  {
-    emoji: '🛡️',
-    title: 'Un espace safe',
-    desc: "Bienveillance et respect sont les règles d'or. Zéro tolérance pour les comportements toxiques.",
-  },
-  {
-    emoji: '💜',
-    title: "L'authenticité",
-    desc: "Pas de photo à perfectionner. Juste ta voix et ce qu'elle dit de toi.",
-  },
-] as const;
 
 interface Props {
   onSignUp: () => void;
@@ -69,26 +52,26 @@ const HomeScreen: React.FC<Props> = ({ onSignUp, onLogin }) => {
         <View style={{ width: '100%', maxWidth, alignSelf: 'center', alignItems: 'center' }}>
           <Image
             source={LOGO}
-            accessibilityLabel="LOVoice"
+            accessibilityLabel={COPY.common.appName}
             resizeMode="contain"
             style={{ width: 160, height: 60, marginBottom: 12 }}
           />
 
           <Text style={{ marginBottom: 4, textAlign: 'center', fontSize: 30, fontFamily: FONT.extrabold, color: COLORS.dark }}>
-            Trouve ta{' '}
+            {COPY.home.headline}
             <Text style={{ fontFamily: FONT.serifItalic, color: COLORS.primary }}>
-              Voix
+              {COPY.home.headlineAccent}
             </Text>
           </Text>
 
           <Text style={{ marginBottom: 16, textAlign: 'center', fontSize: 16, fontFamily: FONT.medium, color: COLORS.textTertiary }}>
-            Écoute. Rencontre. Vibre.
+            {COPY.home.subtitle}
           </Text>
         </View>
 
         {/* Middle: values cards */}
         <View style={{ width: '100%', maxWidth, alignSelf: 'center', gap: 8 }}>
-          {VALUES.map((v) => (
+          {COPY.home.values.map((v) => (
             <View
               key={v.title}
               style={{ flexDirection: 'row', gap: 12, borderRadius: RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.surfaceMuted, padding: 14 }}
@@ -118,8 +101,8 @@ const HomeScreen: React.FC<Props> = ({ onSignUp, onLogin }) => {
               {accepted && <Check size={14} color="#ffffff" strokeWidth={3} />}
             </View>
             <Text style={{ flex: 1, fontSize: 13, lineHeight: 19, fontFamily: FONT.regular, color: COLORS.textSecondary }}>
-              Je m'engage à respecter les valeurs de bienveillance de la communauté Lovoice et j'accepte les{' '}
-              <Text style={{ color: COLORS.dark, textDecorationLine: 'underline' }}>CGU</Text>.
+              {COPY.home.acceptCheckbox}
+              <Text style={{ color: COLORS.dark, textDecorationLine: 'underline' }}>{COPY.home.acceptCguLink}</Text>.
             </Text>
           </Pressable>
 
@@ -135,7 +118,7 @@ const HomeScreen: React.FC<Props> = ({ onSignUp, onLogin }) => {
               end={{ x: 1, y: 0 }}
             >
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 15 }}>
-                <Text style={{ fontFamily: FONT.bold, color: 'white' }}>Créer un compte</Text>
+                <Text style={{ fontFamily: FONT.bold, color: 'white' }}>{COPY.home.signUp}</Text>
                 <ArrowRight size={20} color="#ffffff" />
               </View>
             </LinearGradient>
@@ -146,7 +129,7 @@ const HomeScreen: React.FC<Props> = ({ onSignUp, onLogin }) => {
             onPress={onLogin}
             style={{ width: '100%', borderRadius: RADIUS.full, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.border, paddingVertical: 15 }}
           >
-            <Text style={{ textAlign: 'center', fontFamily: FONT.semibold, color: COLORS.textSecondary }}>Se connecter</Text>
+            <Text style={{ textAlign: 'center', fontFamily: FONT.semibold, color: COLORS.textSecondary }}>{COPY.home.logIn}</Text>
           </Pressable>
         </View>
       </View>

@@ -14,6 +14,7 @@ import type { LucideIcon } from 'lucide-react-native';
 
 import type { Tab } from '../types';
 import { COLORS, FONT } from '../theme';
+import { COPY } from '../copy';
 
 const MAX_NAV_WIDTH = 512;
 const INDICATOR_WIDTH = 32;
@@ -28,9 +29,9 @@ interface BottomNavProps {
 }
 
 const TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
-  { id: 'discover', label: 'Écoute', icon: Compass },
-  { id: 'likes', label: 'Likes', icon: Heart },
-  { id: 'messages', label: 'Messages', icon: MessageCircle },
+  { id: 'discover', label: COPY.nav.discover, icon: Compass },
+  { id: 'likes', label: COPY.nav.likes, icon: Heart },
+  { id: 'messages', label: COPY.nav.messages, icon: MessageCircle },
 ];
 
 function indicatorOffsetX(active: Tab, contentWidth: number): number {

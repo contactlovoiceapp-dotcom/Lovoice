@@ -1,0 +1,196 @@
+/**
+ * Single source of truth for all French UI strings.
+ * Editing copy? This is the only file you need to touch.
+ * Dynamic strings are exposed as functions: `(name: string) => string`.
+ */
+
+export const COPY = {
+  common: {
+    continue: 'Continuer',
+    cancel: 'Annuler',
+    back: 'Retour',
+    close: 'Fermer',
+    save: 'Sauvegarder',
+    later: 'Plus tard',
+    optional: '(Facultatif)',
+    appName: 'LOVoice',
+  },
+
+  a11y: {
+    record: 'Enregistrer',
+    stopRecording: "Arrêter l'enregistrement",
+    play: 'Lecture',
+    pause: 'Mettre en pause',
+    deleteVoice: 'Supprimer le vocal',
+    closeFilters: 'Fermer les filtres',
+    applyFilters: 'Appliquer les filtres',
+  },
+
+  splash: {
+    tagline: 'Bienvenue',
+  },
+
+  home: {
+    headline: 'Trouve ta ',
+    headlineAccent: 'Voix',
+    subtitle: 'Écoute. Rencontre. Vibre.',
+    values: [
+      {
+        emoji: '🎧',
+        title: 'La voix avant tout',
+        desc: "Ici, on écoute avant de regarder. Ta voix, ton énergie, c'est ce qui compte.",
+      },
+      {
+        emoji: '🛡️',
+        title: 'Un espace safe',
+        desc: "Bienveillance et respect sont les règles d'or. Zéro tolérance pour les comportements toxiques.",
+      },
+      {
+        emoji: '💜',
+        title: "L'authenticité",
+        desc: "Pas de photo à perfectionner. Juste ta voix et ce qu'elle dit de toi.",
+      },
+    ] as const,
+    acceptCheckbox:
+      "Je m'engage à respecter les valeurs de bienveillance de la communauté Lovoice et j'accepte les ",
+    acceptCguLink: 'CGU',
+    signUp: 'Créer un compte',
+    logIn: 'Se connecter',
+  },
+
+  phone: {
+    title: 'Ton numéro',
+    subtitle: "Nous t'enverrons un code pour vérifier ton compte.",
+    prefix: '+33',
+    placeholder: '6 12 34 56 78',
+    sendCode: 'Recevoir le code',
+    codeTitle: 'Code de vérification',
+    codeSubtitle: (phone: string) => `Saisis le code envoyé au +33 ${phone}`,
+    codePlaceholder: '0000',
+    verify: 'Vérifier',
+  },
+
+  record: {
+    title: 'Ta ',
+    titleAccent: 'Voix',
+    subtitle: 'Zéro pression. Juste ta voix.',
+    maxDuration: '/ 1:30',
+    restart: 'Recommencer',
+    recorded: 'Voix enregistrée !',
+    hint: 'Une intro, une pensée, un délire... Parle librement. (1m30 max)',
+    needInspiration: "Besoin d'inspiration ?",
+    skip: "Passer pour l'instant",
+    inspirationTitle: 'Idée de voix',
+    inspirationNext: 'Une autre idée',
+    inspirationQuestions: [
+      'Dis-moi ton talent le plus inutile mais incroyable...',
+      'Quel est ton plus gros plaisir coupable ?',
+      'Raconte-moi ta pire honte en cuisine...',
+      'Si tu devais manger un seul plat pour le reste de ta vie ?',
+      "Quel est le dernier film qui t'a fait pleurer ?",
+    ] as const,
+  },
+
+  profile: {
+    title: 'Ton Profil',
+    voiceCard: 'Ton vocal',
+    voiceTimestamp: "À l'instant",
+    catchphraseLabel: 'Titre de ta voix ',
+    catchphraseHint: 'Une phrase courte pour teaser ton vocal.',
+    catchphrasePlaceholder: 'Ex: Ma pire honte en cuisine 🍳...',
+    moodLabel: 'Ton Mood',
+    infoLabel: 'Tes infos',
+    nameLabel: 'Prénom',
+    namePlaceholder: 'Alex',
+    ageLabel: 'Âge',
+    agePlaceholder: '28',
+    cityLabel: 'Ville',
+    cityPlaceholder: 'Paris',
+    emojisLabel: 'Tes 3 Emojis ',
+    submitOnboarding: 'Lancer ma Voix',
+  },
+
+  feed: {
+    autoOn: 'Auto ON',
+    autoOff: 'Auto OFF',
+    loading: 'Recherche de voix...',
+    loadMore: 'Découvrir plus de voix',
+    emptyTitle: 'Plus de voix !',
+    emptyBody:
+      'Tu as écouté toutes les voix du coin. Élargis tes filtres ou reviens plus tard.',
+    editFilters: 'Modifier mes filtres',
+    fallbackPrompt: 'Écoute ma voix…',
+    afterListen: 'Ça vibre ?',
+  },
+
+  actions: {
+    liked: 'Liké !',
+    like: 'Liker',
+    reply: 'Répondre',
+  },
+
+  replyModal: {
+    title: 'Un seul message.',
+    body: (name: string) =>
+      `Envoie un vocal à ${name}. ${name} l'écoute et décide de te répondre, ou non. Un seul message, pour que chacun reste libre.`,
+    cta: 'Enregistrer ma réponse',
+  },
+
+  reportModal: {
+    title: (name: string) => `Signaler ${name}`,
+    placeholder: 'Pourquoi signales-tu ce profil ?',
+    warning:
+      'Le signalement supprimera ce profil de ton fil et enverra un mail à la modération.',
+    submit: 'Envoyer le signalement',
+  },
+
+  lockedModal: {
+    title: 'Prêt·e à les entendre ?',
+    body: 'Enregistre ta voix pour débloquer les autres vocaux. 30 secondes. Juste toi.',
+    cta: 'Enregistrer ma Voix',
+  },
+
+  nav: {
+    discover: 'Écoute',
+    likes: 'Likes',
+    messages: 'Messages',
+  },
+
+  likesScreen: {
+    title: 'Mes Likes',
+    subtitle: "Les profils qui t'ont fait vibrer.",
+    emptyTitle: 'Aucun like',
+    emptyBody: "Tes futurs coups de cœur t'attendent.",
+    howItWorks: 'Comment ça marche ?',
+    bullets: [
+      'Écoute des voix et like celles qui te parlent.',
+      'Retrouve tous tes likes ici.',
+      'Envoie un vocal pour commencer la discussion !',
+    ] as const,
+  },
+
+  messagesScreen: {
+    title: 'Messages',
+    searchPlaceholder: 'Rechercher...',
+    emptyTitle: 'Pas encore de messages',
+    emptyBody: 'Ta prochaine conversation commence ici.',
+    icebreakersTitle: 'Icebreakers',
+    icebreakers: [
+      "\u201CJ\u2019ai adoré ton énergie sur ton vocal !\u201D",
+      "\u201CTa pire honte m\u2019a fait mourir de rire 😂\u201D",
+      "\u201CC\u2019est quoi le dernier son que tu as écouté ?\u201D",
+    ] as const,
+  },
+
+  filters: {
+    title: 'Filtres',
+    newVoices: 'Nouvelles voix',
+    newProfiles: 'Nouveaux profils',
+    ageRange: "Tranche d'âge",
+    ageUnit: 'ans',
+    ageMin: 'Âge minimum',
+    ageMax: 'Âge maximum',
+    location: 'Localisation',
+    apply: 'Appliquer les filtres',
+  },
+} as const;

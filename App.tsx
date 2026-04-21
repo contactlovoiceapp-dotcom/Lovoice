@@ -39,6 +39,7 @@ import {
 
 import { Profile, ColorTheme, Tab, AppState } from './src/types';
 import { COLORS, CTA_GRADIENT, FONT, SHADOW } from './src/theme';
+import { COPY } from './src/copy';
 import { generateNewProfile } from './src/services/geminiService';
 
 import SplashScreen from './src/components/onboarding/SplashScreen';
@@ -263,7 +264,7 @@ function AppContent() {
                   color: autoplay ? COLORS.primary : 'rgba(255,255,255,0.4)',
                 }}
               >
-                Auto {autoplay ? 'ON' : 'OFF'}
+                {autoplay ? COPY.feed.autoOn : COPY.feed.autoOff}
               </Text>
             </Pressable>
           )}
@@ -353,13 +354,13 @@ function AppContent() {
                   >
                     {isGenerating ? (
                       <Text style={{ fontSize: 14, fontFamily: FONT.medium, color: COLORS.textSecondary }}>
-                        Recherche de vibes...
+                        {COPY.feed.loading}
                       </Text>
                     ) : (
                       <>
                         <Sparkles size={16} color={COLORS.secondary} />
                         <Text style={{ fontSize: 14, fontFamily: FONT.medium, color: COLORS.textSecondary }}>
-                          Découvrir plus de vibes
+                          {COPY.feed.loadMore}
                         </Text>
                       </>
                     )}
@@ -373,11 +374,10 @@ function AppContent() {
                 <Sparkles size={40} color={COLORS.primary} />
               </View>
               <Text style={{ marginBottom: 8, textAlign: 'center', fontSize: 24, fontFamily: FONT.bold, color: COLORS.dark }}>
-                Plus de vibes !
+                {COPY.feed.emptyTitle}
               </Text>
               <Text style={{ marginBottom: 32, maxWidth: 250, textAlign: 'center', fontFamily: FONT.regular, color: COLORS.textSecondary }}>
-                Tu as écouté toutes les Vibes du coin. Élargis tes filtres ou
-                reviens plus tard.
+                {COPY.feed.emptyBody}
               </Text>
               <Pressable onPress={() => setShowFilters(true)}>
                 <LinearGradient
@@ -387,7 +387,7 @@ function AppContent() {
                   style={{ borderRadius: 999, paddingHorizontal: 32, paddingVertical: 12 }}
                 >
                   <Text style={{ textAlign: 'center', fontFamily: FONT.bold, color: 'white' }}>
-                    Modifier mes filtres
+                    {COPY.feed.editFilters}
                   </Text>
                 </LinearGradient>
               </Pressable>

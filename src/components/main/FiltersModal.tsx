@@ -7,6 +7,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { X } from 'lucide-react-native';
 
 import { COLORS, FONT, SHADOW, RADIUS, CTA_GRADIENT } from '../../theme';
+import { COPY } from '../../copy';
 
 const CITIES = ['Paris', 'Lyon', 'Marseille', 'Bordeaux', 'Lille'] as const;
 const SLIDER_MAX_TRACK = 'rgba(45,17,54,0.1)';
@@ -55,7 +56,7 @@ const FiltersModal: React.FC<Props> = ({ onClose }) => {
             }}
           >
             <Text style={{ fontFamily: FONT.bold, fontSize: 20, color: COLORS.dark }}>
-              Filtres
+              {COPY.filters.title}
             </Text>
             <Pressable
               onPress={onClose}
@@ -65,7 +66,7 @@ const FiltersModal: React.FC<Props> = ({ onClose }) => {
                 padding: 8,
               }}
               accessibilityRole="button"
-              accessibilityLabel="Fermer les filtres"
+              accessibilityLabel={COPY.a11y.closeFilters}
             >
               <X size={18} color={COLORS.textSecondary} />
             </Pressable>
@@ -75,7 +76,7 @@ const FiltersModal: React.FC<Props> = ({ onClose }) => {
             <View style={{ gap: 16 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Text style={{ fontFamily: FONT.medium, fontSize: 15, color: COLORS.textSecondary }}>
-                  Nouveaux vibes
+                  {COPY.filters.newVoices}
                 </Text>
                 <Switch
                   value={newVibes}
@@ -86,7 +87,7 @@ const FiltersModal: React.FC<Props> = ({ onClose }) => {
               </View>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Text style={{ fontFamily: FONT.medium, fontSize: 15, color: COLORS.textSecondary }}>
-                  Nouveaux profils
+                  {COPY.filters.newProfiles}
                 </Text>
                 <Switch
                   value={newProfiles}
@@ -107,7 +108,7 @@ const FiltersModal: React.FC<Props> = ({ onClose }) => {
                 }}
               >
                 <Text style={{ fontFamily: FONT.medium, fontSize: 15, color: COLORS.textSecondary }}>
-                  {"Tranche d'âge"}
+                  {COPY.filters.ageRange}
                 </Text>
                 <View
                   style={{
@@ -118,7 +119,7 @@ const FiltersModal: React.FC<Props> = ({ onClose }) => {
                   }}
                 >
                   <Text style={{ fontFamily: FONT.bold, fontSize: 14, color: COLORS.primary }}>
-                    {ageRange[0]} - {ageRange[1]} ans
+                    {ageRange[0]} - {ageRange[1]} {COPY.filters.ageUnit}
                   </Text>
                 </View>
               </View>
@@ -132,7 +133,7 @@ const FiltersModal: React.FC<Props> = ({ onClose }) => {
                     marginBottom: 8,
                   }}
                 >
-                  Âge minimum
+                  {COPY.filters.ageMin}
                 </Text>
                 <Slider
                   minimumValue={18}
@@ -161,7 +162,7 @@ const FiltersModal: React.FC<Props> = ({ onClose }) => {
                     marginBottom: 8,
                   }}
                 >
-                  Âge maximum
+                  {COPY.filters.ageMax}
                 </Text>
                 <Slider
                   minimumValue={18}
@@ -191,8 +192,8 @@ const FiltersModal: React.FC<Props> = ({ onClose }) => {
                   marginBottom: 8,
                 }}
               >
-                Localisation
-              </Text>
+                  {COPY.filters.location}
+                </Text>
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
@@ -233,7 +234,7 @@ const FiltersModal: React.FC<Props> = ({ onClose }) => {
             onPress={onClose}
             style={{ marginTop: 32, borderRadius: RADIUS.full, overflow: 'hidden', ...SHADOW.button }}
             accessibilityRole="button"
-            accessibilityLabel="Appliquer les filtres"
+            accessibilityLabel={COPY.a11y.applyFilters}
           >
             <LinearGradient
               colors={[...CTA_GRADIENT]}
@@ -249,7 +250,7 @@ const FiltersModal: React.FC<Props> = ({ onClose }) => {
                   textAlign: 'center',
                 }}
               >
-                Appliquer les filtres
+                {COPY.filters.apply}
               </Text>
             </LinearGradient>
           </Pressable>

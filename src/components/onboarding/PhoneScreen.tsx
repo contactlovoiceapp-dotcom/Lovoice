@@ -12,6 +12,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft, ArrowRight, Phone } from 'lucide-react-native';
 import { COLORS, CTA_GRADIENT, FONT, ONBOARDING_GRADIENT, RADIUS } from '../../theme';
+import { COPY } from '../../copy';
 
 const AMBIENT_GLOW_SIZE = 280;
 
@@ -106,10 +107,10 @@ const PhoneScreen: React.FC<Props> = ({ onNext, onBack }) => {
             {step === 'phone' ? (
               <View>
                 <Text style={{ marginBottom: 12, textAlign: 'center', fontSize: 28, fontFamily: FONT.bold, color: COLORS.dark }}>
-                  Ton numéro
+                  {COPY.phone.title}
                 </Text>
                 <Text style={{ marginBottom: 32, textAlign: 'center', fontFamily: FONT.regular, color: COLORS.textSecondary }}>
-                  Nous t&apos;enverrons un code pour vérifier ton compte.
+                  {COPY.phone.subtitle}
                 </Text>
 
                 <View style={{ gap: 24 }}>
@@ -126,11 +127,11 @@ const PhoneScreen: React.FC<Props> = ({ onNext, onBack }) => {
                       paddingHorizontal: 16,
                     }}
                   >
-                    <Text style={{ marginRight: 8, fontFamily: FONT.medium, color: COLORS.textTertiary }}>+33</Text>
+                    <Text style={{ marginRight: 8, fontFamily: FONT.medium, color: COLORS.textTertiary }}>{COPY.phone.prefix}</Text>
                     <TextInput
                       value={phone}
                       onChangeText={setPhone}
-                      placeholder="6 12 34 56 78"
+                      placeholder={COPY.phone.placeholder}
                       placeholderTextColor={COLORS.textTertiary}
                       keyboardType="number-pad"
                       style={{ flex: 1, minWidth: 0, fontSize: 18, fontFamily: FONT.regular, color: COLORS.dark }}
@@ -148,7 +149,7 @@ const PhoneScreen: React.FC<Props> = ({ onNext, onBack }) => {
                       end={{ x: 1, y: 0 }}
                       style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 16 }}
                     >
-                      <Text style={{ fontFamily: FONT.bold, color: 'white' }}>Recevoir le code</Text>
+                      <Text style={{ fontFamily: FONT.bold, color: 'white' }}>{COPY.phone.sendCode}</Text>
                       <ArrowRight size={20} color="#ffffff" />
                     </LinearGradient>
                   </Pressable>
@@ -157,17 +158,17 @@ const PhoneScreen: React.FC<Props> = ({ onNext, onBack }) => {
             ) : (
               <View>
                 <Text style={{ marginBottom: 12, textAlign: 'center', fontSize: 28, fontFamily: FONT.bold, color: COLORS.dark }}>
-                  Code de vérification
+                  {COPY.phone.codeTitle}
                 </Text>
                 <Text style={{ marginBottom: 32, textAlign: 'center', fontFamily: FONT.regular, color: COLORS.textSecondary }}>
-                  Saisis le code envoyé au +33 {phone}
+                  {COPY.phone.codeSubtitle(phone)}
                 </Text>
 
                 <View style={{ gap: 24 }}>
                   <TextInput
                     value={code}
                     onChangeText={(t) => setCode(t.replace(/\D/g, ''))}
-                    placeholder="0000"
+                    placeholder={COPY.phone.codePlaceholder}
                     placeholderTextColor={COLORS.textTertiary}
                     keyboardType="number-pad"
                     maxLength={4}
@@ -199,7 +200,7 @@ const PhoneScreen: React.FC<Props> = ({ onNext, onBack }) => {
                       end={{ x: 1, y: 0 }}
                       style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 16 }}
                     >
-                      <Text style={{ fontFamily: FONT.bold, color: 'white' }}>Vérifier</Text>
+                      <Text style={{ fontFamily: FONT.bold, color: 'white' }}>{COPY.phone.verify}</Text>
                       <ArrowRight size={20} color="#ffffff" />
                     </LinearGradient>
                   </Pressable>

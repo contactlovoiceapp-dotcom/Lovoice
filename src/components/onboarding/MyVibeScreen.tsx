@@ -27,6 +27,7 @@ import {
 } from 'react-native-safe-area-context';
 import { COLORS, CTA_GRADIENT, FONT, ONBOARDING_GRADIENT, RADIUS, SHADOW } from '../../theme';
 import { ColorTheme } from '../../types';
+import { COPY } from '../../copy';
 
 const WAVE_CONTAINER_HEIGHT = 32;
 const WAVE_BAR_WIDTH = 4;
@@ -169,14 +170,14 @@ const MyVibeScreen: React.FC<Props> = ({
           <View style={{ marginBottom: 24, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Retour"
+              accessibilityLabel={COPY.common.back}
               onPress={onBack}
               style={{ borderRadius: RADIUS.full, backgroundColor: COLORS.border, padding: 8 }}
             >
               <ArrowLeft size={22} color={COLORS.textSecondary} />
             </Pressable>
             <Text style={{ fontFamily: FONT.bold, fontSize: 20, color: COLORS.dark }}>
-              Ton Profil
+              {COPY.profile.title}
             </Text>
             <View style={{ width: 40 }} />
           </View>
@@ -211,15 +212,15 @@ const MyVibeScreen: React.FC<Props> = ({
                   <View style={{ marginBottom: 16, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
                     <View>
                       <Text style={{ fontFamily: FONT.bold, fontSize: 16, color: COLORS.dark }}>
-                        Ton vocal
+                        {COPY.profile.voiceCard}
                       </Text>
                       <Text style={{ fontFamily: FONT.regular, fontSize: 12, color: COLORS.textTertiary }}>
-                        À l&apos;instant
+                        {COPY.profile.voiceTimestamp}
                       </Text>
                     </View>
                     <Pressable
                       accessibilityRole="button"
-                      accessibilityLabel="Supprimer le vocal"
+                      accessibilityLabel={COPY.a11y.deleteVoice}
                       onPress={() => onDeleteVibe?.()}
                       style={{ padding: 8 }}
                     >
@@ -230,7 +231,7 @@ const MyVibeScreen: React.FC<Props> = ({
                   <View style={{ marginBottom: 20, flexDirection: 'row', alignItems: 'center', gap: 16 }}>
                     <Pressable
                       accessibilityRole="button"
-                      accessibilityLabel={isPlaying ? 'Mettre en pause' : 'Lecture'}
+                      accessibilityLabel={isPlaying ? COPY.a11y.pause : COPY.a11y.play}
                       onPress={() => setIsPlaying((p) => !p)}
                       style={{ width: 48, height: 48, flexShrink: 0, borderRadius: 24, overflow: 'hidden' }}
                     >
@@ -272,19 +273,19 @@ const MyVibeScreen: React.FC<Props> = ({
 
                   <View style={{ borderTopWidth: 1, borderTopColor: COLORS.border, paddingTop: 16 }}>
                     <Text style={{ fontFamily: FONT.bold, fontSize: 14, color: COLORS.dark, marginBottom: 4 }}>
-                      Titre de ta vibe{' '}
+                      {COPY.profile.catchphraseLabel}
                       <Text style={{ fontFamily: FONT.regular, fontSize: 12, color: COLORS.textTertiary }}>
-                        (Facultatif)
+                        {COPY.common.optional}
                       </Text>
                     </Text>
                     <Text style={{ fontFamily: FONT.regular, fontSize: 12, color: COLORS.textTertiary, marginBottom: 12 }}>
-                      Une phrase courte pour teaser ton vocal.
+                      {COPY.profile.catchphraseHint}
                     </Text>
                     <View style={{ position: 'relative' }}>
                       <TextInput
                         value={catchphrase}
                         onChangeText={setCatchphrase}
-                        placeholder="Ex: Ma pire honte en cuisine 🍳..."
+                        placeholder={COPY.profile.catchphrasePlaceholder}
                         placeholderTextColor={COLORS.textTertiary}
                         maxLength={60}
                         style={{
@@ -315,7 +316,7 @@ const MyVibeScreen: React.FC<Props> = ({
 
               <View>
                 <Text style={{ fontFamily: FONT.bold, fontSize: 16, color: COLORS.dark, marginBottom: 16 }}>
-                  Ton Mood
+                  {COPY.profile.moodLabel}
                 </Text>
                 <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 16 }}>
                   {MOOD_OPTIONS.map((opt) => {
@@ -361,16 +362,16 @@ const MyVibeScreen: React.FC<Props> = ({
 
               <View style={{ gap: 16 }}>
                 <Text style={{ fontFamily: FONT.bold, fontSize: 16, color: COLORS.dark }}>
-                  Tes infos
+                  {COPY.profile.infoLabel}
                 </Text>
                 <View>
                   <Text style={{ fontFamily: FONT.medium, fontSize: 13, color: COLORS.textSecondary, marginBottom: 6, marginLeft: 4 }}>
-                    Prénom
+                    {COPY.profile.nameLabel}
                   </Text>
                   <TextInput
                     value={name}
                     onChangeText={setName}
-                    placeholder="Alex"
+                    placeholder={COPY.profile.namePlaceholder}
                     placeholderTextColor={COLORS.textTertiary}
                     style={{
                       borderRadius: RADIUS.md,
@@ -387,12 +388,12 @@ const MyVibeScreen: React.FC<Props> = ({
                 <View style={{ flexDirection: 'row', gap: 16 }}>
                   <View style={{ flex: 1 }}>
                     <Text style={{ fontFamily: FONT.medium, fontSize: 13, color: COLORS.textSecondary, marginBottom: 6, marginLeft: 4 }}>
-                      Âge
+                      {COPY.profile.ageLabel}
                     </Text>
                     <TextInput
                       value={age}
                       onChangeText={setAge}
-                      placeholder="28"
+                      placeholder={COPY.profile.agePlaceholder}
                       placeholderTextColor={COLORS.textTertiary}
                       keyboardType="number-pad"
                       style={{
@@ -409,12 +410,12 @@ const MyVibeScreen: React.FC<Props> = ({
                   </View>
                   <View style={{ flex: 2 }}>
                     <Text style={{ fontFamily: FONT.medium, fontSize: 13, color: COLORS.textSecondary, marginBottom: 6, marginLeft: 4 }}>
-                      Ville
+                      {COPY.profile.cityLabel}
                     </Text>
                     <TextInput
                       value={city}
                       onChangeText={setCity}
-                      placeholder="Paris"
+                      placeholder={COPY.profile.cityPlaceholder}
                       placeholderTextColor={COLORS.textTertiary}
                       style={{
                         borderRadius: RADIUS.md,
@@ -433,9 +434,9 @@ const MyVibeScreen: React.FC<Props> = ({
 
               <View>
                 <Text style={{ fontFamily: FONT.bold, fontSize: 16, color: COLORS.dark, marginBottom: 16 }}>
-                  Tes 3 Emojis{' '}
+                  {COPY.profile.emojisLabel}
                   <Text style={{ fontFamily: FONT.regular, fontSize: 14, color: COLORS.textTertiary }}>
-                    (Facultatif)
+                    {COPY.common.optional}
                   </Text>
                 </Text>
                 <View style={{ flexDirection: 'row', gap: 16 }}>
@@ -518,7 +519,7 @@ const MyVibeScreen: React.FC<Props> = ({
                 >
                   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 16 }}>
                     <Text style={{ fontFamily: FONT.bold, color: COLORS.surface }}>
-                      {isOnboarding ? 'Lancer ma Vibe' : 'Sauvegarder'}
+                      {isOnboarding ? COPY.profile.submitOnboarding : COPY.common.save}
                     </Text>
                     <ArrowRight size={20} color={COLORS.surface} />
                   </View>

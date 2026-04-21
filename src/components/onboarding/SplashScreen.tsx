@@ -11,6 +11,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { COLORS, FONT } from '../../theme';
+import { COPY } from '../../copy';
 
 const LOGO = require('../../../assets/logo.png');
 
@@ -81,7 +82,7 @@ function TaglineFade() {
   return (
     <Animated.View style={[{ zIndex: 10, alignItems: 'center', marginTop: 20 }, animStyle]}>
       <Text style={{ fontFamily: FONT.serifItalic, fontSize: 18, color: COLORS.textSecondary, letterSpacing: 0.2 }}>
-        Bienvenue
+        {COPY.splash.tagline}
       </Text>
     </Animated.View>
   );
@@ -112,7 +113,7 @@ const SplashScreen: React.FC<Props> = ({ onFinish }) => {
       <View style={{ zIndex: 10 }}>
         <Image
           source={LOGO}
-          accessibilityLabel="LOVoice"
+          accessibilityLabel={COPY.common.appName}
           resizeMode="contain"
           style={{ width: 200, height: 96 }}
         />

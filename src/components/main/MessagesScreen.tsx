@@ -5,12 +5,7 @@ import { Text, TextInput, View } from 'react-native';
 import { MessageCircle, Search, Sparkles } from 'lucide-react-native';
 
 import { COLORS, FONT, SHADOW, RADIUS } from '../../theme';
-
-const ICEBREAKERS = [
-  '\u201CJ\u2019ai adoré ton énergie sur ton vocal !\u201D',
-  '\u201CTa pire honte m\u2019a fait mourir de rire 😂\u201D',
-  '\u201CC\u2019est quoi le dernier son que tu as écouté ?\u201D',
-] as const;
+import { COPY } from '../../copy';
 
 const MessagesScreen: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -26,7 +21,7 @@ const MessagesScreen: React.FC = () => {
             marginBottom: 16,
           }}
         >
-          Messages
+          {COPY.messagesScreen.title}
         </Text>
 
         <View
@@ -44,7 +39,7 @@ const MessagesScreen: React.FC = () => {
           <TextInput
             value={searchQuery}
             onChangeText={setSearchQuery}
-            placeholder="Rechercher..."
+            placeholder={COPY.messagesScreen.searchPlaceholder}
             placeholderTextColor={COLORS.textTertiary}
             style={{
               flex: 1,
@@ -93,7 +88,7 @@ const MessagesScreen: React.FC = () => {
             marginBottom: 8,
           }}
         >
-          Pas encore de messages
+          {COPY.messagesScreen.emptyTitle}
         </Text>
         <Text
           style={{
@@ -105,7 +100,7 @@ const MessagesScreen: React.FC = () => {
             marginBottom: 32,
           }}
         >
-          Ta prochaine conversation commence ici.
+          {COPY.messagesScreen.emptyBody}
         </Text>
 
         <View
@@ -130,12 +125,12 @@ const MessagesScreen: React.FC = () => {
           >
             <Sparkles size={16} color={COLORS.secondary} />
             <Text style={{ fontFamily: FONT.semibold, fontSize: 14, color: COLORS.dark }}>
-              Icebreakers
+              {COPY.messagesScreen.icebreakersTitle}
             </Text>
           </View>
 
           <View style={{ width: '100%', gap: 10 }}>
-            {ICEBREAKERS.map((text, i) => (
+            {COPY.messagesScreen.icebreakers.map((text, i) => (
               <View
                 key={i}
                 style={{

@@ -5,12 +5,7 @@ import { Text, View } from 'react-native';
 import { Heart, Sparkles } from 'lucide-react-native';
 
 import { COLORS, FONT, SHADOW, RADIUS } from '../../theme';
-
-const BULLET_POINTS = [
-  'Écoute des Vibes et like celles qui te parlent.',
-  'Retrouve tous tes likes ici.',
-  'Envoie un vocal pour commencer la discussion !',
-] as const;
+import { COPY } from '../../copy';
 
 const LikesScreen: React.FC = () => {
   return (
@@ -24,10 +19,10 @@ const LikesScreen: React.FC = () => {
             marginBottom: 8,
           }}
         >
-          Mes Likes
+          {COPY.likesScreen.title}
         </Text>
         <Text style={{ fontFamily: FONT.regular, fontSize: 14, color: COLORS.textSecondary }}>
-          Les profils qui t'ont fait vibrer.
+          {COPY.likesScreen.subtitle}
         </Text>
       </View>
 
@@ -65,7 +60,7 @@ const LikesScreen: React.FC = () => {
             marginBottom: 8,
           }}
         >
-          Aucun like
+          {COPY.likesScreen.emptyTitle}
         </Text>
         <Text
           style={{
@@ -77,7 +72,7 @@ const LikesScreen: React.FC = () => {
             marginBottom: 32,
           }}
         >
-          Tes futurs coups de cœur t'attendent.
+          {COPY.likesScreen.emptyBody}
         </Text>
 
         <View
@@ -108,12 +103,12 @@ const LikesScreen: React.FC = () => {
                 color: COLORS.dark,
               }}
             >
-              Comment ça marche ?
+              {COPY.likesScreen.howItWorks}
             </Text>
           </View>
 
           <View style={{ flexDirection: 'column', gap: 10 }}>
-            {BULLET_POINTS.map((text, i) => (
+            {COPY.likesScreen.bullets.map((text, i) => (
               <View key={i} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
                 <Text style={{ fontFamily: FONT.bold, color: COLORS.primary }}>•</Text>
                 <Text

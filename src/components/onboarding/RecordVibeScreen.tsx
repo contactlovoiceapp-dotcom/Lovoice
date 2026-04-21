@@ -22,14 +22,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowRight, Lightbulb, Mic, Square, X } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS, CTA_GRADIENT, FONT, ONBOARDING_GRADIENT, RADIUS, SHADOW } from '../../theme';
-
-const INSPIRATION_QUESTIONS = [
-  'Dis-moi ton talent le plus inutile mais incroyable...',
-  'Quel est ton plus gros plaisir coupable ?',
-  'Raconte-moi ta pire honte en cuisine...',
-  'Si tu devais manger un seul plat pour le reste de ta vie ?',
-  'Quel est le dernier film qui t\'a fait pleurer ?',
-];
+import { COPY } from '../../copy';
 
 const MIC_SIZE = 128;
 const GLOW_SIZE = 500;
@@ -215,11 +208,11 @@ const RecordVibeScreen: React.FC<Props> = ({ onNext, onSkip }) => {
           {/* Header */}
           <View style={{ width: '100%', alignSelf: 'center', paddingTop: 16, maxWidth: contentMaxWidth }}>
             <Text style={{ marginBottom: 8, textAlign: 'center', fontSize: 28, fontFamily: FONT.bold, color: COLORS.dark }}>
-              Ta{' '}
-              <Text style={{ fontFamily: FONT.serifItalic, color: COLORS.primary }}>Vibe</Text>
+              {COPY.record.title}
+              <Text style={{ fontFamily: FONT.serifItalic, color: COLORS.primary }}>{COPY.record.titleAccent}</Text>
             </Text>
             <Text style={{ textAlign: 'center', fontFamily: FONT.medium, color: COLORS.textTertiary }}>
-              Zéro pression. Juste ta voix.
+              {COPY.record.subtitle}
             </Text>
           </View>
 
@@ -243,7 +236,7 @@ const RecordVibeScreen: React.FC<Props> = ({ onNext, onSkip }) => {
               <View style={{ position: 'absolute' }}>
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel={isRecording ? 'Arrêter l\'enregistrement' : 'Enregistrer'}
+                  accessibilityLabel={isRecording ? COPY.a11y.stopRecording : COPY.a11y.record}
                   onPress={toggleRecording}
                   style={{
                     width: MIC_SIZE,
@@ -285,7 +278,7 @@ const RecordVibeScreen: React.FC<Props> = ({ onNext, onSkip }) => {
                   }}
                 >
                   {formatTime(time)}{' '}
-                  <Text style={{ fontSize: 18, fontFamily: FONT.regular, color: COLORS.textTertiary }}>/ 1:30</Text>
+                  <Text style={{ fontSize: 18, fontFamily: FONT.regular, color: COLORS.textTertiary }}>{COPY.record.maxDuration}</Text>
                 </Text>
               )}
 
@@ -301,7 +294,7 @@ const RecordVibeScreen: React.FC<Props> = ({ onNext, onSkip }) => {
                   <Text
                     style={{ fontSize: 14, fontFamily: FONT.medium, color: COLORS.textTertiary, textDecorationLine: 'underline' }}
                   >
-                    Recommencer
+                    {COPY.record.restart}
                   </Text>
                 </Pressable>
               )}
@@ -320,9 +313,7 @@ const RecordVibeScreen: React.FC<Props> = ({ onNext, onSkip }) => {
               }}
             >
               <Text style={{ fontSize: 14, lineHeight: 20, fontFamily: FONT.regular, color: COLORS.textSecondary }}>
-                {hasRecorded
-                  ? 'Vibe enregistrée !'
-                  : 'Une intro, une pensée, un délire... Parle librement. (1m30 max)'}
+                {hasRecorded ? COPY.record.recorded : COPY.record.hint}
               </Text>
 
               {!hasRecorded && (
@@ -343,7 +334,7 @@ const RecordVibeScreen: React.FC<Props> = ({ onNext, onSkip }) => {
                 >
                   <Lightbulb size={16} color="#f59e0b" />
                   <Text style={{ fontSize: 14, fontFamily: FONT.medium, color: COLORS.textSecondary }}>
-                    Besoin d'inspiration ?
+                    {COPY.record.needInspiration}
                   </Text>
                 </Pressable>
               )}
@@ -367,7 +358,7 @@ const RecordVibeScreen: React.FC<Props> = ({ onNext, onSkip }) => {
                 end={{ x: 1, y: 0 }}
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 16 }}>
-                  <Text style={{ fontFamily: FONT.bold, color: 'white' }}>Continuer</Text>
+                  <Text style={{ fontFamily: FONT.bold, color: 'white' }}>{COPY.common.continue}</Text>
                   <ArrowRight size={20} color={COLORS.surface} />
                 </View>
               </LinearGradient>
@@ -380,7 +371,7 @@ const RecordVibeScreen: React.FC<Props> = ({ onNext, onSkip }) => {
                 style={{ width: '100%', paddingVertical: 8 }}
               >
                 <Text style={{ textAlign: 'center', fontSize: 14, fontFamily: FONT.medium, color: COLORS.textTertiary }}>
-                  Passer pour l'instant
+                  {COPY.record.skip}
                 </Text>
               </Pressable>
             )}
@@ -415,7 +406,7 @@ const RecordVibeScreen: React.FC<Props> = ({ onNext, onSkip }) => {
           >
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Fermer"
+              accessibilityLabel={COPY.common.close}
               onPress={() => setShowInspiration(false)}
               style={{ position: 'absolute', right: 16, top: 16, padding: 8 }}
             >
@@ -436,17 +427,17 @@ const RecordVibeScreen: React.FC<Props> = ({ onNext, onSkip }) => {
               <Lightbulb size={24} color="#f59e0b" />
             </View>
 
-            <Text style={{ marginBottom: 16, fontSize: 20, fontFamily: FONT.bold, color: COLORS.dark }}>Idée de vibe</Text>
+            <Text style={{ marginBottom: 16, fontSize: 20, fontFamily: FONT.bold, color: COLORS.dark }}>{COPY.record.inspirationTitle}</Text>
             <Text
               style={{ marginBottom: 32, fontFamily: FONT.serifItalic, fontSize: 18, color: COLORS.textSecondary, minHeight: 80 }}
             >
-              {`\u201C${INSPIRATION_QUESTIONS[currentQuestion]}\u201D`}
+              {`\u201C${COPY.record.inspirationQuestions[currentQuestion]}\u201D`}
             </Text>
 
             <Pressable
               accessibilityRole="button"
               onPress={() =>
-                setCurrentQuestion((prev) => (prev + 1) % INSPIRATION_QUESTIONS.length)
+                setCurrentQuestion((prev) => (prev + 1) % COPY.record.inspirationQuestions.length)
               }
               style={{
                 width: '100%',
@@ -457,7 +448,7 @@ const RecordVibeScreen: React.FC<Props> = ({ onNext, onSkip }) => {
                 paddingVertical: 12,
               }}
             >
-              <Text style={{ textAlign: 'center', fontFamily: FONT.bold, color: COLORS.textSecondary }}>Une autre idée</Text>
+              <Text style={{ textAlign: 'center', fontFamily: FONT.bold, color: COLORS.textSecondary }}>{COPY.record.inspirationNext}</Text>
             </Pressable>
           </View>
         </View>
