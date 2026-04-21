@@ -160,10 +160,10 @@ export const COPY = {
     title: 'Mes Likes',
     subtitle: "Les profils qui t'ont fait vibrer.",
     emptyTitle: 'Aucun like',
-    emptyBody: "Tes futurs coups de cœur t'attendent.",
+    emptyBody: "Découvre de nouvelles Voix et like celles qui te plaisent !",
     howItWorks: 'Comment ça marche ?',
     bullets: [
-      'Écoute des voix et like celles qui te parlent.',
+      'Like les vocaux qui te plaisent.',
       'Retrouve tous tes likes ici.',
       'Envoie un vocal pour commencer la discussion !',
     ] as const,
