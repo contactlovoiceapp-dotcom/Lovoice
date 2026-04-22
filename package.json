@@ -6,7 +6,11 @@
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "build:ios": "EAS_BUILD_NO_EXPO_GO_WARNING=true eas build --platform ios --profile production",
+    "build:android": "EAS_BUILD_NO_EXPO_GO_WARNING=true eas build --platform android --profile production",
+    "submit:ios": "eas submit --platform ios --profile production --latest",
+    "submit:android": "eas submit --platform android --profile production --latest"
   },
   "dependencies": {
     "@expo-google-fonts/outfit": "^0.4.3",
