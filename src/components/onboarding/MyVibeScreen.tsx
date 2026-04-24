@@ -420,34 +420,38 @@ const MyVibeScreen: React.FC<Props> = ({
                 <Text style={{ fontFamily: FONT.bold, fontSize: 16, color: COLORS.dark, marginBottom: 16 }}>
                   {COPY.profile.moodLabel}
                 </Text>
-                <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 16 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-around' }}>
                   {MOOD_OPTIONS.map((opt) => {
                     const selected = mood === opt.id;
                     return (
-                      <View key={opt.id} style={{ alignItems: 'center', gap: 6 }}>
+                      <View key={opt.id} style={{ alignItems: 'center', gap: 8 }}>
                         <Pressable
                           accessibilityRole="button"
                           accessibilityState={{ selected }}
                           onPress={() => setMood(opt.id)}
                           style={{
-                            transform: [{ scale: selected ? 1.15 : 1 }],
-                            borderWidth: selected ? 2.5 : 0,
-                            borderColor: COLORS.primary,
+                            padding: 10,
                             borderRadius: RADIUS.full,
-                            overflow: 'hidden',
                             opacity: selected ? 1 : 0.45,
                           }}
+                          hitSlop={4}
                         >
                           <LinearGradient
                             colors={[...opt.colors]}
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 1 }}
-                            style={{ width: 52, height: 52 }}
+                            style={{
+                              width: 52,
+                              height: 52,
+                              borderRadius: RADIUS.full,
+                              borderWidth: selected ? 2.5 : 0,
+                              borderColor: COLORS.primary,
+                            }}
                           />
                         </Pressable>
                         <Text
                           style={{
-                            fontFamily: FONT.medium,
+                            fontFamily: selected ? FONT.semibold : FONT.medium,
                             fontSize: 11,
                             color: selected ? COLORS.primary : COLORS.textTertiary,
                           }}
