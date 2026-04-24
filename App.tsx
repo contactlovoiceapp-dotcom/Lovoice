@@ -1,7 +1,8 @@
 /* Root application shell — manages navigation state, the Discover feed (FlatList), font loading, and safe-area context. */
 
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
+  Animated,
   FlatList,
   Image,
   Pressable,
@@ -138,8 +139,60 @@ function AppContent() {
   const [autoplay, setAutoplay] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [hasRecordedVibe, setHasRecordedVibe] = useState(false);
+  const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const flatListRef = useRef<FlatList<Profile>>(null);
+  const firstLikeShown = useRef(false);
+  const toastOpacity = useRef(new Animated.Value(0)).current;
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const likedProfiles = useMemo(
+    () => profiles.filter((p) => likedIds.has(p.id)),
+    [profiles, likedIds],
+  );
+
+  const showToast = useCallback(
+    (message: string) => {
+      setToastMessage(message);
+      toastOpacity.setValue(0);
+      Animated.timing(toastOpacity, {
+        toValue: 1,
+        duration: 250,
+        useNativeDriver: true,
+      }).start();
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+      toastTimerRef.current = setTimeout(() => {
+        Animated.timing(toastOpacity, {
+          toValue: 0,
+          duration: 400,
+          useNativeDriver: true,
+        }).start(() => setToastMessage(null));
+      }, 2500);
+    },
+    [toastOpacity],
+  );
+
+  const toggleLike = useCallback(
+    (id: string) => {
+      const isAdding = !likedIds.has(id);
+      const profile = profiles.find((p) => p.id === id);
+      setLikedIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(id)) {
+          next.delete(id);
+        } else {
+          next.add(id);
+        }
+        return next;
+      });
+      if (isAdding && !firstLikeShown.current && profile) {
+        firstLikeShown.current = true;
+        showToast(COPY.likeToast.firstLike(profile.name));
+      }
+    },
+    [likedIds, profiles, showToast],
+  );
 
   const navigateTo = useCallback((next: AppState) => {
     setAppState(next);
@@ -181,12 +234,6 @@ function AppContent() {
     [autoplay, profiles],
   );
 
-  const handleLike = useCallback((id: string) => {
-    setTimeout(() => {
-      setProfiles((prev) => prev.filter((p) => p.id !== id));
-    }, 800);
-  }, []);
-
   const handleLoadMore = useCallback(async () => {
     if (isGenerating) return;
     setIsGenerating(true);
@@ -205,12 +252,13 @@ function AppContent() {
           togglePlay={togglePlay}
           onFinish={handleTrackFinish}
           hasRecordedVibe={hasRecordedVibe}
-          onLike={() => handleLike(item.id)}
+          isLiked={likedIds.has(item.id)}
+          onToggleLike={() => toggleLike(item.id)}
           onRecordVibe={() => navigateTo('onboarding_record')}
         />
       </View>
     ),
-    [windowWidth, windowHeight, togglePlay, handleTrackFinish, hasRecordedVibe, handleLike],
+    [windowWidth, windowHeight, togglePlay, handleTrackFinish, hasRecordedVibe, toggleLike, likedIds, navigateTo],
   );
 
   const renderMainScreen = () => (
@@ -398,7 +446,10 @@ function AppContent() {
 
       {activeTab === 'likes' && (
         <View style={{ flex: 1, paddingHorizontal: 16, paddingBottom: 112, paddingTop: insets.top + 56 }}>
-          <LikesScreen />
+          <LikesScreen
+            likedProfiles={likedProfiles}
+            onUnlike={(id) => toggleLike(id)}
+          />
         </View>
       )}
 
@@ -416,6 +467,39 @@ function AppContent() {
         <View style={{ flex: 1, paddingHorizontal: 16, paddingBottom: 112, paddingTop: insets.top + 56 }}>
           <MessagesScreen />
         </View>
+      )}
+
+      {toastMessage !== null && (
+        <Animated.View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            bottom: insets.bottom + 12 + 64 + 16,
+            left: 24,
+            right: 24,
+            zIndex: 30,
+            opacity: toastOpacity,
+            alignItems: 'center',
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: 'rgba(45,17,54,0.92)',
+              borderRadius: 999,
+              paddingHorizontal: 20,
+              paddingVertical: 12,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.18,
+              shadowRadius: 12,
+              elevation: 8,
+            }}
+          >
+            <Text style={{ color: 'white', fontSize: 14, fontFamily: FONT.medium }}>
+              {toastMessage}
+            </Text>
+          </View>
+        </Animated.View>
       )}
 
       <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />

@@ -24,24 +24,32 @@ export const THEME_GRADIENTS = {
     ringColor: '#fbbf24',
     glowColor: '#fbbf24',
     accent: '#f59e0b',
+    // Violet → magenta: complementary to orange, brand-adjacent
+    ctaGradient: ['#7c3aed', '#e724ab'] as const,
   },
   chill: {
     colors: ['#c084fc', '#8b5cf6', '#4b164c'] as const,
     ringColor: '#d479ec',
     glowColor: '#a78bfa',
     accent: '#c084fc',
+    // Magenta → amber: warm contrast on cool purple background
+    ctaGradient: ['#e724ab', '#ea580c'] as const,
   },
   electric: {
     colors: ['#e724ab', '#9333ea', '#4b164c'] as const,
     ringColor: '#e724ab',
     glowColor: '#e724ab',
     accent: '#e724ab',
+    // Indigo → violet: steps back in the spectrum, readable on magenta
+    ctaGradient: ['#4f46e5', '#7c3aed'] as const,
   },
   midnight: {
     colors: ['#374151', '#1f2937', '#1a0a1b'] as const,
     ringColor: '#9ca3af',
     glowColor: '#6b7280',
     accent: '#9ca3af',
+    // Brand CTA: pops on dark, no change needed
+    ctaGradient: ['#e724ab', '#d479ec'] as const,
   },
 } as const;
 

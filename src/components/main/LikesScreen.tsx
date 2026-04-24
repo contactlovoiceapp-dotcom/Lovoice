@@ -1,13 +1,19 @@
-/* Likes tab — empty state with usage hints when the user has not liked any profiles yet. */
+/* Likes tab — lists liked profiles or shows an empty state with usage hints. */
 
 import React from 'react';
-import { Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { Heart, Sparkles } from 'lucide-react-native';
 
-import { COLORS, FONT, SHADOW, RADIUS } from '../../theme';
+import type { Profile } from '../../types';
+import { COLORS, FONT, RADIUS, SHADOW } from '../../theme';
 import { COPY } from '../../copy';
 
-const LikesScreen: React.FC = () => {
+interface LikesScreenProps {
+  likedProfiles: Profile[];
+  onUnlike: (id: string) => void;
+}
+
+const LikesScreen: React.FC<LikesScreenProps> = ({ likedProfiles, onUnlike }) => {
   return (
     <View style={{ flex: 1, flexDirection: 'column' }}>
       <View style={{ marginBottom: 24 }}>
@@ -26,106 +32,142 @@ const LikesScreen: React.FC = () => {
         </Text>
       </View>
 
-      <View
-        style={{
-          flex: 1,
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          paddingVertical: 32,
-        }}
-      >
+      {likedProfiles.length > 0 ? (
+        <View style={{ flexDirection: 'column', gap: 10 }}>
+          {likedProfiles.map((profile) => (
+            <View
+              key={profile.id}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: 16,
+                borderRadius: RADIUS.lg,
+                backgroundColor: COLORS.surface,
+                borderWidth: 1,
+                borderColor: COLORS.border,
+                ...SHADOW.card,
+              }}
+            >
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontFamily: FONT.semibold, fontSize: 16, color: COLORS.dark }}>
+                  {profile.name}, {profile.age}
+                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 }}>
+                  <Text style={{ fontFamily: FONT.regular, fontSize: 13, color: COLORS.textSecondary }}>
+                    {profile.city}
+                  </Text>
+                  <Text style={{ fontSize: 13 }}>{profile.emojis.join(' ')}</Text>
+                </View>
+              </View>
+              <Pressable onPress={() => onUnlike(profile.id)} hitSlop={10} style={{ padding: 8 }}>
+                <Heart size={22} color="#ef4444" fill="#ef4444" />
+              </Pressable>
+            </View>
+          ))}
+        </View>
+      ) : (
         <View
           style={{
-            width: 72,
-            height: 72,
-            borderRadius: 36,
-            backgroundColor: COLORS.primaryMuted,
-            borderWidth: 1,
-            borderColor: COLORS.border,
+            flex: 1,
+            flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            marginBottom: 24,
-          }}
-        >
-          <Heart size={30} color={COLORS.primary} />
-        </View>
-
-        <Text
-          style={{
-            fontFamily: FONT.bold,
-            fontSize: 20,
-            color: COLORS.dark,
-            textAlign: 'center',
-            marginBottom: 8,
-          }}
-        >
-          {COPY.likesScreen.emptyTitle}
-        </Text>
-        <Text
-          style={{
-            fontFamily: FONT.regular,
-            fontSize: 14,
-            color: COLORS.textSecondary,
-            textAlign: 'center',
-            maxWidth: 250,
-            marginBottom: 32,
-          }}
-        >
-          {COPY.likesScreen.emptyBody}
-        </Text>
-
-        <View
-          style={{
-            width: '100%',
-            maxWidth: 384,
-            borderRadius: RADIUS.lg,
-            borderWidth: 1,
-            borderColor: COLORS.border,
-            backgroundColor: COLORS.surface,
-            padding: 20,
-            ...SHADOW.card,
+            paddingVertical: 32,
           }}
         >
           <View
             style={{
-              flexDirection: 'row',
+              width: 72,
+              height: 72,
+              borderRadius: 36,
+              backgroundColor: COLORS.primaryMuted,
+              borderWidth: 1,
+              borderColor: COLORS.border,
               alignItems: 'center',
-              gap: 8,
-              marginBottom: 16,
+              justifyContent: 'center',
+              marginBottom: 24,
             }}
           >
-            <Sparkles size={16} color={COLORS.secondary} />
-            <Text
-              style={{
-                fontFamily: FONT.semibold,
-                fontSize: 14,
-                color: COLORS.dark,
-              }}
-            >
-              {COPY.likesScreen.howItWorks}
-            </Text>
+            <Heart size={30} color={COLORS.primary} />
           </View>
 
-          <View style={{ flexDirection: 'column', gap: 10 }}>
-            {COPY.likesScreen.bullets.map((text, i) => (
-              <View key={i} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
-                <Text style={{ fontFamily: FONT.bold, color: COLORS.primary }}>•</Text>
-                <Text
-                  style={{
-                    flex: 1,
-                    fontFamily: FONT.regular,
-                    fontSize: 14,
-                    color: COLORS.textSecondary,
-                  }}
-                >
-                  {text}
-                </Text>
-              </View>
-            ))}
+          <Text
+            style={{
+              fontFamily: FONT.bold,
+              fontSize: 20,
+              color: COLORS.dark,
+              textAlign: 'center',
+              marginBottom: 8,
+            }}
+          >
+            {COPY.likesScreen.emptyTitle}
+          </Text>
+          <Text
+            style={{
+              fontFamily: FONT.regular,
+              fontSize: 14,
+              color: COLORS.textSecondary,
+              textAlign: 'center',
+              maxWidth: 250,
+              marginBottom: 32,
+            }}
+          >
+            {COPY.likesScreen.emptyBody}
+          </Text>
+
+          <View
+            style={{
+              width: '100%',
+              maxWidth: 384,
+              borderRadius: RADIUS.lg,
+              borderWidth: 1,
+              borderColor: COLORS.border,
+              backgroundColor: COLORS.surface,
+              padding: 20,
+              ...SHADOW.card,
+            }}
+          >
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 8,
+                marginBottom: 16,
+              }}
+            >
+              <Sparkles size={16} color={COLORS.secondary} />
+              <Text
+                style={{
+                  fontFamily: FONT.semibold,
+                  fontSize: 14,
+                  color: COLORS.dark,
+                }}
+              >
+                {COPY.likesScreen.howItWorks}
+              </Text>
+            </View>
+
+            <View style={{ flexDirection: 'column', gap: 10 }}>
+              {COPY.likesScreen.bullets.map((text, i) => (
+                <View key={i} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
+                  <Text style={{ fontFamily: FONT.bold, color: COLORS.primary }}>•</Text>
+                  <Text
+                    style={{
+                      flex: 1,
+                      fontFamily: FONT.regular,
+                      fontSize: 14,
+                      color: COLORS.textSecondary,
+                    }}
+                  >
+                    {text}
+                  </Text>
+                </View>
+              ))}
+            </View>
           </View>
         </View>
-      </View>
+      )}
     </View>
   );
 };

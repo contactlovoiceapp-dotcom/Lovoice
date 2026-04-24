@@ -35,7 +35,7 @@ import {
 } from 'lucide-react-native';
 
 import type { Profile } from '../types';
-import { COLORS, CTA_GRADIENT, FONT, SHADOW, THEME_GRADIENTS } from '../theme';
+import { COLORS, FONT, SHADOW, THEME_GRADIENTS } from '../theme';
 import { COPY } from '../copy';
 import Waveform from './Waveform';
 
@@ -44,7 +44,8 @@ interface ProfileCardProps {
   togglePlay: (id: string) => void;
   onFinish?: (id: string) => void;
   hasRecordedVibe?: boolean;
-  onLike?: () => void;
+  isLiked: boolean;
+  onToggleLike: () => void;
   onRecordVibe?: () => void;
 }
 
@@ -147,19 +148,6 @@ function formatTime(sec: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-function EntranceView({
-  children,
-  style,
-}: {
-  children: React.ReactNode;
-  delay?: number;
-  fromY?: number;
-  fromScale?: number;
-  style?: object;
-}) {
-  return <View style={style}>{children}</View>;
-}
-
 function FadeWhen({ visible, children }: { visible: boolean; children: React.ReactNode }) {
   const opacity = useSharedValue(visible ? 1 : 0);
 
@@ -227,18 +215,19 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
   togglePlay,
   onFinish,
   hasRecordedVibe = true,
-  onLike,
+  isLiked,
+  onToggleLike,
   onRecordVibe,
 }) => {
   const { theme, isPlaying, audioDurationSec } = profile;
   const { width: windowWidth } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const bottomNavHeight = 56 + insets.bottom + 16;
+  // Floating pill nav (52px) + bottom inset + 12px gap above + 16px breathing
+  const bottomNavHeight = 52 + insets.bottom + 12 + 16;
 
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const [hasListened, setHasListened] = useState(false);
-  const [liked, setLiked] = useState(false);
   const [showReplyModal, setShowReplyModal] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportReason, setReportReason] = useState('');
@@ -306,8 +295,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
   const glowSize = windowWidth * 0.8;
 
   const handleLike = () => {
-    setLiked(true);
-    setTimeout(() => onLike?.(), 600);
+    onToggleLike();
   };
 
   return (
@@ -336,7 +324,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
         <View style={{ flex: 1, paddingTop: insets.top + 56, zIndex: 10 }}>
           {/* Center zone: title + play + waveform */}
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-            <EntranceView delay={0} fromY={20} style={{ marginBottom: 32, paddingHorizontal: 24, maxWidth: 384 }}>
+            <View style={{ marginBottom: 32, paddingHorizontal: 24, maxWidth: 384 }}>
               {profile.promptTitle ? (
                 <Text
                   style={{
@@ -367,9 +355,9 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
                   {COPY.feed.fallbackPrompt}
                 </Text>
               )}
-            </EntranceView>
+            </View>
 
-            <EntranceView delay={200} fromScale={0} style={{ position: 'relative', marginBottom: 20, alignItems: 'center', justifyContent: 'center', width: svgSize, height: svgSize }}>
+            <View style={{ position: 'relative', marginBottom: 20, alignItems: 'center', justifyContent: 'center', width: svgSize, height: svgSize }}>
               <Svg
                 width={svgSize}
                 height={svgSize}
@@ -439,11 +427,11 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
                   <Play size={32} fill="white" color="white" />
                 )}
               </Pressable>
-            </EntranceView>
+            </View>
 
-            <EntranceView delay={300} fromY={0} style={{ width: '100%', paddingHorizontal: 12 }}>
+            <View style={{ width: '100%', paddingHorizontal: 12 }}>
               <Waveform isPlaying={!!isPlaying} theme={theme} height={100} />
-            </EntranceView>
+            </View>
 
             <Text
               style={{
@@ -460,8 +448,8 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
             </Text>
           </View>
 
-          {/* ── Bottom: info + actions ────────────────────────────────── */}
-          <View style={{ paddingHorizontal: 24, paddingBottom: bottomNavHeight, gap: 14 }}>
+          {/* ── Bottom: primary CTA + identity + secondary actions ────── */}
+          <View style={{ paddingHorizontal: 24, paddingBottom: bottomNavHeight, gap: 16 }}>
           <FadeWhen visible={hasListened && !isPlaying}>
             <Text
               style={{
@@ -475,6 +463,35 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
               {COPY.feed.afterListen}
             </Text>
           </FadeWhen>
+
+          {/* Primary CTA — bridges the vocal above and the profile below */}
+          <Pressable
+            onPress={() => setShowReplyModal(true)}
+            onPressIn={() => { replyScale.value = withSpring(0.97, TAP_SPRING); }}
+            onPressOut={() => { replyScale.value = withSpring(1, TAP_SPRING); }}
+          >
+            <Animated.View style={replyAnimStyle}>
+              <LinearGradient
+                colors={[...themeData.ctaGradient]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={{
+                  height: 56,
+                  borderRadius: 999,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 10,
+                  ...SHADOW.button,
+                }}
+              >
+                <Mic size={20} color="white" />
+                <Text style={{ fontFamily: FONT.semibold, fontSize: 16, color: 'white' }}>
+                  {COPY.actions.reply}
+                </Text>
+              </LinearGradient>
+            </Animated.View>
+          </Pressable>
 
           <View>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -490,89 +507,36 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
                   ))}
                 </View>
               </View>
-              <Pressable
-                onPress={() => setShowReportModal(true)}
-                style={{ padding: 6 }}
-                hitSlop={8}
-              >
-                <MoreHorizontal size={20} color="rgba(255,255,255,0.5)" />
-              </Pressable>
+
+              {/* Secondary actions: like + report */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <Pressable
+                  onPress={handleLike}
+                  onPressIn={() => { likeScale.value = withSpring(0.85, TAP_SPRING); }}
+                  onPressOut={() => { likeScale.value = withSpring(1, TAP_SPRING); }}
+                  hitSlop={10}
+                  style={{ padding: 8 }}
+                >
+                  <Animated.View style={likeAnimStyle}>
+                    <Heart
+                      size={24}
+                      color={isLiked ? '#ef4444' : 'rgba(255,255,255,0.7)'}
+                      fill={isLiked ? '#ef4444' : 'none'}
+                    />
+                  </Animated.View>
+                </Pressable>
+                <Pressable
+                  onPress={() => setShowReportModal(true)}
+                  style={{ padding: 8 }}
+                  hitSlop={10}
+                >
+                  <MoreHorizontal size={20} color="rgba(255,255,255,0.4)" />
+                </Pressable>
+              </View>
             </View>
             <Text style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)', fontFamily: FONT.medium, marginTop: 2 }}>
               {profile.city}
             </Text>
-          </View>
-
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
-            <Pressable
-              onPress={handleLike}
-              onPressIn={() => {
-                likeScale.value = withSpring(0.9, TAP_SPRING);
-              }}
-              onPressOut={() => {
-                likeScale.value = withSpring(1, TAP_SPRING);
-              }}
-              style={{ flex: 1 }}
-            >
-              <Animated.View
-                style={[
-                  {
-                    height: 56,
-                    borderRadius: 999,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 8,
-                    backgroundColor: liked ? '#ef4444' : 'rgba(255,255,255,0.12)',
-                    borderWidth: liked ? 0 : 1.5,
-                    borderColor: liked ? undefined : 'rgba(255,255,255,0.2)',
-                  },
-                  likeAnimStyle,
-                ]}
-              >
-                <Heart
-                  size={22}
-                  color="white"
-                  fill={liked ? 'white' : 'none'}
-                />
-                <Text style={{ fontFamily: FONT.semibold, fontSize: 16, color: 'white' }}>
-                  {liked ? COPY.actions.liked : COPY.actions.like}
-                </Text>
-              </Animated.View>
-            </Pressable>
-
-            <Pressable
-              onPress={() => setShowReplyModal(true)}
-              onPressIn={() => {
-                replyScale.value = withSpring(0.9, TAP_SPRING);
-              }}
-              onPressOut={() => {
-                replyScale.value = withSpring(1, TAP_SPRING);
-              }}
-              style={{ flex: 1 }}
-            >
-              <Animated.View style={replyAnimStyle}>
-                <LinearGradient
-                  colors={[...CTA_GRADIENT]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={{
-                    height: 56,
-                    borderRadius: 999,
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 8,
-                    ...SHADOW.button,
-                  }}
-                >
-                  <Mic size={22} color="white" />
-                  <Text style={{ fontFamily: FONT.semibold, fontSize: 16, color: 'white' }}>
-                    {COPY.actions.reply}
-                  </Text>
-                </LinearGradient>
-              </Animated.View>
-            </Pressable>
           </View>
         </View>
         </View>
@@ -589,7 +553,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
         </Text>
         <Pressable onPress={() => setShowReplyModal(false)}>
           <LinearGradient
-            colors={[...CTA_GRADIENT]}
+            colors={[...themeData.ctaGradient]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={{ borderRadius: 999, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}
@@ -652,7 +616,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
         </Text>
         <Pressable onPress={() => { setShowLockedModal(false); onRecordVibe?.(); }} style={{ width: '100%' }}>
           <LinearGradient
-            colors={[...CTA_GRADIENT]}
+            colors={[...themeData.ctaGradient]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
             style={{ borderRadius: 999, paddingVertical: 16, alignItems: 'center' }}

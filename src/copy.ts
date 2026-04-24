@@ -173,15 +173,20 @@ export const COPY = {
 
   likesScreen: {
     title: 'Mes Likes',
-    subtitle: "Les profils qui t'ont fait vibrer.",
+    subtitle: 'Tes voix préférées. Réponds-leur quand tu veux.',
     emptyTitle: 'Aucun like',
     emptyBody: "Découvre de nouvelles Voix et like celles qui te plaisent !",
     howItWorks: 'Comment ça marche ?',
     bullets: [
       'Like les vocaux qui te plaisent.',
       'Retrouve tous tes likes ici.',
-      'Envoie un vocal pour commencer la discussion !',
+      'Réponds quand tu te sens inspiré·e — pas de pression.',
     ] as const,
+  },
+
+  likeToast: {
+    firstLike: (name: string) =>
+      `Ajouté à tes Likes — ${name} recevra une notification.`,
   },
 
   messagesScreen: {
