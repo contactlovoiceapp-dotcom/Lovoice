@@ -1,4 +1,4 @@
-/* Animated audio waveform visualization — full-width bar columns with Reanimated height oscillation (Expo / React Native). */
+/* Animated audio waveform — decorative bar animation during playback (Reanimated, Expo / React Native). */
 
 import React, { useEffect, useMemo } from 'react';
 import { View } from 'react-native';

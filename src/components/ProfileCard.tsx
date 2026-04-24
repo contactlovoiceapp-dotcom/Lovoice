@@ -345,6 +345,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
 
   const progress =
     audioDurationSec > 0 ? (elapsed / audioDurationSec) * 100 : 0;
+  const waveformProgress = audioDurationSec > 0 ? elapsed / audioDurationSec : 0;
   const themeData = THEME_GRADIENTS[theme] ?? THEME_GRADIENTS.sunset;
   const ringRadius = (PLAY_BTN_SIZE + RING_PADDING) / 2;
   const ringCircumference = ringRadius * 2 * Math.PI;
@@ -526,19 +527,29 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
               <Waveform isPlaying={!!isPlaying} theme={theme} height={100} />
             </View>
 
-            <Text
+            <View
               style={{
-                marginTop: 10,
-                fontSize: 14,
-                color: 'rgba(255,255,255,0.5)',
-                fontVariant: ['tabular-nums'],
-                fontFamily: FONT.medium,
+                flexDirection: 'row',
+                justifyContent: 'flex-end',
+                paddingHorizontal: 16,
+                marginTop: 6,
               }}
             >
-              {elapsed > 0
-                ? `${formatTime(elapsed)} / ${formatTime(audioDurationSec)}`
-                : formatTime(audioDurationSec)}
-            </Text>
+              <Text
+                style={{
+                  fontSize: 11,
+                  color: 'rgba(255,255,255,0.4)',
+                  fontVariant: ['tabular-nums'],
+                  fontFamily: FONT.medium,
+                }}
+              >
+                {waveformProgress >= 1
+                  ? formatTime(audioDurationSec)
+                  : waveformProgress > 0
+                    ? `${formatTime(elapsed)} / ${formatTime(audioDurationSec)}`
+                    : formatTime(audioDurationSec)}
+              </Text>
+            </View>
           </View>
 
           {/* ── Bottom: actions row + identity card ────── */}
