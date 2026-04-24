@@ -66,7 +66,7 @@ const PhoneScreen: React.FC<Props> = ({ onNext, onBack }) => {
               height: AMBIENT_GLOW_SIZE,
               borderRadius: AMBIENT_GLOW_SIZE / 2,
               transform: [{ translateX: -(AMBIENT_GLOW_SIZE / 2) }, { translateY: -(AMBIENT_GLOW_SIZE / 2) }],
-              backgroundColor: 'rgba(231,38,106,0.08)',
+              backgroundColor: 'rgba(212,121,236,0.08)',
             }}
           />
         </View>

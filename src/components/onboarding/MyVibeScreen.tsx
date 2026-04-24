@@ -47,10 +47,10 @@ const MOOD_OPTIONS: {
   label: string;
   colors: readonly [string, string];
 }[] = [
-  { id: ColorTheme.Sunset, label: COPY.moods.sunset, colors: ['#FF8A3D', '#FF6B35'] },
-  { id: ColorTheme.Chill, label: COPY.moods.chill, colors: ['#667EEA', '#764BA2'] },
-  { id: ColorTheme.Electric, label: COPY.moods.electric, colors: ['#F5515F', '#C9302C'] },
-  { id: ColorTheme.Midnight, label: COPY.moods.midnight, colors: ['#302B63', '#24243E'] },
+  { id: ColorTheme.Sunset, label: COPY.moods.sunset, colors: ['#f59e0b', '#ea580c'] },
+  { id: ColorTheme.Chill, label: COPY.moods.chill, colors: ['#c084fc', '#8b5cf6'] },
+  { id: ColorTheme.Electric, label: COPY.moods.electric, colors: ['#e724ab', '#9333ea'] },
+  { id: ColorTheme.Midnight, label: COPY.moods.midnight, colors: ['#374151', '#1f2937'] },
 ];
 
 function getMoodGradient(theme: ColorTheme): readonly [string, string] {

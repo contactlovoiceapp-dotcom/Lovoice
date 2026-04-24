@@ -2,51 +2,51 @@
    Single source of truth so every screen speaks the same visual language. */
 
 export const COLORS = {
-  background: '#FFF9F5',
+  background: '#f8f5ff',
   surface: '#ffffff',
-  surfaceLight: '#FFF5EF',
+  surfaceLight: '#f0ebf5',
   surfaceMuted: 'rgba(255,255,255,0.7)',
-  primary: '#E7266A',
-  primaryMuted: 'rgba(231,38,106,0.12)',
-  secondary: '#C156D0',
-  dark: '#2D1136',
-  darkMuted: 'rgba(45,17,54,0.5)',
-  textPrimary: '#2D1136',
-  textSecondary: 'rgba(45,17,54,0.55)',
-  textTertiary: 'rgba(45,17,54,0.3)',
-  border: 'rgba(45,17,54,0.08)',
-  borderLight: 'rgba(45,17,54,0.04)',
+  primary: '#e724ab',
+  primaryMuted: 'rgba(231,36,171,0.12)',
+  secondary: '#d479ec',
+  dark: '#4b164c',
+  darkMuted: 'rgba(75,22,76,0.5)',
+  textPrimary: '#4b164c',
+  textSecondary: 'rgba(75,22,76,0.55)',
+  textTertiary: 'rgba(75,22,76,0.3)',
+  border: 'rgba(75,22,76,0.08)',
+  borderLight: 'rgba(75,22,76,0.04)',
 } as const;
 
 export const THEME_GRADIENTS = {
   sunset: {
-    colors: ['#FF8A3D', '#FF6B35', '#C9302C'] as const,
-    ringColor: '#FFB347',
-    glowColor: '#FF8A3D',
-    accent: '#FF6B35',
+    colors: ['#f59e0b', '#ea580c', '#4b164c'] as const,
+    ringColor: '#fbbf24',
+    glowColor: '#fbbf24',
+    accent: '#f59e0b',
   },
   chill: {
-    colors: ['#667EEA', '#764BA2', '#3B235A'] as const,
-    ringColor: '#8B9CF7',
-    glowColor: '#667EEA',
-    accent: '#667EEA',
+    colors: ['#c084fc', '#8b5cf6', '#4b164c'] as const,
+    ringColor: '#d479ec',
+    glowColor: '#a78bfa',
+    accent: '#c084fc',
   },
   electric: {
-    colors: ['#F5515F', '#C9302C', '#5A1018'] as const,
-    ringColor: '#FF7A85',
-    glowColor: '#F5515F',
-    accent: '#F5515F',
+    colors: ['#e724ab', '#9333ea', '#4b164c'] as const,
+    ringColor: '#e724ab',
+    glowColor: '#e724ab',
+    accent: '#e724ab',
   },
   midnight: {
-    colors: ['#302B63', '#24243E', '#0F0C29'] as const,
-    ringColor: '#6C63FF',
-    glowColor: '#4A42B0',
-    accent: '#6C63FF',
+    colors: ['#374151', '#1f2937', '#1a0a1b'] as const,
+    ringColor: '#9ca3af',
+    glowColor: '#6b7280',
+    accent: '#9ca3af',
   },
 } as const;
 
-export const CTA_GRADIENT = ['#E7266A', '#C156D0'] as const;
-export const ONBOARDING_GRADIENT = ['#FFF9F5', '#FFF0EB', '#F8E8F5'] as const;
+export const CTA_GRADIENT = ['#e724ab', '#d479ec'] as const;
+export const ONBOARDING_GRADIENT = ['#f8f5ff', '#edf2fc', '#f0e8f8'] as const;
 
 export const FONT = {
   light: 'Outfit_300Light',
@@ -73,14 +73,14 @@ export const RADIUS = {
 
 export const SHADOW = {
   card: {
-    shadowColor: '#2D1136',
+    shadowColor: '#4b164c',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.06,
     shadowRadius: 16,
     elevation: 4,
   },
   button: {
-    shadowColor: '#E7266A',
+    shadowColor: '#e724ab',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.2,
     shadowRadius: 12,

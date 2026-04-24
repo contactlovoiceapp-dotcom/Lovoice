@@ -16,7 +16,7 @@ import { COPY } from '../../copy';
 const LOGO = require('../../../assets/logo.png');
 
 const GLOW_SIZE = 400;
-const GLOW_BACKGROUND = 'rgba(231,38,106,0.15)';
+const GLOW_BACKGROUND = 'rgba(212,121,236,0.15)';
 
 interface Props {
   onFinish: () => void;

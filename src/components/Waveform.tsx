@@ -36,13 +36,13 @@ interface WaveformBarProps {
 function getBarColor(theme: ColorTheme): string {
   switch (theme) {
     case ColorTheme.Sunset:
-      return '#FFB347';
+      return '#fbbf24';
     case ColorTheme.Chill:
-      return '#8B9CF7';
+      return '#a78bfa';
     case ColorTheme.Electric:
-      return '#FF7A85';
+      return '#e724ab';
     case ColorTheme.Midnight:
-      return '#6C63FF';
+      return '#9ca3af';
     default:
       return 'rgba(255,255,255,0.5)';
   }
