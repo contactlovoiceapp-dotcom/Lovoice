@@ -17,11 +17,12 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withRepeat,
+  withSequence,
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
-import Svg, { Circle } from 'react-native-svg';
+import Svg, { Circle, Defs, RadialGradient, Stop } from 'react-native-svg';
 import {
   Heart,
   Lock,
@@ -35,7 +36,7 @@ import {
 } from 'lucide-react-native';
 
 import type { Profile } from '../types';
-import { COLORS, FONT, SHADOW, THEME_GRADIENTS } from '../theme';
+import { COLORS, FONT, SHADOW, THEME_GRADIENTS, hexToRgba } from '../theme';
 import { COPY } from '../copy';
 import Waveform from './Waveform';
 
@@ -55,7 +56,7 @@ const TAP_SPRING = { stiffness: 400, damping: 30 } as const;
 
 /* ─── Reanimated sub-components ────────────────────────────────────────────── */
 
-function PulseRing() {
+function PulseRing({ color }: { color: string }) {
   const scale = useSharedValue(1);
   const opacity = useSharedValue(0.2);
 
@@ -90,7 +91,7 @@ function PulseRing() {
           height: 96,
           borderRadius: 48,
           borderWidth: 2,
-          borderColor: 'rgba(255,255,255,0.2)',
+          borderColor: color,
         },
         animStyle,
       ]}
@@ -98,18 +99,36 @@ function PulseRing() {
   );
 }
 
-function AmbientGlow({ color, size }: { color: string; size: number }) {
-  const scale = useSharedValue(0.6);
+/* True radial gradient bloom — fades to zero at edges so no disc contour is visible.
+   stopOpacity values define the falloff shape; the View's animated opacity drives intensity. */
+function GlowLayer({
+  color,
+  size,
+  maxOpacity,
+  scaleFrom,
+  scaleTo,
+  duration,
+  gradientId,
+}: {
+  color: string;
+  size: number;
+  maxOpacity: number;
+  scaleFrom: number;
+  scaleTo: number;
+  duration: number;
+  gradientId: string;
+}) {
+  const scale = useSharedValue(scaleFrom);
   const opacity = useSharedValue(0);
 
   useEffect(() => {
     scale.value = withRepeat(
-      withTiming(1.3, { duration: 2000, easing: Easing.inOut(Easing.ease) }),
+      withTiming(scaleTo, { duration, easing: Easing.inOut(Easing.sin) }),
       -1,
       true,
     );
     opacity.value = withRepeat(
-      withTiming(0.2, { duration: 2000, easing: Easing.inOut(Easing.ease) }),
+      withTiming(maxOpacity, { duration, easing: Easing.inOut(Easing.sin) }),
       -1,
       true,
     );
@@ -125,18 +144,19 @@ function AmbientGlow({ color, size }: { color: string; size: number }) {
   }));
 
   return (
-    <Animated.View
-      pointerEvents="none"
-      style={[
-        {
-          width: size,
-          height: size,
-          borderRadius: size / 2,
-          backgroundColor: color,
-        },
-        animStyle,
-      ]}
-    />
+    <Animated.View pointerEvents="none" style={[animStyle, { width: size, height: size }]}>
+      <Svg width={size} height={size}>
+        <Defs>
+          <RadialGradient id={gradientId} cx="50%" cy="50%" r="50%">
+            <Stop offset="0%"   stopColor={color} stopOpacity={1} />
+            <Stop offset="35%"  stopColor={color} stopOpacity={0.55} />
+            <Stop offset="65%"  stopColor={color} stopOpacity={0.15} />
+            <Stop offset="100%" stopColor={color} stopOpacity={0} />
+          </RadialGradient>
+        </Defs>
+        <Circle cx={size / 2} cy={size / 2} r={size / 2} fill={`url(#${gradientId})`} />
+      </Svg>
+    </Animated.View>
   );
 }
 
@@ -226,12 +246,21 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
   const replyScale = useSharedValue(1);
   // Drives the CTA from "present but calm" (0.7) to "fully engaged" (1.0) once the user starts listening.
   const intensity = useSharedValue(0);
+  const playScale = useSharedValue(1);
+  // Controls the ambient glow visibility — fades in on play, fades out slowly on pause.
+  const glowOpacity = useSharedValue(0);
 
   const likeAnimStyle = useAnimatedStyle(() => ({
     transform: [{ scale: likeScale.value }],
   }));
   const replyAnimStyle = useAnimatedStyle(() => ({
     transform: [{ scale: replyScale.value }],
+  }));
+  const playScaleStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: playScale.value }],
+  }));
+  const glowStyle = useAnimatedStyle(() => ({
+    opacity: glowOpacity.value,
   }));
   const ctaIntensityStyle = useAnimatedStyle(() => ({
     opacity: 0.7 + intensity.value * 0.3,
@@ -286,6 +315,34 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
     intensity.value = withTiming(isPlaying || elapsed > 0 ? 1 : 0, { duration: 300 });
   }, [isPlaying, elapsed]);
 
+  useEffect(() => {
+    if (isPlaying) {
+      glowOpacity.value = withTiming(1, { duration: 600, easing: Easing.out(Easing.ease) });
+    } else {
+      // Slow fade-out so the glow dissolves rather than snapping off.
+      glowOpacity.value = withTiming(0, { duration: 1200, easing: Easing.in(Easing.ease) });
+    }
+  }, [isPlaying]);
+
+  useEffect(() => {
+    if (isPlaying) {
+      playScale.value = withRepeat(
+        withSequence(
+          withTiming(1.03, { duration: 750, easing: Easing.inOut(Easing.sin) }),
+          withTiming(1, { duration: 750, easing: Easing.inOut(Easing.sin) }),
+        ),
+        -1,
+        false,
+      );
+    } else {
+      cancelAnimation(playScale);
+      playScale.value = withTiming(1, { duration: 200 });
+    }
+    return () => {
+      cancelAnimation(playScale);
+    };
+  }, [isPlaying]);
+
   const progress =
     audioDurationSec > 0 ? (elapsed / audioDurationSec) * 100 : 0;
   const themeData = THEME_GRADIENTS[theme] ?? THEME_GRADIENTS.sunset;
@@ -294,7 +351,8 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
   const ringOffset =
     ringCircumference - (progress / 100) * ringCircumference;
   const svgSize = PLAY_BTN_SIZE + RING_PADDING + 4;
-  const glowSize = windowWidth * 0.8;
+  const outerGlowSize = windowWidth * 1.6;
+  const innerGlowSize = windowWidth * 0.9;
 
   const handleLike = () => {
     onToggleLike();
@@ -306,7 +364,8 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
         colors={[...themeData.colors]}
         style={{ flex: 1 }}
       >
-        {isPlaying && (
+        <Animated.View pointerEvents="none" style={[{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 }, glowStyle]}>
+          {/* Outer haze: white spotlight on the theme gradient — wide, slow, barely there */}
           <View
             pointerEvents="none"
             style={{
@@ -314,13 +373,43 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
               left: 0,
               right: 0,
               top: '33%',
-              marginTop: -glowSize / 2,
+              marginTop: -(outerGlowSize / 2),
               alignItems: 'center',
             }}
           >
-            <AmbientGlow color={themeData.glowColor} size={glowSize} />
+            <GlowLayer
+              gradientId="glowOuter"
+              color="white"
+              size={outerGlowSize}
+              maxOpacity={0.16}
+              scaleFrom={0.85}
+              scaleTo={1.15}
+              duration={4000}
+            />
           </View>
-        )}
+          {/* Inner bloom: theme color concentrated around the play button, faster beat */}
+          <View
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              top: '33%',
+              marginTop: -(innerGlowSize / 2),
+              alignItems: 'center',
+            }}
+          >
+            <GlowLayer
+              gradientId="glowInner"
+              color={themeData.glowColor}
+              size={innerGlowSize}
+              maxOpacity={0.38}
+              scaleFrom={0.75}
+              scaleTo={1.05}
+              duration={2500}
+            />
+          </View>
+        </Animated.View>
 
         {/* Full-height content: header clearance at top, actions pinned at bottom */}
         <View style={{ flex: 1, paddingTop: insets.top + 56, zIndex: 10 }}>
@@ -402,33 +491,35 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
                     justifyContent: 'center',
                   }}
                 >
-                  <PulseRing />
+                  <PulseRing color={hexToRgba(themeData.ringColor, 0.3)} />
                 </View>
               )}
 
-              <Pressable
-                onPress={handlePlayPress}
-                style={{
-                  width: 96,
-                  height: 96,
-                  borderRadius: 48,
-                  backgroundColor: 'rgba(255,255,255,0.15)',
-                  borderWidth: 1,
-                  borderColor: 'rgba(255,255,255,0.2)',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                {!hasRecordedVibe ? (
-                  <Lock size={32} color="rgba(255,255,255,0.8)" />
-                ) : hasListened && !isPlaying ? (
-                  <RotateCcw size={28} color="rgba(255,255,255,0.9)" />
-                ) : isPlaying ? (
-                  <Pause size={32} fill="white" color="white" />
-                ) : (
-                  <Play size={32} fill="white" color="white" />
-                )}
-              </Pressable>
+              <Animated.View style={[playScaleStyle, SHADOW.play, { borderRadius: 48 }]}>
+                <Pressable
+                  onPress={handlePlayPress}
+                  style={{
+                    width: 96,
+                    height: 96,
+                    borderRadius: 48,
+                    backgroundColor: 'rgba(255,255,255,0.22)',
+                    borderWidth: 1,
+                    borderColor: 'rgba(255,255,255,0.35)',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  {!hasRecordedVibe ? (
+                    <Lock size={32} color="rgba(255,255,255,0.8)" />
+                  ) : hasListened && !isPlaying ? (
+                    <RotateCcw size={28} color="rgba(255,255,255,0.9)" />
+                  ) : isPlaying ? (
+                    <Pause size={32} fill="white" color="white" />
+                  ) : (
+                    <Play size={32} fill="white" color="white" />
+                  )}
+                </Pressable>
+              </Animated.View>
             </View>
 
             <View style={{ width: '100%', paddingHorizontal: 12 }}>

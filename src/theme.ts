@@ -1,6 +1,13 @@
 /* Centralized design tokens — palette, mood gradients, typography, and spacing constants.
    Single source of truth so every screen speaks the same visual language. */
 
+/** Converts a `#rrggbb` hex color to `rgba(r,g,b,alpha)`. Throws on invalid input. */
+export function hexToRgba(hex: string, alpha: number): string {
+  const result = /^#([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  if (!result) throw new Error(`hexToRgba: invalid hex color "${hex}"`);
+  return `rgba(${parseInt(result[1], 16)},${parseInt(result[2], 16)},${parseInt(result[3], 16)},${alpha})`;
+}
+
 export const COLORS = {
   background: '#f8f5ff',
   surface: '#ffffff',
@@ -93,5 +100,13 @@ export const SHADOW = {
     shadowOpacity: 0.2,
     shadowRadius: 12,
     elevation: 6,
+  },
+  // Darker shadow gives the play button physical depth on saturated backgrounds.
+  play: {
+    shadowColor: '#1a0a1b',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.35,
+    shadowRadius: 24,
+    elevation: 12,
   },
 } as const;
