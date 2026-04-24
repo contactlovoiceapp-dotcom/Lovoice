@@ -148,18 +148,6 @@ function formatTime(sec: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-function FadeWhen({ visible, children }: { visible: boolean; children: React.ReactNode }) {
-  const opacity = useSharedValue(visible ? 1 : 0);
-
-  useEffect(() => {
-    opacity.value = withTiming(visible ? 1 : 0, { duration: 250 });
-  }, [visible]);
-
-  const animStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
-
-  return <Animated.View style={animStyle}>{children}</Animated.View>;
-}
-
 function ModalOverlay({
   visible,
   onClose,
@@ -236,11 +224,21 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
 
   const likeScale = useSharedValue(1);
   const replyScale = useSharedValue(1);
+  // Drives the CTA from "present but calm" (0.7) to "fully engaged" (1.0) once the user starts listening.
+  const intensity = useSharedValue(0);
+
   const likeAnimStyle = useAnimatedStyle(() => ({
     transform: [{ scale: likeScale.value }],
   }));
   const replyAnimStyle = useAnimatedStyle(() => ({
     transform: [{ scale: replyScale.value }],
+  }));
+  const ctaIntensityStyle = useAnimatedStyle(() => ({
+    opacity: 0.7 + intensity.value * 0.3,
+  }));
+  // Glow layer behind the CTA gradient, revealed as the user engages.
+  const ctaGlowStyle = useAnimatedStyle(() => ({
+    opacity: intensity.value,
   }));
 
   const handlePlayPress = () => {
@@ -283,6 +281,10 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
   }, [isPlaying, audioDurationSec, onFinish, profile.id]);
+
+  useEffect(() => {
+    intensity.value = withTiming(isPlaying || elapsed > 0 ? 1 : 0, { duration: 300 });
+  }, [isPlaying, elapsed]);
 
   const progress =
     audioDurationSec > 0 ? (elapsed / audioDurationSec) * 100 : 0;
@@ -448,97 +450,123 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
             </Text>
           </View>
 
-          {/* ── Bottom: primary CTA + identity + secondary actions ────── */}
+          {/* ── Bottom: actions row + identity card ────── */}
           <View style={{ paddingHorizontal: 24, paddingBottom: bottomNavHeight, gap: 16 }}>
-          <FadeWhen visible={hasListened && !isPlaying}>
-            <Text
-              style={{
-                textAlign: 'center',
-                fontFamily: FONT.serifItalic,
-                fontSize: 18,
-                color: 'rgba(255,255,255,0.6)',
-                fontStyle: 'italic',
-              }}
-            >
-              {COPY.feed.afterListen}
-            </Text>
-          </FadeWhen>
 
-          {/* Primary CTA — bridges the vocal above and the profile below */}
-          <Pressable
-            onPress={() => setShowReplyModal(true)}
-            onPressIn={() => { replyScale.value = withSpring(0.97, TAP_SPRING); }}
-            onPressOut={() => { replyScale.value = withSpring(1, TAP_SPRING); }}
-          >
-            <Animated.View style={replyAnimStyle}>
-              <LinearGradient
-                colors={[...themeData.ctaGradient]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={{
-                  height: 56,
-                  borderRadius: 999,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 10,
-                  ...SHADOW.button,
-                }}
+            {/* Row 1: CTA "Répondre" (flex 1) + Like satellite (56px) */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <Pressable
+                style={{ flex: 1 }}
+                onPress={() => setShowReplyModal(true)}
+                onPressIn={() => { replyScale.value = withSpring(0.97, TAP_SPRING); }}
+                onPressOut={() => { replyScale.value = withSpring(1, TAP_SPRING); }}
               >
-                <Mic size={20} color="white" />
-                <Text style={{ fontFamily: FONT.semibold, fontSize: 16, color: 'white' }}>
-                  {COPY.actions.reply}
-                </Text>
-              </LinearGradient>
-            </Animated.View>
-          </Pressable>
+                <Animated.View style={[replyAnimStyle, ctaIntensityStyle]}>
+                  {/* Shadow caster for the glow — behind the gradient, opacity driven by intensity */}
+                  <Animated.View
+                    pointerEvents="none"
+                    style={[
+                      {
+                        position: 'absolute',
+                        top: 0, left: 0, right: 0, bottom: 0,
+                        borderRadius: 999,
+                        backgroundColor: '#e724ab',
+                        shadowColor: '#e724ab',
+                        shadowOffset: { width: 0, height: 8 },
+                        shadowOpacity: 0.4,
+                        shadowRadius: 20,
+                      },
+                      ctaGlowStyle,
+                    ]}
+                  />
+                  <LinearGradient
+                    colors={[...themeData.ctaGradient]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={{
+                      height: 56,
+                      borderRadius: 999,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 10,
+                      ...SHADOW.button,
+                    }}
+                  >
+                    <Mic size={20} color="white" />
+                    <Text style={{ fontFamily: FONT.semibold, fontSize: 16, color: 'white' }}>
+                      {COPY.actions.reply}
+                    </Text>
+                  </LinearGradient>
+                </Animated.View>
+              </Pressable>
 
-          <View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-              <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 12, flexShrink: 1 }}>
+              {/* Like satellite — 56px circle, closer to thumb than buried in identity row */}
+              <Pressable
+                onPress={handleLike}
+                onPressIn={() => { likeScale.value = withSpring(0.85, TAP_SPRING); }}
+                onPressOut={() => { likeScale.value = withSpring(1, TAP_SPRING); }}
+                hitSlop={8}
+              >
+                <Animated.View
+                  style={[
+                    {
+                      width: 56,
+                      height: 56,
+                      borderRadius: 28,
+                      backgroundColor: 'rgba(255,255,255,0.12)',
+                      borderWidth: 1,
+                      borderColor: 'rgba(255,255,255,0.25)',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    },
+                    likeAnimStyle,
+                  ]}
+                >
+                  <Heart
+                    size={26}
+                    color={isLiked ? '#ef4444' : 'rgba(255,255,255,0.9)'}
+                    fill={isLiked ? '#ef4444' : 'none'}
+                  />
+                </Animated.View>
+              </Pressable>
+            </View>
+
+            {/* Row 2: Identity card */}
+            <View style={{ gap: 4 }}>
+              {/* Line 1: name + age | More button */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Text style={{ fontSize: 24, fontFamily: FONT.bold, color: 'white' }}>
                   {profile.name}, {profile.age}
                 </Text>
-                <View style={{ flexDirection: 'row', gap: 4 }}>
-                  {profile.emojis.map((emoji, idx) => (
-                    <Text key={idx} style={{ fontSize: 16 }}>
-                      {emoji}
-                    </Text>
-                  ))}
-                </View>
-              </View>
-
-              {/* Secondary actions: like + report */}
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                <Pressable
-                  onPress={handleLike}
-                  onPressIn={() => { likeScale.value = withSpring(0.85, TAP_SPRING); }}
-                  onPressOut={() => { likeScale.value = withSpring(1, TAP_SPRING); }}
-                  hitSlop={10}
-                  style={{ padding: 8 }}
-                >
-                  <Animated.View style={likeAnimStyle}>
-                    <Heart
-                      size={24}
-                      color={isLiked ? '#ef4444' : 'rgba(255,255,255,0.7)'}
-                      fill={isLiked ? '#ef4444' : 'none'}
-                    />
-                  </Animated.View>
-                </Pressable>
                 <Pressable
                   onPress={() => setShowReportModal(true)}
-                  style={{ padding: 8 }}
-                  hitSlop={10}
+                  hitSlop={12}
+                  style={{ padding: 4 }}
                 >
-                  <MoreHorizontal size={20} color="rgba(255,255,255,0.4)" />
+                  <MoreHorizontal size={18} color="rgba(255,255,255,0.35)" />
                 </Pressable>
               </View>
+
+              {/* Line 2: emojis · city */}
+              <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' }}>
+                {profile.emojis.map((emoji, idx) => (
+                  <Text
+                    key={idx}
+                    style={{ fontSize: 18, marginRight: idx < profile.emojis.length - 1 ? 4 : 0 }}
+                  >
+                    {emoji}
+                  </Text>
+                ))}
+                <Text style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)', marginHorizontal: 4 }}>
+                  ·
+                </Text>
+                <Text style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)', fontFamily: FONT.medium }}>
+                  {profile.city}
+                </Text>
+              </View>
             </View>
-            <Text style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)', fontFamily: FONT.medium, marginTop: 2 }}>
-              {profile.city}
-            </Text>
           </View>
-        </View>
         </View>
       </LinearGradient>
 

@@ -135,12 +135,9 @@ export const COPY = {
       'Tu as écouté toutes les voix du coin. Élargis tes filtres ou reviens plus tard.',
     editFilters: 'Modifier mes filtres',
     fallbackPrompt: 'Écoute ma voix…',
-    afterListen: 'Ça vibre ?',
   },
 
   actions: {
-    liked: 'Liké !',
-    like: 'Liker',
     reply: 'Répondre',
   },
 
