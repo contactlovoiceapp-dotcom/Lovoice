@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import {
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -142,6 +143,7 @@ const MyVibeScreen: React.FC<Props> = ({
   const [interestedIn, setInterestedIn] = useState<string[]>([]);
   const [showGenderPicker, setShowGenderPicker] = useState(false);
   const [showDeleteProfileModal, setShowDeleteProfileModal] = useState(false);
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
 
   const { width: windowWidth } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -167,6 +169,20 @@ const MyVibeScreen: React.FC<Props> = ({
     city.trim() !== '' &&
     gender !== '' &&
     interestedIn.length > 0;
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener('keyboardWillShow', () => {
+      setIsKeyboardVisible(true);
+    });
+    const hideSub = Keyboard.addListener('keyboardWillHide', () => {
+      setIsKeyboardVisible(false);
+    });
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   const playColors = getMoodGradient(mood);
   const activeMoodAccent = playColors[0];
@@ -645,45 +661,47 @@ const MyVibeScreen: React.FC<Props> = ({
             </ScrollView>
           </View>
 
-          <View
-            style={{
-              position: 'absolute',
-              bottom: 0,
-              left: 0,
-              right: 0,
-              zIndex: 20,
-              paddingHorizontal: 16,
-              paddingBottom: Math.max(insets.bottom, 16) + 8,
-            }}
-          >
-            <Pressable
-              accessibilityRole="button"
-              disabled={!isFormValid}
-              onPress={onSend}
+          {!isKeyboardVisible && (
+            <View
               style={{
-                width: '100%',
-                alignSelf: 'center',
-                borderRadius: RADIUS.full,
-                overflow: 'hidden',
-                maxWidth: contentMaxWidth,
-                opacity: isFormValid ? 1 : 0.2,
-                ...SHADOW.button,
+                position: 'absolute',
+                bottom: 0,
+                left: 0,
+                right: 0,
+                zIndex: 20,
+                paddingHorizontal: 16,
+                paddingBottom: Math.max(insets.bottom, 16) + 8,
               }}
             >
-              <LinearGradient
-                colors={[...CTA_GRADIENT]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
+              <Pressable
+                accessibilityRole="button"
+                disabled={!isFormValid}
+                onPress={onSend}
+                style={{
+                  width: '100%',
+                  alignSelf: 'center',
+                  borderRadius: RADIUS.full,
+                  overflow: 'hidden',
+                  maxWidth: contentMaxWidth,
+                  opacity: isFormValid ? 1 : 0.2,
+                  ...SHADOW.button,
+                }}
               >
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 16 }}>
-                  <Text style={{ fontFamily: FONT.bold, color: COLORS.surface }}>
-                    {isOnboarding ? COPY.profile.submitOnboarding : COPY.common.save}
-                  </Text>
-                  <ArrowRight size={20} color={COLORS.surface} />
-                </View>
-              </LinearGradient>
-            </Pressable>
-          </View>
+                <LinearGradient
+                  colors={[...CTA_GRADIENT]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 16 }}>
+                    <Text style={{ fontFamily: FONT.bold, color: COLORS.surface }}>
+                      {isOnboarding ? COPY.profile.submitOnboarding : COPY.common.save}
+                    </Text>
+                    <ArrowRight size={20} color={COLORS.surface} />
+                  </View>
+                </LinearGradient>
+              </Pressable>
+            </View>
+          )}
         </SafeAreaView>
       </KeyboardAvoidingView>
 
