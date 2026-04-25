@@ -77,7 +77,7 @@ export const COPY = {
     maxDuration: '/ 1:30',
     restart: 'Recommencer',
     recorded: 'Voix enregistrée !',
-    hint: 'Une intro, une pensée, un délire... Parle librement. (10 sec min, 1m30 max)',
+    hint: 'Parle comme à une personne, pas comme à un micro. 10 sec min, 1m30 max.',
     minimumDurationError: 'Ton vocal doit durer au moins 10 secondes.',
     idleStatus: 'Appuie pour commencer',
     recordingStatus: 'Appuie pour arrêter',
