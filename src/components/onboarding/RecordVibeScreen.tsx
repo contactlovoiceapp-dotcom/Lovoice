@@ -29,6 +29,8 @@ const GLOW_SIZE = 500;
 const MIN_RECORDING_SECONDS = 10;
 const MAX_RECORDING_SECONDS = 90;
 
+type RecordingState = 'idle' | 'recording' | 'tooShort' | 'recorded' | 'playingPreview';
+
 interface Props {
   onNext: () => void;
   onSkip: () => void;
@@ -154,15 +156,16 @@ function PingRing({
 }
 
 const RecordVibeScreen: React.FC<Props> = ({ onNext, onSkip }) => {
-  const [isRecording, setIsRecording] = useState(false);
+  const [recordingState, setRecordingState] = useState<RecordingState>('idle');
   const [time, setTime] = useState(0);
-  const [hasRecorded, setHasRecorded] = useState(false);
-  const [isPreviewPlaying, setIsPreviewPlaying] = useState(false);
-  const [recordingError, setRecordingError] = useState('');
   const [showInspiration, setShowInspiration] = useState(false);
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const { width: windowWidth } = useWindowDimensions();
   const contentMaxWidth = Math.min(384, windowWidth - 48);
+  const isRecording = recordingState === 'recording';
+  const hasRecorded = recordingState === 'recorded' || recordingState === 'playingPreview';
+  const isPreviewPlaying = recordingState === 'playingPreview';
+  const recordingError = recordingState === 'tooShort' ? COPY.record.minimumDurationError : '';
   const minimumRemaining = Math.max(MIN_RECORDING_SECONDS - time, 0);
   const statusText = hasRecorded
     ? isPreviewPlaying
@@ -174,7 +177,7 @@ const RecordVibeScreen: React.FC<Props> = ({ onNext, onSkip }) => {
   const minimumGuidanceText = isRecording
     ? minimumRemaining > 0
       ? COPY.record.minimumRemaining(minimumRemaining)
-      : COPY.record.minimumReached
+      : ''
     : '';
   const continueLabel = hasRecorded
     ? COPY.common.continue
@@ -190,10 +193,7 @@ const RecordVibeScreen: React.FC<Props> = ({ onNext, onSkip }) => {
       interval = setInterval(() => {
         setTime((prev) => {
           if (prev >= MAX_RECORDING_SECONDS) {
-            setIsRecording(false);
-            setHasRecorded(true);
-            setIsPreviewPlaying(false);
-            setRecordingError('');
+            setRecordingState('recorded');
             return MAX_RECORDING_SECONDS;
           }
           return prev + 1;
@@ -205,28 +205,20 @@ const RecordVibeScreen: React.FC<Props> = ({ onNext, onSkip }) => {
 
   const toggleRecording = () => {
     if (isRecording) {
-      setIsRecording(false);
       if (time >= MIN_RECORDING_SECONDS) {
-        setHasRecorded(true);
-        setIsPreviewPlaying(false);
-        setRecordingError('');
+        setRecordingState('recorded');
         return;
       }
-      setHasRecorded(false);
-      setIsPreviewPlaying(false);
-      setRecordingError(COPY.record.minimumDurationError);
+      setRecordingState('tooShort');
     } else {
       setTime(0);
-      setIsRecording(true);
-      setHasRecorded(false);
-      setIsPreviewPlaying(false);
-      setRecordingError('');
+      setRecordingState('recording');
     }
   };
 
   const handlePrimaryButtonPress = () => {
     if (hasRecorded && !isRecording) {
-      setIsPreviewPlaying((current) => !current);
+      setRecordingState(isPreviewPlaying ? 'recorded' : 'playingPreview');
       return;
     }
     toggleRecording();
@@ -357,7 +349,7 @@ const RecordVibeScreen: React.FC<Props> = ({ onNext, onSkip }) => {
                     textAlign: 'center',
                     fontSize: 12,
                     fontFamily: FONT.medium,
-                    color: minimumRemaining > 0 ? COLORS.textTertiary : COLORS.primary,
+                    color: COLORS.textTertiary,
                   }}
                 >
                   {minimumGuidanceText}
@@ -368,10 +360,8 @@ const RecordVibeScreen: React.FC<Props> = ({ onNext, onSkip }) => {
                 <Pressable
                   accessibilityRole="button"
                   onPress={() => {
-                    setHasRecorded(false);
-                    setIsPreviewPlaying(false);
                     setTime(0);
-                    setRecordingError('');
+                    setRecordingState('idle');
                   }}
                   style={{ marginTop: 8 }}
                 >

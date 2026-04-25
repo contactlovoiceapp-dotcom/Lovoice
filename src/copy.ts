@@ -85,7 +85,6 @@ export const COPY = {
     previewPlayingStatus: 'Lecture de ta voix',
     previewHint: 'Tu peux réécouter, recommencer ou continuer.',
     minimumRemaining: (seconds: number) => `Encore ${seconds} sec minimum`,
-    minimumReached: "Tu peux t'arrêter quand tu veux",
     ctaRecord: 'Enregistre ta voix',
     ctaMinimumRemaining: (seconds: number) => `Encore ${seconds} sec`,
     ctaStopRecording: "Arrête l'enregistrement",
