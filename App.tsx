@@ -472,6 +472,10 @@ function AppContent() {
           <MyVibeScreen
             onBack={() => setActiveTab('discover')}
             onSend={() => setActiveTab('discover')}
+            onDeleteVibe={() => {
+              setHasRecordedVibe(false);
+              navigateTo('onboarding_record');
+            }}
             hasRecordedVibe={hasRecordedVibe}
           />
         </View>
@@ -566,6 +570,10 @@ function AppContent() {
           <MyVibeScreen
             onBack={() => navigateTo('onboarding_record')}
             onSend={() => navigateTo('main')}
+            onDeleteVibe={() => {
+              setHasRecordedVibe(false);
+              navigateTo('onboarding_record');
+            }}
             hasRecordedVibe={hasRecordedVibe}
             isOnboarding
           />
