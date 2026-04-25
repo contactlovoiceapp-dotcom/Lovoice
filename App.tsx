@@ -516,7 +516,9 @@ function AppContent() {
         </Animated.View>
       )}
 
-      <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
+      {activeTab !== 'my-vibes' && (
+        <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
+      )}
       {showFilters && <FiltersModal onClose={() => setShowFilters(false)} />}
     </View>
   );

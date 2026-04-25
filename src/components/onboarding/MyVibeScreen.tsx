@@ -191,7 +191,7 @@ const MyVibeScreen: React.FC<Props> = ({
               keyboardShouldPersistTaps="handled"
               contentContainerStyle={{
                 gap: 24,
-                paddingBottom: 140,
+                paddingBottom: 112,
                 paddingHorizontal: 4,
                 maxWidth: contentMaxWidth,
                 alignSelf: 'center',
@@ -522,43 +522,36 @@ const MyVibeScreen: React.FC<Props> = ({
               right: 0,
               zIndex: 20,
               paddingHorizontal: 16,
-              paddingBottom: Math.max(insets.bottom, 16),
+              paddingBottom: Math.max(insets.bottom, 16) + 8,
             }}
           >
-            <LinearGradient
-              colors={['transparent', 'rgba(255,249,245,0.9)', COLORS.background]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 0, y: 1 }}
-              style={{ paddingTop: 24, paddingBottom: 8 }}
+            <Pressable
+              accessibilityRole="button"
+              disabled={!isFormValid}
+              onPress={onSend}
+              style={{
+                width: '100%',
+                alignSelf: 'center',
+                borderRadius: RADIUS.full,
+                overflow: 'hidden',
+                maxWidth: contentMaxWidth,
+                opacity: isFormValid ? 1 : 0.2,
+                ...SHADOW.button,
+              }}
             >
-              <Pressable
-                accessibilityRole="button"
-                disabled={!isFormValid}
-                onPress={onSend}
-                style={{
-                  width: '100%',
-                  alignSelf: 'center',
-                  borderRadius: RADIUS.full,
-                  overflow: 'hidden',
-                  maxWidth: contentMaxWidth,
-                  opacity: isFormValid ? 1 : 0.2,
-                  ...SHADOW.button,
-                }}
+              <LinearGradient
+                colors={[...CTA_GRADIENT]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
               >
-                <LinearGradient
-                  colors={[...CTA_GRADIENT]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                >
-                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 16 }}>
-                    <Text style={{ fontFamily: FONT.bold, color: COLORS.surface }}>
-                      {isOnboarding ? COPY.profile.submitOnboarding : COPY.common.save}
-                    </Text>
-                    <ArrowRight size={20} color={COLORS.surface} />
-                  </View>
-                </LinearGradient>
-              </Pressable>
-            </LinearGradient>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 16 }}>
+                  <Text style={{ fontFamily: FONT.bold, color: COLORS.surface }}>
+                    {isOnboarding ? COPY.profile.submitOnboarding : COPY.common.save}
+                  </Text>
+                  <ArrowRight size={20} color={COLORS.surface} />
+                </View>
+              </LinearGradient>
+            </Pressable>
           </View>
         </SafeAreaView>
       </KeyboardAvoidingView>
