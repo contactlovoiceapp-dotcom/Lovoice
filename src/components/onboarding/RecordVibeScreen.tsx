@@ -162,6 +162,24 @@ const RecordVibeScreen: React.FC<Props> = ({ onNext, onSkip }) => {
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const { width: windowWidth } = useWindowDimensions();
   const contentMaxWidth = Math.min(384, windowWidth - 48);
+  const minimumRemaining = Math.max(MIN_RECORDING_SECONDS - time, 0);
+  const statusText = hasRecorded
+    ? COPY.record.recordedStatus
+    : isRecording
+      ? COPY.record.recordingStatus
+      : COPY.record.idleStatus;
+  const minimumGuidanceText = isRecording
+    ? minimumRemaining > 0
+      ? COPY.record.minimumRemaining(minimumRemaining)
+      : COPY.record.minimumReached
+    : '';
+  const continueLabel = hasRecorded
+    ? COPY.common.continue
+    : isRecording
+      ? minimumRemaining > 0
+        ? COPY.record.ctaMinimumRemaining(minimumRemaining)
+        : COPY.record.ctaStopRecording
+      : COPY.record.ctaRecord;
 
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
@@ -278,7 +296,7 @@ const RecordVibeScreen: React.FC<Props> = ({ onNext, onSkip }) => {
               </View>
             </View>
 
-            <View style={{ marginTop: 24, height: 64, flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start' }}>
+            <View style={{ marginTop: 24, minHeight: 92, flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start' }}>
               {(isRecording || hasRecorded || recordingError !== '') && (
                 <Text
                   style={{
@@ -290,6 +308,32 @@ const RecordVibeScreen: React.FC<Props> = ({ onNext, onSkip }) => {
                 >
                   {formatTime(time)}{' '}
                   <Text style={{ fontSize: 18, fontFamily: FONT.regular, color: COLORS.textTertiary }}>{COPY.record.maxDuration}</Text>
+                </Text>
+              )}
+
+              <Text
+                style={{
+                  marginTop: isRecording || hasRecorded || recordingError !== '' ? 6 : 0,
+                  textAlign: 'center',
+                  fontSize: 14,
+                  fontFamily: FONT.medium,
+                  color: COLORS.textSecondary,
+                }}
+              >
+                {statusText}
+              </Text>
+
+              {minimumGuidanceText !== '' && (
+                <Text
+                  style={{
+                    marginTop: 4,
+                    textAlign: 'center',
+                    fontSize: 12,
+                    fontFamily: FONT.medium,
+                    color: minimumRemaining > 0 ? COLORS.textTertiary : COLORS.primary,
+                  }}
+                >
+                  {minimumGuidanceText}
                 </Text>
               )}
 
@@ -370,7 +414,7 @@ const RecordVibeScreen: React.FC<Props> = ({ onNext, onSkip }) => {
                 end={{ x: 1, y: 0 }}
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 16 }}>
-                  <Text style={{ fontFamily: FONT.bold, color: 'white' }}>{COPY.common.continue}</Text>
+                  <Text style={{ fontFamily: FONT.bold, color: 'white' }}>{continueLabel}</Text>
                   <ArrowRight size={20} color={COLORS.surface} />
                 </View>
               </LinearGradient>
