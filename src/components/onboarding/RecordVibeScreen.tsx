@@ -26,6 +26,8 @@ import { COPY } from '../../copy';
 
 const MIC_SIZE = 128;
 const GLOW_SIZE = 500;
+const MIN_RECORDING_SECONDS = 10;
+const MAX_RECORDING_SECONDS = 90;
 
 interface Props {
   onNext: () => void;
@@ -155,6 +157,7 @@ const RecordVibeScreen: React.FC<Props> = ({ onNext, onSkip }) => {
   const [isRecording, setIsRecording] = useState(false);
   const [time, setTime] = useState(0);
   const [hasRecorded, setHasRecorded] = useState(false);
+  const [recordingError, setRecordingError] = useState('');
   const [showInspiration, setShowInspiration] = useState(false);
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const { width: windowWidth } = useWindowDimensions();
@@ -165,10 +168,11 @@ const RecordVibeScreen: React.FC<Props> = ({ onNext, onSkip }) => {
     if (isRecording) {
       interval = setInterval(() => {
         setTime((prev) => {
-          if (prev >= 90) {
+          if (prev >= MAX_RECORDING_SECONDS) {
             setIsRecording(false);
             setHasRecorded(true);
-            return 90;
+            setRecordingError('');
+            return MAX_RECORDING_SECONDS;
           }
           return prev + 1;
         });
@@ -180,11 +184,18 @@ const RecordVibeScreen: React.FC<Props> = ({ onNext, onSkip }) => {
   const toggleRecording = () => {
     if (isRecording) {
       setIsRecording(false);
-      setHasRecorded(true);
+      if (time >= MIN_RECORDING_SECONDS) {
+        setHasRecorded(true);
+        setRecordingError('');
+        return;
+      }
+      setHasRecorded(false);
+      setRecordingError(COPY.record.minimumDurationError);
     } else {
       setTime(0);
       setIsRecording(true);
       setHasRecorded(false);
+      setRecordingError('');
     }
   };
 
@@ -268,7 +279,7 @@ const RecordVibeScreen: React.FC<Props> = ({ onNext, onSkip }) => {
             </View>
 
             <View style={{ marginTop: 24, height: 64, flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start' }}>
-              {(isRecording || hasRecorded) && (
+              {(isRecording || hasRecorded || recordingError !== '') && (
                 <Text
                   style={{
                     fontSize: 28,
@@ -288,6 +299,7 @@ const RecordVibeScreen: React.FC<Props> = ({ onNext, onSkip }) => {
                   onPress={() => {
                     setHasRecorded(false);
                     setTime(0);
+                    setRecordingError('');
                   }}
                   style={{ marginTop: 8 }}
                 >
@@ -313,7 +325,7 @@ const RecordVibeScreen: React.FC<Props> = ({ onNext, onSkip }) => {
               }}
             >
               <Text style={{ fontSize: 14, lineHeight: 20, fontFamily: FONT.regular, color: COLORS.textSecondary }}>
-                {hasRecorded ? COPY.record.recorded : COPY.record.hint}
+                {recordingError || (hasRecorded ? COPY.record.recorded : COPY.record.hint)}
               </Text>
 
               {!hasRecorded && (
