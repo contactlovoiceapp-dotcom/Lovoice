@@ -184,6 +184,100 @@ const MyVibeScreen: React.FC<Props> = ({
             <View style={{ width: 40 }} />
           </View>
 
+          {hasRecordedVibe && (
+            <View
+              style={{
+                width: '100%',
+                maxWidth: contentMaxWidth,
+                alignSelf: 'center',
+                marginBottom: 20,
+                borderRadius: RADIUS.lg,
+                borderWidth: 1,
+                borderColor: COLORS.border,
+                borderLeftWidth: 3,
+                borderLeftColor: activeMoodAccent,
+                backgroundColor: COLORS.surfaceMuted,
+                padding: 16,
+                ...SHADOW.card,
+              }}
+            >
+              <View style={{ marginBottom: 12, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                <View>
+                  <Text style={{ fontFamily: FONT.bold, fontSize: 16, color: COLORS.dark }}>
+                    {COPY.profile.voiceCard}
+                  </Text>
+                  <Text style={{ fontFamily: FONT.regular, fontSize: 12, color: COLORS.textTertiary }}>
+                    {COPY.profile.voiceTimestamp}
+                  </Text>
+                </View>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={COPY.a11y.deleteVoice}
+                  onPress={() => onDeleteVibe?.()}
+                  style={{ padding: 8 }}
+                >
+                  <Trash2 size={18} color={COLORS.textTertiary} />
+                </Pressable>
+              </View>
+
+              <View style={{ marginBottom: 12, flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={isPlaying ? COPY.a11y.pause : COPY.a11y.play}
+                  onPress={() => setIsPlaying((p) => !p)}
+                  style={{ width: 48, height: 48, flexShrink: 0, borderRadius: 24, overflow: 'hidden' }}
+                >
+                  <LinearGradient
+                    colors={[...playColors]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={{ width: 48, height: 48, alignItems: 'center', justifyContent: 'center' }}
+                  >
+                    {isPlaying ? (
+                      <Pause size={18} color={COLORS.surface} fill={COLORS.surface} />
+                    ) : (
+                      <Play size={18} color={COLORS.surface} fill={COLORS.surface} style={{ marginLeft: 2 }} />
+                    )}
+                  </LinearGradient>
+                </Pressable>
+
+                <View style={{ flex: 1, flexDirection: 'row', alignItems: 'flex-end', overflow: 'hidden', height: WAVE_CONTAINER_HEIGHT, gap: 2 }}>
+                  {Array.from({ length: WAVE_BAR_COUNT }, (_, i) => (
+                    <MiniWaveBar
+                      key={i}
+                      isPlaying={isPlaying}
+                      containerHeight={WAVE_CONTAINER_HEIGHT}
+                      barColor={activeMoodAccent}
+                    />
+                  ))}
+                </View>
+
+                <Text
+                  style={{
+                    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+                    fontSize: 12,
+                    color: COLORS.textTertiary,
+                  }}
+                >
+                  0:01
+                </Text>
+              </View>
+
+              <Text
+                numberOfLines={2}
+                style={{
+                  fontFamily: catchphrase.trim() ? FONT.semibold : FONT.regular,
+                  fontSize: 13,
+                  lineHeight: 18,
+                  color: catchphrase.trim() ? COLORS.dark : COLORS.textTertiary,
+                  fontStyle: catchphrase.trim() ? 'normal' : 'italic',
+                }}
+              >
+                {catchphrase.trim() ? `“${catchphrase.trim()}”` : COPY.profile.catchphraseHint}
+              </Text>
+            </View>
+          )}
+
           <View style={{ flex: 1 }}>
             <ScrollView
               style={{ flex: 1 }}
@@ -199,118 +293,43 @@ const MyVibeScreen: React.FC<Props> = ({
               }}
             >
               {hasRecordedVibe && (
-                <View
-                  style={{
-                    borderRadius: RADIUS.lg,
-                    borderWidth: 1,
-                    borderColor: COLORS.border,
-                    borderLeftWidth: 3,
-                    borderLeftColor: activeMoodAccent,
-                    backgroundColor: COLORS.surfaceMuted,
-                    padding: 20,
-                    ...SHADOW.card,
-                  }}
-                >
-                  <View style={{ marginBottom: 16, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-                    <View>
-                      <Text style={{ fontFamily: FONT.bold, fontSize: 16, color: COLORS.dark }}>
-                        {COPY.profile.voiceCard}
-                      </Text>
-                      <Text style={{ fontFamily: FONT.regular, fontSize: 12, color: COLORS.textTertiary }}>
-                        {COPY.profile.voiceTimestamp}
-                      </Text>
-                    </View>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel={COPY.a11y.deleteVoice}
-                      onPress={() => onDeleteVibe?.()}
-                      style={{ padding: 8 }}
-                    >
-                      <Trash2 size={18} color={COLORS.textTertiary} />
-                    </Pressable>
-                  </View>
-
-                  <View style={{ marginBottom: 20, flexDirection: 'row', alignItems: 'center', gap: 16 }}>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel={isPlaying ? COPY.a11y.pause : COPY.a11y.play}
-                      onPress={() => setIsPlaying((p) => !p)}
-                      style={{ width: 48, height: 48, flexShrink: 0, borderRadius: 24, overflow: 'hidden' }}
-                    >
-                      <LinearGradient
-                        colors={[...playColors]}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 1 }}
-                        style={{ width: 48, height: 48, alignItems: 'center', justifyContent: 'center' }}
-                      >
-                        {isPlaying ? (
-                          <Pause size={18} color={COLORS.surface} fill={COLORS.surface} />
-                        ) : (
-                          <Play size={18} color={COLORS.surface} fill={COLORS.surface} style={{ marginLeft: 2 }} />
-                        )}
-                      </LinearGradient>
-                    </Pressable>
-
-                    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'flex-end', overflow: 'hidden', height: WAVE_CONTAINER_HEIGHT, gap: 2 }}>
-                      {Array.from({ length: WAVE_BAR_COUNT }, (_, i) => (
-                        <MiniWaveBar
-                          key={i}
-                          isPlaying={isPlaying}
-                          containerHeight={WAVE_CONTAINER_HEIGHT}
-                          barColor={activeMoodAccent}
-                        />
-                      ))}
-                    </View>
-
-                    <Text
+                <View>
+                  <Text style={{ fontFamily: FONT.bold, fontSize: 16, color: COLORS.dark, marginBottom: 4 }}>
+                    {COPY.profile.catchphraseLabel}
+                    <Text style={{ fontFamily: FONT.regular, fontSize: 14, color: COLORS.textTertiary }}>
+                      {COPY.common.optional}
+                    </Text>
+                  </Text>
+                  <Text style={{ fontFamily: FONT.regular, fontSize: 12, color: COLORS.textTertiary, marginBottom: 12 }}>
+                    {COPY.profile.catchphraseHint}
+                  </Text>
+                  <View style={{ position: 'relative' }}>
+                    <TextInput
+                      value={catchphrase}
+                      onChangeText={setCatchphrase}
+                      placeholder={COPY.profile.catchphrasePlaceholder}
+                      placeholderTextColor={COLORS.textTertiary}
+                      maxLength={60}
                       style={{
-                        fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-                        fontSize: 12,
-                        color: COLORS.textTertiary,
+                        borderRadius: RADIUS.md,
+                        borderWidth: 1,
+                        borderColor: COLORS.border,
+                        backgroundColor: COLORS.surfaceMuted,
+                        paddingVertical: 12,
+                        paddingLeft: 16,
+                        paddingRight: 48,
+                        fontSize: 14,
+                        fontFamily: FONT.regular,
+                        color: COLORS.dark,
                       }}
+                    />
+                    <View
+                      pointerEvents="none"
+                      style={{ position: 'absolute', bottom: 0, right: 16, top: 0, justifyContent: 'center' }}
                     >
-                      0:01
-                    </Text>
-                  </View>
-
-                  <View style={{ borderTopWidth: 1, borderTopColor: COLORS.border, paddingTop: 16 }}>
-                    <Text style={{ fontFamily: FONT.bold, fontSize: 14, color: COLORS.dark, marginBottom: 4 }}>
-                      {COPY.profile.catchphraseLabel}
                       <Text style={{ fontFamily: FONT.regular, fontSize: 12, color: COLORS.textTertiary }}>
-                        {COPY.common.optional}
+                        {catchphrase.length}/60
                       </Text>
-                    </Text>
-                    <Text style={{ fontFamily: FONT.regular, fontSize: 12, color: COLORS.textTertiary, marginBottom: 12 }}>
-                      {COPY.profile.catchphraseHint}
-                    </Text>
-                    <View style={{ position: 'relative' }}>
-                      <TextInput
-                        value={catchphrase}
-                        onChangeText={setCatchphrase}
-                        placeholder={COPY.profile.catchphrasePlaceholder}
-                        placeholderTextColor={COLORS.textTertiary}
-                        maxLength={60}
-                        style={{
-                          borderRadius: RADIUS.md,
-                          borderWidth: 1,
-                          borderColor: COLORS.border,
-                          backgroundColor: COLORS.surfaceMuted,
-                          paddingVertical: 12,
-                          paddingLeft: 16,
-                          paddingRight: 48,
-                          fontSize: 14,
-                          fontFamily: FONT.regular,
-                          color: COLORS.dark,
-                        }}
-                      />
-                      <View
-                        pointerEvents="none"
-                        style={{ position: 'absolute', bottom: 0, right: 16, top: 0, justifyContent: 'center' }}
-                      >
-                        <Text style={{ fontFamily: FONT.regular, fontSize: 12, color: COLORS.textTertiary }}>
-                          {catchphrase.length}/60
-                        </Text>
-                      </View>
                     </View>
                   </View>
                 </View>
