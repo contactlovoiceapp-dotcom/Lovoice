@@ -54,6 +54,18 @@ const MOOD_OPTIONS: {
   { id: ColorTheme.Midnight, label: COPY.moods.midnight, colors: [THEME_GRADIENTS.midnight.colors[0], THEME_GRADIENTS.midnight.colors[1]] },
 ];
 
+const GENDER_OPTIONS = [
+  { value: COPY.gender.female, label: COPY.gender.female },
+  { value: COPY.gender.male, label: COPY.gender.male },
+  { value: COPY.gender.other, label: COPY.gender.other },
+] as const;
+
+const INTEREST_OPTIONS = [
+  { value: 'female', label: COPY.gender.interestedInFemale },
+  { value: 'male', label: COPY.gender.interestedInMale },
+  { value: 'other', label: COPY.gender.interestedInOther },
+] as const;
+
 function getMoodGradient(theme: ColorTheme): readonly [string, string] {
   return MOOD_OPTIONS.find((m) => m.id === theme)?.colors ?? ['#FF8A3D', '#FF6B35'];
 }
@@ -125,6 +137,7 @@ const MyVibeScreen: React.FC<Props> = ({
   const [city, setCity] = useState('');
   const [emojis, setEmojis] = useState(['', '', '']);
   const [gender, setGender] = useState('');
+  const [interestedIn, setInterestedIn] = useState<string[]>([]);
   const [showGenderPicker, setShowGenderPicker] = useState(false);
 
   const { width: windowWidth } = useWindowDimensions();
@@ -137,8 +150,20 @@ const MyVibeScreen: React.FC<Props> = ({
     setEmojis(updated);
   };
 
+  const toggleInterestedIn = (value: string) => {
+    setInterestedIn((current) =>
+      current.includes(value)
+        ? current.filter((item) => item !== value)
+        : [...current, value],
+    );
+  };
+
   const isFormValid =
-    name.trim() !== '' && age.trim() !== '' && city.trim() !== '' && gender !== '';
+    name.trim() !== '' &&
+    age.trim() !== '' &&
+    city.trim() !== '' &&
+    gender !== '' &&
+    interestedIn.length > 0;
 
   const playColors = getMoodGradient(mood);
   const activeMoodAccent = playColors[0];
@@ -436,6 +461,53 @@ const MyVibeScreen: React.FC<Props> = ({
                 </View>
               </View>
 
+              <View style={{ gap: 16 }}>
+                <Text style={{ fontFamily: FONT.bold, fontSize: 16, color: COLORS.dark }}>
+                  {COPY.profile.preferencesLabel}
+                </Text>
+                <View>
+                  <Text style={{ fontFamily: FONT.medium, fontSize: 13, color: COLORS.textSecondary, marginBottom: 6, marginLeft: 4 }}>
+                    {COPY.gender.interestedInLabel}
+                  </Text>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+                    {INTEREST_OPTIONS.map((opt) => {
+                      const selected = interestedIn.includes(opt.value);
+                      return (
+                        <Pressable
+                          key={opt.value}
+                          accessibilityRole="button"
+                          accessibilityState={{ selected }}
+                          onPress={() => toggleInterestedIn(opt.value)}
+                          style={{
+                            borderRadius: RADIUS.full,
+                            borderWidth: 1,
+                            borderColor: selected ? COLORS.primary : COLORS.border,
+                            backgroundColor: selected ? COLORS.primaryMuted : COLORS.surfaceMuted,
+                            paddingHorizontal: 16,
+                            paddingVertical: 10,
+                          }}
+                        >
+                          <Text
+                            style={{
+                              fontFamily: selected ? FONT.semibold : FONT.medium,
+                              fontSize: 13,
+                              color: selected ? COLORS.primary : COLORS.textSecondary,
+                            }}
+                          >
+                            {opt.label}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                  {interestedIn.length === 0 && (
+                    <Text style={{ marginTop: 8, marginLeft: 4, fontFamily: FONT.regular, fontSize: 12, color: COLORS.textTertiary }}>
+                      {COPY.gender.interestedInHint}
+                    </Text>
+                  )}
+                </View>
+              </View>
+
               <View>
                 <Text style={{ fontFamily: FONT.bold, fontSize: 16, color: COLORS.dark, marginBottom: 16 }}>
                   {COPY.profile.moodLabel}
@@ -599,11 +671,7 @@ const MyVibeScreen: React.FC<Props> = ({
             <Text style={{ fontFamily: FONT.bold, fontSize: 18, color: COLORS.dark, marginBottom: 20 }}>
               {COPY.gender.label}
             </Text>
-            {([
-              { value: COPY.gender.female, label: COPY.gender.female },
-              { value: COPY.gender.male, label: COPY.gender.male },
-              { value: COPY.gender.other, label: COPY.gender.other },
-            ] as const).map((opt) => (
+            {GENDER_OPTIONS.map((opt) => (
               <Pressable
                 key={opt.value}
                 accessibilityRole="button"
