@@ -19,7 +19,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ArrowRight, Lightbulb, Mic, Square, X } from 'lucide-react-native';
+import { ArrowRight, Lightbulb, Mic, Pause, Play, Square, X } from 'lucide-react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS, CTA_GRADIENT, FONT, ONBOARDING_GRADIENT, RADIUS, SHADOW } from '../../theme';
 import { COPY } from '../../copy';
@@ -157,6 +157,7 @@ const RecordVibeScreen: React.FC<Props> = ({ onNext, onSkip }) => {
   const [isRecording, setIsRecording] = useState(false);
   const [time, setTime] = useState(0);
   const [hasRecorded, setHasRecorded] = useState(false);
+  const [isPreviewPlaying, setIsPreviewPlaying] = useState(false);
   const [recordingError, setRecordingError] = useState('');
   const [showInspiration, setShowInspiration] = useState(false);
   const [currentQuestion, setCurrentQuestion] = useState(0);
@@ -164,7 +165,9 @@ const RecordVibeScreen: React.FC<Props> = ({ onNext, onSkip }) => {
   const contentMaxWidth = Math.min(384, windowWidth - 48);
   const minimumRemaining = Math.max(MIN_RECORDING_SECONDS - time, 0);
   const statusText = hasRecorded
-    ? COPY.record.recordedStatus
+    ? isPreviewPlaying
+      ? COPY.record.previewPlayingStatus
+      : COPY.record.recordedStatus
     : isRecording
       ? COPY.record.recordingStatus
       : COPY.record.idleStatus;
@@ -189,6 +192,7 @@ const RecordVibeScreen: React.FC<Props> = ({ onNext, onSkip }) => {
           if (prev >= MAX_RECORDING_SECONDS) {
             setIsRecording(false);
             setHasRecorded(true);
+            setIsPreviewPlaying(false);
             setRecordingError('');
             return MAX_RECORDING_SECONDS;
           }
@@ -204,17 +208,28 @@ const RecordVibeScreen: React.FC<Props> = ({ onNext, onSkip }) => {
       setIsRecording(false);
       if (time >= MIN_RECORDING_SECONDS) {
         setHasRecorded(true);
+        setIsPreviewPlaying(false);
         setRecordingError('');
         return;
       }
       setHasRecorded(false);
+      setIsPreviewPlaying(false);
       setRecordingError(COPY.record.minimumDurationError);
     } else {
       setTime(0);
       setIsRecording(true);
       setHasRecorded(false);
+      setIsPreviewPlaying(false);
       setRecordingError('');
     }
+  };
+
+  const handlePrimaryButtonPress = () => {
+    if (hasRecorded && !isRecording) {
+      setIsPreviewPlaying((current) => !current);
+      return;
+    }
+    toggleRecording();
   };
 
   const formatTime = (seconds: number) => {
@@ -265,8 +280,16 @@ const RecordVibeScreen: React.FC<Props> = ({ onNext, onSkip }) => {
               <View style={{ position: 'absolute' }}>
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel={isRecording ? COPY.a11y.stopRecording : COPY.a11y.record}
-                  onPress={toggleRecording}
+                  accessibilityLabel={
+                    isRecording
+                      ? COPY.a11y.stopRecording
+                      : hasRecorded && isPreviewPlaying
+                        ? COPY.a11y.pause
+                        : hasRecorded
+                          ? COPY.a11y.play
+                          : COPY.a11y.record
+                  }
+                  onPress={handlePrimaryButtonPress}
                   style={{
                     width: MIC_SIZE,
                     height: MIC_SIZE,
@@ -288,6 +311,10 @@ const RecordVibeScreen: React.FC<Props> = ({ onNext, onSkip }) => {
                   >
                     {isRecording ? (
                       <Square size={32} color={COLORS.surface} fill={COLORS.surface} />
+                    ) : hasRecorded && isPreviewPlaying ? (
+                      <Pause size={40} color={COLORS.surface} fill={COLORS.surface} />
+                    ) : hasRecorded ? (
+                      <Play size={40} color={COLORS.surface} fill={COLORS.surface} style={{ marginLeft: 4 }} />
                     ) : (
                       <Mic size={44} color={COLORS.surface} />
                     )}
@@ -342,6 +369,7 @@ const RecordVibeScreen: React.FC<Props> = ({ onNext, onSkip }) => {
                   accessibilityRole="button"
                   onPress={() => {
                     setHasRecorded(false);
+                    setIsPreviewPlaying(false);
                     setTime(0);
                     setRecordingError('');
                   }}
@@ -369,7 +397,7 @@ const RecordVibeScreen: React.FC<Props> = ({ onNext, onSkip }) => {
               }}
             >
               <Text style={{ fontSize: 14, lineHeight: 20, fontFamily: FONT.regular, color: COLORS.textSecondary }}>
-                {recordingError || (hasRecorded ? COPY.record.recorded : COPY.record.hint)}
+                {recordingError || (hasRecorded ? COPY.record.previewHint : COPY.record.hint)}
               </Text>
 
               {!hasRecorded && (
