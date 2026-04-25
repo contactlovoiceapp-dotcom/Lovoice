@@ -126,8 +126,7 @@ export const COPY = {
   },
 
   feed: {
-    autoOn: 'Auto ON',
-    autoOff: 'Auto OFF',
+    autoplay: 'Autoplay',
     loading: 'Recherche de voix...',
     loadMore: 'Découvrir plus de voix',
     emptyTitle: 'Plus de voix !',

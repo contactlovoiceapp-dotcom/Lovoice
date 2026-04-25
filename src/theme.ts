@@ -8,6 +8,18 @@ export function hexToRgba(hex: string, alpha: number): string {
   return `rgba(${parseInt(result[1], 16)},${parseInt(result[2], 16)},${parseInt(result[3], 16)},${alpha})`;
 }
 
+/**
+ * Returns true if a hex color is perceived as "light" — used to flip status bar style.
+ * Threshold 0.55 keeps electric (#e724ab, lum ≈ 0.43) as "dark" while chill (#c084fc, lum ≈ 0.64) flips to "light".
+ */
+export function isHexLight(hex: string): boolean {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.55;
+}
+
 export const COLORS = {
   background: '#f8f5ff',
   surface: '#ffffff',

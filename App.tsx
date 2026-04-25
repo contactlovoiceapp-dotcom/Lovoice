@@ -9,6 +9,7 @@ import {
   Text,
   useWindowDimensions,
   View,
+  ViewToken,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -31,15 +32,13 @@ import {
   PlayfairDisplay_900Black,
 } from '@expo-google-fonts/playfair-display';
 import {
-  PlayCircle,
   SlidersHorizontal,
   Sparkles,
-  StopCircle,
   User,
 } from 'lucide-react-native';
 
 import { Profile, ColorTheme, Tab, AppState } from './src/types';
-import { COLORS, CTA_GRADIENT, FONT, SHADOW } from './src/theme';
+import { COLORS, CTA_GRADIENT, FONT, THEME_GRADIENTS, isHexLight } from './src/theme';
 import { COPY } from './src/copy';
 import { generateNewProfile } from './src/services/geminiService';
 
@@ -141,8 +140,17 @@ function AppContent() {
   const [hasRecordedVibe, setHasRecordedVibe] = useState(false);
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [activeProfileIndex, setActiveProfileIndex] = useState(0);
 
   const flatListRef = useRef<FlatList<Profile>>(null);
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 80 }).current;
+  const onViewableItemsChanged = useRef(
+    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+      if (viewableItems.length > 0 && viewableItems[0].index !== null) {
+        setActiveProfileIndex(viewableItems[0].index);
+      }
+    },
+  ).current;
   const firstLikeShown = useRef(false);
   const toastOpacity = useRef(new Animated.Value(0)).current;
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -199,6 +207,12 @@ function AppContent() {
   }, []);
 
   const isDiscover = activeTab === 'discover';
+
+  const activeTheme = profiles[activeProfileIndex]?.theme ?? ColorTheme.Sunset;
+  const statusBarStyle = useMemo<'light' | 'dark'>(() => {
+    if (!isDiscover || appState !== 'main') return 'dark';
+    return isHexLight(THEME_GRADIENTS[activeTheme].colors[0]) ? 'dark' : 'light';
+  }, [isDiscover, appState, activeTheme]);
 
   const togglePlay = useCallback(
     (id: string) => {
@@ -291,28 +305,26 @@ function AppContent() {
               style={{
                 flexDirection: 'row',
                 alignItems: 'center',
-                gap: 6,
+                gap: 4,
                 borderRadius: 999,
                 borderWidth: 1,
                 paddingHorizontal: 12,
                 paddingVertical: 6,
-                borderColor: autoplay ? 'rgba(231,38,106,0.5)' : 'rgba(255,255,255,0.15)',
-                backgroundColor: autoplay ? 'rgba(231,38,106,0.2)' : 'rgba(255,255,255,0.1)',
+                borderColor: autoplay ? 'rgba(231,36,171,0.5)' : 'rgba(255,255,255,0.15)',
+                backgroundColor: autoplay ? 'rgba(231,36,171,0.15)' : 'rgba(255,255,255,0.08)',
               }}
             >
-              {autoplay ? (
-                <PlayCircle size={14} color={COLORS.primary} />
-              ) : (
-                <StopCircle size={14} color="rgba(255,255,255,0.4)" />
-              )}
+              <Text style={{ fontSize: 12, fontFamily: FONT.medium, color: 'rgba(255,255,255,0.7)' }}>
+                {COPY.feed.autoplay}
+              </Text>
               <Text
                 style={{
                   fontSize: 12,
-                  fontFamily: FONT.semibold,
-                  color: autoplay ? COLORS.primary : 'rgba(255,255,255,0.4)',
+                  fontFamily: FONT.bold,
+                  color: autoplay ? COLORS.primary : 'rgba(255,255,255,0.35)',
                 }}
               >
-                {autoplay ? COPY.feed.autoOn : COPY.feed.autoOff}
+                {autoplay ? 'ON' : 'OFF'}
               </Text>
             </Pressable>
           )}
@@ -370,6 +382,8 @@ function AppContent() {
               showsVerticalScrollIndicator={false}
               decelerationRate="fast"
               snapToAlignment="start"
+              viewabilityConfig={viewabilityConfig}
+              onViewableItemsChanged={onViewableItemsChanged}
               getItemLayout={(_, index) => ({
                 length: windowHeight,
                 offset: windowHeight * index,
@@ -563,7 +577,7 @@ function AppContent() {
 
   return (
     <View style={{ flex: 1, backgroundColor: COLORS.background }}>
-      <StatusBar style={isDiscover && appState === 'main' ? 'light' : 'dark'} />
+      <StatusBar style={statusBarStyle} />
       {renderScreen()}
     </View>
   );

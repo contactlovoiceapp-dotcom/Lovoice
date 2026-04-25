@@ -24,6 +24,7 @@ import Animated, {
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle, Defs, RadialGradient, Stop } from 'react-native-svg';
 import {
+  ChevronDown,
   Heart,
   Lock,
   Mic,
@@ -34,6 +35,7 @@ import {
   Send,
   X,
 } from 'lucide-react-native';
+import * as Haptics from 'expo-haptics';
 
 import type { Profile } from '../types';
 import { COLORS, FONT, SHADOW, THEME_GRADIENTS, hexToRgba } from '../theme';
@@ -160,6 +162,19 @@ function GlowLayer({
   );
 }
 
+/* Fades children in/out on 250ms when `visible` changes. Local to this file — only used for the swipe affordance. */
+function FadeWhen({ visible, children }: { visible: boolean; children: React.ReactNode }) {
+  const opacity = useSharedValue(visible ? 1 : 0);
+
+  useEffect(() => {
+    opacity.value = withTiming(visible ? 1 : 0, { duration: 250 });
+  }, [visible]);
+
+  const animStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
+
+  return <Animated.View style={animStyle}>{children}</Animated.View>;
+}
+
 /* ─── Helpers ──────────────────────────────────────────────────────────────── */
 
 function formatTime(sec: number): string {
@@ -249,6 +264,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
   const playScale = useSharedValue(1);
   // Controls the ambient glow visibility — fades in on play, fades out slowly on pause.
   const glowOpacity = useSharedValue(0);
+  const chevronY = useSharedValue(0);
 
   const likeAnimStyle = useAnimatedStyle(() => ({
     transform: [{ scale: likeScale.value }],
@@ -269,8 +285,24 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
   const ctaGlowStyle = useAnimatedStyle(() => ({
     opacity: intensity.value,
   }));
+  const chevronAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: chevronY.value }],
+  }));
+
+  useEffect(() => {
+    chevronY.value = withRepeat(
+      withSequence(
+        withTiming(4, { duration: 900, easing: Easing.inOut(Easing.sin) }),
+        withTiming(0, { duration: 900, easing: Easing.inOut(Easing.sin) }),
+      ),
+      -1,
+      false,
+    );
+    return () => cancelAnimation(chevronY);
+  }, []);
 
   const handlePlayPress = () => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (!hasRecordedVibe) {
       setShowLockedModal(true);
       return;
@@ -356,6 +388,11 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
   const innerGlowSize = windowWidth * 0.9;
 
   const handleLike = () => {
+    if (!isLiked) {
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    } else {
+      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
     onToggleLike();
   };
 
@@ -559,7 +596,10 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
               <Pressable
                 style={{ flex: 1 }}
-                onPress={() => setShowReplyModal(true)}
+                onPress={() => {
+                  void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  setShowReplyModal(true);
+                }}
                 onPressIn={() => { replyScale.value = withSpring(0.97, TAP_SPRING); }}
                 onPressOut={() => { replyScale.value = withSpring(1, TAP_SPRING); }}
               >
@@ -668,6 +708,15 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
                 </Text>
               </View>
             </View>
+
+            {/* Swipe affordance — only shown after listening is done and not during playback */}
+            <FadeWhen visible={hasListened && !isPlaying}>
+              <View style={{ alignItems: 'center', marginTop: 4 }}>
+                <Animated.View style={chevronAnimStyle}>
+                  <ChevronDown size={20} color="rgba(255,255,255,0.4)" strokeWidth={2.4} />
+                </Animated.View>
+              </View>
+            </FadeWhen>
           </View>
         </View>
       </LinearGradient>
