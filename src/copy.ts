@@ -186,10 +186,16 @@ export const COPY = {
   },
 
   likesScreen: {
-    title: 'Mes Likes',
-    subtitle: 'Tes voix préférées. Réponds-leur quand tu veux.',
-    emptyTitle: 'Aucun like',
-    emptyBody: "Découvre de nouvelles Voix et like celles qui te plaisent !",
+    title: 'Likes',
+    subtitle: 'Retrouve les personnes qui aiment ta voix et celles que tu as likées.',
+    receivedTab: 'Reçus',
+    givenTab: 'Donnés',
+    receivedBadge: 'A aimé ta voix',
+    receivedAction: 'Découvrir son profil',
+    givenEmptyTitle: 'Aucun like donné',
+    givenEmptyBody: "Découvre de nouvelles Voix et like celles qui te plaisent !",
+    receivedEmptyTitle: 'Aucun like reçu',
+    receivedEmptyBody: 'Continue à faire entendre ta voix, les likes arriveront ici.',
     howItWorks: 'Comment ça marche ?',
     bullets: [
       'Like les vocaux qui te plaisent.',

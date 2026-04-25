@@ -251,6 +251,7 @@ function AppContent() {
     () => profiles.filter((p) => likedIds.has(p.id)),
     [profiles, likedIds],
   );
+  const receivedLikeProfiles = useMemo(() => profiles.slice(0, 2), [profiles]);
 
   const showToast = useCallback(
     (message: string) => {
@@ -301,6 +302,21 @@ function AppContent() {
   const dismissSwipeHint = useCallback(() => {
     setShowSwipeHint(false);
   }, []);
+
+  const openProfileFromLike = useCallback((id: string) => {
+    const profileIndex = profiles.findIndex((profile) => profile.id === id);
+    if (profileIndex === -1) return;
+
+    dismissSwipeHint();
+    setActiveProfileIndex(profileIndex);
+    setActiveTab('discover');
+    setTimeout(() => {
+      flatListRef.current?.scrollToIndex({
+        index: profileIndex,
+        animated: false,
+      });
+    }, 80);
+  }, [dismissSwipeHint, profiles]);
 
   const isDiscover = activeTab === 'discover';
 
@@ -566,7 +582,9 @@ function AppContent() {
         <View style={{ flex: 1, paddingHorizontal: 16, paddingBottom: 112, paddingTop: insets.top + 56 }}>
           <LikesScreen
             likedProfiles={likedProfiles}
+            receivedLikeProfiles={receivedLikeProfiles}
             onUnlike={(id) => toggleLike(id)}
+            onOpenReceivedLike={openProfileFromLike}
           />
         </View>
       )}
