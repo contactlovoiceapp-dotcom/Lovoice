@@ -1,6 +1,6 @@
 /* Root application shell — manages navigation state, the Discover feed (FlatList), font loading, and safe-area context. */
 
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   FlatList,
@@ -32,6 +32,7 @@ import {
   PlayfairDisplay_900Black,
 } from '@expo-google-fonts/playfair-display';
 import {
+  ChevronUp,
   SlidersHorizontal,
   Sparkles,
   User,
@@ -58,6 +59,96 @@ import BottomNav from './src/components/BottomNav';
 import './global.css';
 
 const LOGO = require('./assets/logo.png');
+
+function SwipeHintOverlay({
+  bottom,
+  onDone,
+}: {
+  bottom: number;
+  onDone: () => void;
+}) {
+  const opacity = useRef(new Animated.Value(0)).current;
+  const translateY = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const entrance = Animated.sequence([
+      Animated.delay(900),
+      Animated.timing(opacity, {
+        toValue: 1,
+        duration: 350,
+        useNativeDriver: true,
+      }),
+      Animated.delay(2800),
+      Animated.timing(opacity, {
+        toValue: 0,
+        duration: 450,
+        useNativeDriver: true,
+      }),
+    ]);
+    const lift = Animated.loop(
+      Animated.sequence([
+        Animated.timing(translateY, {
+          toValue: -8,
+          duration: 650,
+          useNativeDriver: true,
+        }),
+        Animated.timing(translateY, {
+          toValue: 0,
+          duration: 650,
+          useNativeDriver: true,
+        }),
+      ]),
+      { iterations: 3 },
+    );
+
+    entrance.start(({ finished }) => {
+      if (finished) onDone();
+    });
+    lift.start();
+
+    return () => {
+      entrance.stop();
+      lift.stop();
+    };
+  }, [onDone, opacity, translateY]);
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={{
+        position: 'absolute',
+        left: 0,
+        right: 0,
+        bottom,
+        zIndex: 35,
+        alignItems: 'center',
+        opacity,
+      }}
+    >
+      <Animated.View
+        style={{
+          alignItems: 'center',
+          minWidth: 248,
+          borderRadius: 28,
+          borderWidth: 1,
+          borderColor: 'rgba(255,255,255,0.2)',
+          backgroundColor: 'rgba(255,255,255,0.14)',
+          paddingHorizontal: 24,
+          paddingVertical: 18,
+          transform: [{ translateY }],
+        }}
+      >
+        <ChevronUp size={24} color="rgba(255,255,255,0.9)" />
+        <Text style={{ marginTop: 8, color: 'rgba(255,255,255,0.92)', fontFamily: FONT.semibold, fontSize: 15 }}>
+          {COPY.feed.swipeHintTitle}
+        </Text>
+        <Text style={{ marginTop: 4, color: 'rgba(255,255,255,0.7)', fontFamily: FONT.medium, fontSize: 13 }}>
+          {COPY.feed.swipeHintBody}
+        </Text>
+      </Animated.View>
+    </Animated.View>
+  );
+}
 
 const INITIAL_PROFILES: Profile[] = [
   {
@@ -141,6 +232,7 @@ function AppContent() {
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [activeProfileIndex, setActiveProfileIndex] = useState(0);
+  const [showSwipeHint, setShowSwipeHint] = useState(true);
 
   const flatListRef = useRef<FlatList<Profile>>(null);
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 80 }).current;
@@ -204,6 +296,10 @@ function AppContent() {
 
   const navigateTo = useCallback((next: AppState) => {
     setAppState(next);
+  }, []);
+
+  const dismissSwipeHint = useCallback(() => {
+    setShowSwipeHint(false);
   }, []);
 
   const isDiscover = activeTab === 'discover';
@@ -384,6 +480,7 @@ function AppContent() {
               snapToAlignment="start"
               viewabilityConfig={viewabilityConfig}
               onViewableItemsChanged={onViewableItemsChanged}
+              onScrollBeginDrag={dismissSwipeHint}
               getItemLayout={(_, index) => ({
                 length: windowHeight,
                 offset: windowHeight * index,
@@ -456,6 +553,13 @@ function AppContent() {
             </View>
           )}
         </>
+      )}
+
+      {isDiscover && showSwipeHint && profiles.length > 1 && (
+        <SwipeHintOverlay
+          bottom={windowHeight * 0.44}
+          onDone={dismissSwipeHint}
+        />
       )}
 
       {activeTab === 'likes' && (
