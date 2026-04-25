@@ -344,7 +344,9 @@ const MyVibeScreen: React.FC<Props> = ({
                         paddingLeft: 16,
                         paddingRight: 48,
                         fontSize: 14,
+                        lineHeight: 20,
                         fontFamily: FONT.regular,
+                        letterSpacing: 0,
                         color: COLORS.dark,
                       }}
                     />
