@@ -1,20 +1,18 @@
-/* Floating pill bottom nav — semi-transparent dark capsule with active label only.
-   Sits above the content instead of consuming layout space, scales to 4-5 items. */
+/* Floating pill bottom nav — stable icon tabs over the main app content. */
 
 import React from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated, { LinearTransition } from 'react-native-reanimated';
 import { Compass, Heart, MessageCircle } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 
 import type { Tab } from '../types';
-import { COLORS, FONT, RADIUS } from '../theme';
+import { RADIUS } from '../theme';
 import { COPY } from '../copy';
 
 const ICON_SIZE = 22;
 const PILL_HEIGHT = 64;
-const ITEM_TIMING = 220;
+const ITEM_WIDTH = 56;
 
 interface BottomNavProps {
   activeTab: Tab;
@@ -39,43 +37,27 @@ function TabItem({
   onPress: () => void;
 }) {
   return (
-    <Animated.View layout={LinearTransition.duration(ITEM_TIMING)}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityState={{ selected: isActive }}
-        onPress={onPress}
-        hitSlop={12}
-        style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 8,
-          height: 48,
-          minWidth: 48,
-          paddingHorizontal: isActive ? 20 : 16,
-          borderRadius: RADIUS.cta,
-          backgroundColor: isActive ? 'rgba(255,255,255,0.18)' : 'transparent',
-        }}
-      >
-        <Icon
-          size={ICON_SIZE}
-          strokeWidth={isActive ? 2.4 : 1.8}
-          color={isActive ? '#ffffff' : 'rgba(255,255,255,0.65)'}
-        />
-        {isActive && (
-          <Text
-            numberOfLines={1}
-            style={{
-              fontSize: 13,
-              fontFamily: FONT.semibold,
-              color: '#ffffff',
-            }}
-          >
-            {label}
-          </Text>
-        )}
-      </Pressable>
-    </Animated.View>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ selected: isActive }}
+      onPress={onPress}
+      hitSlop={12}
+      style={{
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: 48,
+        width: ITEM_WIDTH,
+        borderRadius: RADIUS.cta,
+        backgroundColor: isActive ? 'rgba(255,255,255,0.12)' : 'transparent',
+      }}
+    >
+      <Icon
+        size={ICON_SIZE}
+        strokeWidth={isActive ? 2.4 : 1.8}
+        color={isActive ? '#ffffff' : 'rgba(255,255,255,0.65)'}
+      />
+    </Pressable>
   );
 }
 
