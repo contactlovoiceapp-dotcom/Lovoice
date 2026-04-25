@@ -598,6 +598,12 @@ function AppContent() {
               setHasRecordedVibe(false);
               navigateTo('onboarding_record');
             }}
+            onDeleteProfile={() => {
+              setHasRecordedVibe(false);
+              setLikedIds(new Set());
+              setActiveTab('discover');
+              navigateTo('home');
+            }}
             hasRecordedVibe={hasRecordedVibe}
           />
         </View>

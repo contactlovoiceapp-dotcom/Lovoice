@@ -38,6 +38,7 @@ interface Props {
   onBack?: () => void;
   onSend?: () => void;
   onDeleteVibe?: () => void;
+  onDeleteProfile?: () => void;
   hasRecordedVibe?: boolean;
   isOnboarding?: boolean;
 }
@@ -126,6 +127,7 @@ const MyVibeScreen: React.FC<Props> = ({
   onBack,
   onSend,
   onDeleteVibe,
+  onDeleteProfile,
   hasRecordedVibe = true,
   isOnboarding = false,
 }) => {
@@ -139,6 +141,7 @@ const MyVibeScreen: React.FC<Props> = ({
   const [gender, setGender] = useState('');
   const [interestedIn, setInterestedIn] = useState<string[]>([]);
   const [showGenderPicker, setShowGenderPicker] = useState(false);
+  const [showDeleteProfileModal, setShowDeleteProfileModal] = useState(false);
 
   const { width: windowWidth } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -604,6 +607,41 @@ const MyVibeScreen: React.FC<Props> = ({
                   ))}
                 </View>
               </View>
+
+              {!isOnboarding && (
+                <View
+                  style={{
+                    borderTopWidth: 1,
+                    borderTopColor: COLORS.border,
+                    paddingTop: 24,
+                    gap: 12,
+                  }}
+                >
+                  <Text style={{ fontFamily: FONT.bold, fontSize: 16, color: '#dc2626' }}>
+                    {COPY.profile.dangerTitle}
+                  </Text>
+                  <Text style={{ fontFamily: FONT.regular, fontSize: 13, lineHeight: 19, color: COLORS.textSecondary }}>
+                    {COPY.profile.dangerBody}
+                  </Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => setShowDeleteProfileModal(true)}
+                    style={{
+                      alignSelf: 'flex-start',
+                      borderRadius: RADIUS.full,
+                      borderWidth: 1,
+                      borderColor: 'rgba(220,38,38,0.28)',
+                      backgroundColor: 'rgba(220,38,38,0.06)',
+                      paddingHorizontal: 16,
+                      paddingVertical: 10,
+                    }}
+                  >
+                    <Text style={{ fontFamily: FONT.semibold, fontSize: 13, color: '#dc2626' }}>
+                      {COPY.profile.dangerCta}
+                    </Text>
+                  </Pressable>
+                </View>
+              )}
             </ScrollView>
           </View>
 
@@ -715,6 +753,82 @@ const MyVibeScreen: React.FC<Props> = ({
                 )}
               </Pressable>
             ))}
+          </View>
+        </Pressable>
+      </Modal>
+
+      <Modal
+        visible={showDeleteProfileModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowDeleteProfileModal(false)}
+      >
+        <Pressable
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', padding: 24 }}
+          onPress={() => setShowDeleteProfileModal(false)}
+        >
+          <View
+            onStartShouldSetResponder={() => true}
+            style={{
+              width: '100%',
+              maxWidth: contentMaxWidth,
+              alignSelf: 'center',
+              borderRadius: RADIUS.xl,
+              backgroundColor: COLORS.surface,
+              padding: 24,
+              borderWidth: 1,
+              borderColor: COLORS.border,
+              ...SHADOW.card,
+            }}
+          >
+            <View
+              style={{
+                width: 48,
+                height: 48,
+                borderRadius: 24,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: 'rgba(220,38,38,0.08)',
+                marginBottom: 16,
+              }}
+            >
+              <Trash2 size={22} color="#dc2626" />
+            </View>
+            <Text style={{ fontFamily: FONT.bold, fontSize: 20, color: COLORS.dark, marginBottom: 8 }}>
+              {COPY.profile.deleteConfirmTitle}
+            </Text>
+            <Text style={{ fontFamily: FONT.regular, fontSize: 14, lineHeight: 20, color: COLORS.textSecondary, marginBottom: 24 }}>
+              {COPY.profile.deleteConfirmBody}
+            </Text>
+
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => {
+                setShowDeleteProfileModal(false);
+                onDeleteProfile?.();
+              }}
+              style={{
+                borderRadius: RADIUS.full,
+                backgroundColor: '#dc2626',
+                paddingVertical: 14,
+                alignItems: 'center',
+                marginBottom: 12,
+              }}
+            >
+              <Text style={{ fontFamily: FONT.bold, color: COLORS.surface }}>
+                {COPY.profile.deleteConfirmCta}
+              </Text>
+            </Pressable>
+
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setShowDeleteProfileModal(false)}
+              style={{ borderRadius: RADIUS.full, paddingVertical: 12, alignItems: 'center' }}
+            >
+              <Text style={{ fontFamily: FONT.medium, color: COLORS.textTertiary }}>
+                {COPY.common.cancel}
+              </Text>
+            </Pressable>
           </View>
         </Pressable>
       </Modal>

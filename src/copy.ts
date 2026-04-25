@@ -139,6 +139,12 @@ export const COPY = {
     cityPlaceholder: 'Paris',
     emojisLabel: 'Tes 3 Emojis ',
     submitOnboarding: 'Valider mon profil',
+    dangerTitle: 'Supprimer mon profil',
+    dangerBody: 'Cette action supprimera ton compte, ta voix, tes likes et tes conversations.',
+    dangerCta: 'Supprimer mon profil',
+    deleteConfirmTitle: 'Supprimer ton profil ?',
+    deleteConfirmBody: 'Ton compte, ta voix, tes likes et tes conversations seront supprimés définitivement.',
+    deleteConfirmCta: 'Supprimer définitivement',
   },
 
   feed: {
