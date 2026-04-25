@@ -39,35 +39,35 @@ export const COLORS = {
 
 export const THEME_GRADIENTS = {
   sunset: {
-    colors: ['#f59e0b', '#ea580c', '#4b164c'] as const,
+    colors: ['#fbbf24', '#f59e0b', '#4b164c'] as const,
     ringColor: '#fbbf24',
     glowColor: '#fbbf24',
     accent: '#f59e0b',
-    // Violet → magenta: complementary to orange, brand-adjacent
-    ctaGradient: ['#7c3aed', '#e724ab'] as const,
+    // Tonal: amber light → amber saturated. Stays in the warm family of the background.
+    ctaGradient: ['#fbbf24', '#f59e0b'] as const,
   },
   chill: {
     colors: ['#c084fc', '#8b5cf6', '#4b164c'] as const,
     ringColor: '#d479ec',
     glowColor: '#a78bfa',
     accent: '#c084fc',
-    // Magenta → amber: warm contrast on cool purple background
-    ctaGradient: ['#e724ab', '#ea580c'] as const,
+    // Tonal: lavender → violet. Cool family aligned with the cool background.
+    ctaGradient: ['#d479ec', '#a78bfa'] as const,
   },
   electric: {
     colors: ['#e724ab', '#9333ea', '#4b164c'] as const,
     ringColor: '#e724ab',
     glowColor: '#e724ab',
     accent: '#e724ab',
-    // Indigo → violet: steps back in the spectrum, readable on magenta
-    ctaGradient: ['#4f46e5', '#7c3aed'] as const,
+    // Tonal: pink pop → electric violet. Same family as the saturated background.
+    ctaGradient: ['#f472b6', '#9333ea'] as const,
   },
   midnight: {
     colors: ['#374151', '#1f2937', '#1a0a1b'] as const,
     ringColor: '#9ca3af',
     glowColor: '#6b7280',
     accent: '#9ca3af',
-    // Brand CTA: pops on dark, no change needed
+    // Exception: brand magenta — tonal grey on dark grey background would be invisible.
     ctaGradient: ['#e724ab', '#d479ec'] as const,
   },
 } as const;
@@ -96,6 +96,10 @@ export const RADIUS = {
   lg: 20,
   xl: 28,
   full: 999,
+  // Usage-oriented aliases — prefer these in components over bare numbers.
+  cta: 999,    // pill buttons (CTAs, nav capsules, pills)
+  modal: 24,   // modal cards and overlay popup containers
+  input: 16,   // text inputs and inline info boxes
 } as const;
 
 export const SHADOW = {

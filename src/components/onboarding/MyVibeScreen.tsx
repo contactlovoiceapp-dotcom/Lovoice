@@ -26,7 +26,7 @@ import {
   SafeAreaView,
   useSafeAreaInsets,
 } from 'react-native-safe-area-context';
-import { COLORS, CTA_GRADIENT, FONT, ONBOARDING_GRADIENT, RADIUS, SHADOW } from '../../theme';
+import { COLORS, CTA_GRADIENT, FONT, ONBOARDING_GRADIENT, RADIUS, SHADOW, THEME_GRADIENTS } from '../../theme';
 import { ColorTheme } from '../../types';
 import { COPY } from '../../copy';
 
@@ -42,15 +42,16 @@ interface Props {
   isOnboarding?: boolean;
 }
 
+// Derived from THEME_GRADIENTS so swatch colors always stay in sync with the feed.
 const MOOD_OPTIONS: {
   id: ColorTheme;
   label: string;
   colors: readonly [string, string];
 }[] = [
-  { id: ColorTheme.Sunset, label: COPY.moods.sunset, colors: ['#f59e0b', '#ea580c'] },
-  { id: ColorTheme.Chill, label: COPY.moods.chill, colors: ['#c084fc', '#8b5cf6'] },
-  { id: ColorTheme.Electric, label: COPY.moods.electric, colors: ['#e724ab', '#9333ea'] },
-  { id: ColorTheme.Midnight, label: COPY.moods.midnight, colors: ['#374151', '#1f2937'] },
+  { id: ColorTheme.Sunset, label: COPY.moods.sunset, colors: [THEME_GRADIENTS.sunset.colors[0], THEME_GRADIENTS.sunset.colors[1]] },
+  { id: ColorTheme.Chill, label: COPY.moods.chill, colors: [THEME_GRADIENTS.chill.colors[0], THEME_GRADIENTS.chill.colors[1]] },
+  { id: ColorTheme.Electric, label: COPY.moods.electric, colors: [THEME_GRADIENTS.electric.colors[0], THEME_GRADIENTS.electric.colors[1]] },
+  { id: ColorTheme.Midnight, label: COPY.moods.midnight, colors: [THEME_GRADIENTS.midnight.colors[0], THEME_GRADIENTS.midnight.colors[1]] },
 ];
 
 function getMoodGradient(theme: ColorTheme): readonly [string, string] {

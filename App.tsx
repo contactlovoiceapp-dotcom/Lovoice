@@ -38,7 +38,7 @@ import {
 } from 'lucide-react-native';
 
 import { Profile, ColorTheme, Tab, AppState } from './src/types';
-import { COLORS, CTA_GRADIENT, FONT, THEME_GRADIENTS, isHexLight } from './src/theme';
+import { COLORS, CTA_GRADIENT, FONT, RADIUS, THEME_GRADIENTS, isHexLight } from './src/theme';
 import { COPY } from './src/copy';
 import { generateNewProfile } from './src/services/geminiService';
 
@@ -306,7 +306,7 @@ function AppContent() {
                 flexDirection: 'row',
                 alignItems: 'center',
                 gap: 4,
-                borderRadius: 999,
+                borderRadius: RADIUS.cta,
                 borderWidth: 1,
                 paddingHorizontal: 12,
                 paddingVertical: 6,
@@ -332,7 +332,7 @@ function AppContent() {
           <Pressable
             onPress={() => setShowFilters(true)}
             style={{
-              borderRadius: 999,
+              borderRadius: RADIUS.cta,
               padding: 8,
               backgroundColor: isDiscover ? 'rgba(255,255,255,0.1)' : 'rgba(45,17,54,0.05)',
             }}
@@ -405,7 +405,7 @@ function AppContent() {
                       flexDirection: 'row',
                       alignItems: 'center',
                       gap: 8,
-                      borderRadius: 999,
+                      borderRadius: RADIUS.cta,
                       borderWidth: 1,
                       borderColor: COLORS.border,
                       backgroundColor: 'rgba(45,17,54,0.05)',
@@ -446,7 +446,7 @@ function AppContent() {
                   colors={[...CTA_GRADIENT]}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
-                  style={{ borderRadius: 999, paddingHorizontal: 32, paddingVertical: 12 }}
+                  style={{ borderRadius: RADIUS.cta, paddingHorizontal: 32, paddingVertical: 12 }}
                 >
                   <Text style={{ textAlign: 'center', fontFamily: FONT.bold, color: 'white' }}>
                     {COPY.feed.editFilters}
@@ -499,7 +499,7 @@ function AppContent() {
           <View
             style={{
               backgroundColor: 'rgba(45,17,54,0.92)',
-              borderRadius: 999,
+              borderRadius: RADIUS.cta,
               paddingHorizontal: 20,
               paddingVertical: 12,
               shadowColor: '#000',

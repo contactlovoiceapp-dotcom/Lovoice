@@ -9,7 +9,7 @@ import { Compass, Heart, MessageCircle } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 
 import type { Tab } from '../types';
-import { COLORS, FONT } from '../theme';
+import { COLORS, FONT, RADIUS } from '../theme';
 import { COPY } from '../copy';
 
 const ICON_SIZE = 22;
@@ -53,7 +53,7 @@ function TabItem({
           height: 48,
           minWidth: 48,
           paddingHorizontal: isActive ? 20 : 16,
-          borderRadius: 999,
+          borderRadius: RADIUS.cta,
           backgroundColor: isActive ? 'rgba(255,255,255,0.18)' : 'transparent',
         }}
       >
@@ -101,7 +101,7 @@ const BottomNav: React.FC<BottomNavProps> = ({ activeTab, setActiveTab }) => {
           height: PILL_HEIGHT,
           paddingHorizontal: 8,
           gap: 2,
-          borderRadius: 999,
+          borderRadius: RADIUS.cta,
           backgroundColor: 'rgba(45,17,54,0.85)',
           borderWidth: 1,
           borderColor: 'rgba(255,255,255,0.08)',

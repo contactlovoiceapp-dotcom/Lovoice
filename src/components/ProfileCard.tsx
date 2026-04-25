@@ -38,7 +38,7 @@ import {
 import * as Haptics from 'expo-haptics';
 
 import type { Profile } from '../types';
-import { COLORS, FONT, SHADOW, THEME_GRADIENTS, hexToRgba } from '../theme';
+import { COLORS, FONT, RADIUS, SHADOW, THEME_GRADIENTS, hexToRgba } from '../theme';
 import { COPY } from '../copy';
 import Waveform from './Waveform';
 
@@ -211,7 +211,7 @@ function ModalOverlay({
       <View
         style={{
           backgroundColor: 'white',
-          borderRadius: 24,
+          borderRadius: RADIUS.modal,
           padding: 24,
           width: '100%',
           maxWidth: 384,
@@ -604,16 +604,16 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
                 onPressOut={() => { replyScale.value = withSpring(1, TAP_SPRING); }}
               >
                 <Animated.View style={[replyAnimStyle, ctaIntensityStyle]}>
-                  {/* Shadow caster for the glow — behind the gradient, opacity driven by intensity */}
+                  {/* Glow caster behind the CTA — uses the active theme accent so the halo matches the mood. */}
                   <Animated.View
                     pointerEvents="none"
                     style={[
                       {
                         position: 'absolute',
                         top: 0, left: 0, right: 0, bottom: 0,
-                        borderRadius: 999,
-                        backgroundColor: '#e724ab',
-                        shadowColor: '#e724ab',
+                        borderRadius: RADIUS.cta,
+                        backgroundColor: themeData.accent,
+                        shadowColor: themeData.accent,
                         shadowOffset: { width: 0, height: 8 },
                         shadowOpacity: 0.4,
                         shadowRadius: 20,
@@ -627,7 +627,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
                     end={{ x: 1, y: 0 }}
                     style={{
                       height: 56,
-                      borderRadius: 999,
+                      borderRadius: RADIUS.cta,
                       flexDirection: 'row',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -735,7 +735,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
             colors={[...themeData.ctaGradient]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
-            style={{ borderRadius: 999, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+            style={{ borderRadius: RADIUS.cta, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}
           >
             <Mic size={18} color="white" />
             <Text style={{ color: 'white', fontFamily: FONT.bold }}>{COPY.replyModal.cta}</Text>
@@ -757,7 +757,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
             backgroundColor: COLORS.borderLight,
             borderWidth: 1,
             borderColor: COLORS.border,
-            borderRadius: 16,
+            borderRadius: RADIUS.input,
             padding: 16,
             color: COLORS.dark,
             marginBottom: 12,
@@ -775,7 +775,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
           disabled={!reportReason.trim()}
           style={{ opacity: reportReason.trim() ? 1 : 0.4 }}
         >
-          <View style={{ backgroundColor: '#ef4444', borderRadius: 999, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+          <View style={{ backgroundColor: '#ef4444', borderRadius: RADIUS.cta, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
             <Send size={18} color="white" />
             <Text style={{ color: 'white', fontFamily: FONT.bold }}>{COPY.reportModal.submit}</Text>
           </View>
@@ -798,7 +798,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
             colors={[...themeData.ctaGradient]}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
-            style={{ borderRadius: 999, paddingVertical: 16, alignItems: 'center' }}
+            style={{ borderRadius: RADIUS.cta, paddingVertical: 16, alignItems: 'center' }}
           >
             <Text style={{ color: 'white', fontFamily: FONT.bold }}>{COPY.lockedModal.cta}</Text>
           </LinearGradient>

@@ -13,6 +13,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { ColorTheme } from '../types';
+import { RADIUS } from '../theme';
 
 const BAR_COUNT = 50;
 
@@ -87,7 +88,7 @@ function WaveformBar({ height: staticHeight, color, isPlaying, delay }: Waveform
         {
           flex: 1,
           minWidth: 1.5,
-          borderRadius: 999,
+          borderRadius: RADIUS.cta,
           backgroundColor: color,
           opacity: isPlaying ? 0.8 : 0.35,
         },
