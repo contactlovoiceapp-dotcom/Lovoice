@@ -1,9 +1,17 @@
-/* Zustand store for the Discover feed — persists state across tab switches. */
+/* Zustand store for the Discover feed — keeps local simulated feed and voice-gate state. */
 
+import * as SecureStore from 'expo-secure-store';
 import { create } from 'zustand';
+import { createJSONStorage, persist, type StateStorage } from 'zustand/middleware';
 import type { Profile } from '../../../types';
 import { ColorTheme } from '../../../types';
 import { generateNewProfile } from '../../../services/mockProfilesService';
+
+const secureStoreStorage: StateStorage = {
+  getItem: (name) => SecureStore.getItemAsync(name),
+  setItem: (name, value) => SecureStore.setItemAsync(name, value),
+  removeItem: (name) => SecureStore.deleteItemAsync(name),
+};
 
 const INITIAL_PROFILES: Profile[] = [
   {
@@ -94,79 +102,88 @@ interface FeedState {
   receivedLikeProfiles: () => Profile[];
 }
 
-export const useFeedState = create<FeedState>((set, get) => ({
-  profiles: INITIAL_PROFILES,
-  likedIds: new Set<string>(),
-  autoplay: false,
-  activeProfileIndex: 0,
-  isGenerating: false,
-  hasRecordedVoice: false,
+export const useFeedState = create<FeedState>()(
+  persist(
+    (set, get) => ({
+      profiles: INITIAL_PROFILES,
+      likedIds: new Set<string>(),
+      autoplay: false,
+      activeProfileIndex: 0,
+      isGenerating: false,
+      hasRecordedVoice: false,
 
-  setActiveProfileIndex: (index) => set({ activeProfileIndex: index }),
-  setAutoplay: (value) => set({ autoplay: value }),
-  setHasRecordedVoice: (value) => set({ hasRecordedVoice: value }),
+      setActiveProfileIndex: (index) => set({ activeProfileIndex: index }),
+      setAutoplay: (value) => set({ autoplay: value }),
+      setHasRecordedVoice: (value) => set({ hasRecordedVoice: value }),
 
-  toggleLike: (id) =>
-    set((state) => {
-      const next = new Set(state.likedIds);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return { likedIds: next };
-    }),
+      toggleLike: (id) =>
+        set((state) => {
+          const next = new Set(state.likedIds);
+          if (next.has(id)) {
+            next.delete(id);
+          } else {
+            next.add(id);
+          }
+          return { likedIds: next };
+        }),
 
-  togglePlay: (id) =>
-    set((state) => ({
-      profiles: state.profiles.map((p) => ({
-        ...p,
-        isPlaying: p.id === id ? !p.isPlaying : false,
-      })),
-    })),
+      togglePlay: (id) =>
+        set((state) => ({
+          profiles: state.profiles.map((p) => ({
+            ...p,
+            isPlaying: p.id === id ? !p.isPlaying : false,
+          })),
+        })),
 
-  handleTrackFinish: (finishedId) => {
-    const { autoplay, profiles } = get();
-    set({
-      profiles: profiles.map((p) => ({ ...p, isPlaying: false })),
-    });
-    if (autoplay) {
-      const currentIndex = profiles.findIndex((p) => p.id === finishedId);
-      if (currentIndex !== -1 && currentIndex < profiles.length - 1) {
-        const nextId = profiles[currentIndex + 1].id;
-        setTimeout(() => {
+      handleTrackFinish: (finishedId) => {
+        const { autoplay, profiles } = get();
+        set({
+          profiles: profiles.map((p) => ({ ...p, isPlaying: false })),
+        });
+        if (autoplay) {
+          const currentIndex = profiles.findIndex((p) => p.id === finishedId);
+          if (currentIndex !== -1 && currentIndex < profiles.length - 1) {
+            const nextId = profiles[currentIndex + 1].id;
+            setTimeout(() => {
+              set((state) => ({
+                profiles: state.profiles.map((p) => ({
+                  ...p,
+                  isPlaying: p.id === nextId,
+                })),
+                activeProfileIndex: currentIndex + 1,
+              }));
+            }, 500);
+          }
+        }
+      },
+
+      loadMore: async () => {
+        const { isGenerating } = get();
+        if (isGenerating) return;
+        set({ isGenerating: true });
+        const newProfile = await generateNewProfile();
+        if (newProfile) {
           set((state) => ({
-            profiles: state.profiles.map((p) => ({
-              ...p,
-              isPlaying: p.id === nextId,
-            })),
-            activeProfileIndex: currentIndex + 1,
+            profiles: [...state.profiles, newProfile],
           }));
-        }, 500);
-      }
-    }
-  },
+        }
+        set({ isGenerating: false });
+      },
 
-  loadMore: async () => {
-    const { isGenerating } = get();
-    if (isGenerating) return;
-    set({ isGenerating: true });
-    const newProfile = await generateNewProfile();
-    if (newProfile) {
-      set((state) => ({
-        profiles: [...state.profiles, newProfile],
-      }));
-    }
-    set({ isGenerating: false });
-  },
+      likedProfiles: () => {
+        const { profiles, likedIds } = get();
+        return profiles.filter((p) => likedIds.has(p.id));
+      },
 
-  likedProfiles: () => {
-    const { profiles, likedIds } = get();
-    return profiles.filter((p) => likedIds.has(p.id));
-  },
-
-  receivedLikeProfiles: () => {
-    const { profiles } = get();
-    return profiles.slice(0, 2);
-  },
-}));
+      receivedLikeProfiles: () => {
+        const { profiles } = get();
+        return profiles.slice(0, 2);
+      },
+    }),
+    {
+      name: 'lovoice-feed-state',
+      storage: createJSONStorage(() => secureStoreStorage),
+      partialize: (state) => ({ hasRecordedVoice: state.hasRecordedVoice }),
+    },
+  ),
+);
