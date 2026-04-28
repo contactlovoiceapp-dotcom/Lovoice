@@ -20,7 +20,7 @@ export interface Profile {
   audioDurationSec: number;
 }
 
-export type Tab = 'discover' | 'likes' | 'messages' | 'my-vibes';
+export type Tab = 'discover' | 'likes' | 'messages' | 'my-voice';
 
 export type AppState =
   | 'splash'

@@ -38,9 +38,9 @@ const WAVE_BAR_COUNT = 40;
 interface Props {
   onBack?: () => void;
   onSend?: () => void;
-  onDeleteVibe?: () => void;
+  onDeleteVoice?: () => void;
   onDeleteProfile?: () => void;
-  hasRecordedVibe?: boolean;
+  hasRecordedVoice?: boolean;
   isOnboarding?: boolean;
 }
 
@@ -124,12 +124,12 @@ function MiniWaveBar({
   );
 }
 
-const MyVibeScreen: React.FC<Props> = ({
+const MyVoiceScreen: React.FC<Props> = ({
   onBack,
   onSend,
-  onDeleteVibe,
+  onDeleteVoice,
   onDeleteProfile,
-  hasRecordedVibe = true,
+  hasRecordedVoice = true,
   isOnboarding = false,
 }) => {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -228,7 +228,7 @@ const MyVibeScreen: React.FC<Props> = ({
             <View style={{ width: 40 }} />
           </View>
 
-          {hasRecordedVibe && (
+          {hasRecordedVoice && (
             <View
               style={{
                 width: '100%',
@@ -257,7 +257,7 @@ const MyVibeScreen: React.FC<Props> = ({
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={COPY.a11y.deleteVoice}
-                  onPress={() => onDeleteVibe?.()}
+                  onPress={() => onDeleteVoice?.()}
                   style={{ padding: 8 }}
                 >
                   <Trash2 size={18} color={COLORS.textTertiary} />
@@ -336,7 +336,7 @@ const MyVibeScreen: React.FC<Props> = ({
                 width: '100%',
               }}
             >
-              {hasRecordedVibe && (
+              {hasRecordedVoice && (
                 <View>
                   <Text style={{ fontFamily: FONT.bold, fontSize: 16, color: COLORS.dark, marginBottom: 4 }}>
                     {COPY.profile.catchphraseLabel}
@@ -854,4 +854,4 @@ const MyVibeScreen: React.FC<Props> = ({
   );
 };
 
-export default MyVibeScreen;
+export default MyVoiceScreen;

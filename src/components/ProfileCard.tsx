@@ -46,10 +46,10 @@ interface ProfileCardProps {
   profile: Profile;
   togglePlay: (id: string) => void;
   onFinish?: (id: string) => void;
-  hasRecordedVibe?: boolean;
+  hasRecordedVoice?: boolean;
   isLiked: boolean;
   onToggleLike: () => void;
-  onRecordVibe?: () => void;
+  onRecordVoice?: () => void;
 }
 
 const PLAY_BTN_SIZE = 96;
@@ -162,7 +162,7 @@ function GlowLayer({
   );
 }
 
-/* Fades children in/out on 250ms when `visible` changes. Local to this file — only used for the swipe affordance. */
+/* Fades children in/out on 250ms when `visible` changes. Local to this file for the feed advance cue. */
 function FadeWhen({ visible, children }: { visible: boolean; children: React.ReactNode }) {
   const opacity = useSharedValue(visible ? 1 : 0);
 
@@ -237,10 +237,10 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
   profile,
   togglePlay,
   onFinish,
-  hasRecordedVibe = true,
+  hasRecordedVoice = true,
   isLiked,
   onToggleLike,
-  onRecordVibe,
+  onRecordVoice,
 }) => {
   const { theme, isPlaying, audioDurationSec } = profile;
   const { width: windowWidth } = useWindowDimensions();
@@ -303,7 +303,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
 
   const handlePlayPress = () => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    if (!hasRecordedVibe) {
+    if (!hasRecordedVoice) {
       setShowLockedModal(true);
       return;
     }
@@ -547,7 +547,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
                     justifyContent: 'center',
                   }}
                 >
-                  {!hasRecordedVibe ? (
+                  {!hasRecordedVoice ? (
                     <Lock size={32} color="rgba(255,255,255,0.8)" />
                   ) : hasListened && !isPlaying ? (
                     <RotateCcw size={28} color="rgba(255,255,255,0.9)" />
@@ -709,7 +709,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
               </View>
             </View>
 
-            {/* Swipe affordance — only shown after listening is done and not during playback */}
+            {/* Feed advance cue — only shown after listening is done and not during playback */}
             <FadeWhen visible={hasListened && !isPlaying}>
               <View style={{ alignItems: 'center', marginTop: 4 }}>
                 <Animated.View style={chevronAnimStyle}>
@@ -793,7 +793,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
         <Text style={{ color: COLORS.textSecondary, marginBottom: 32, textAlign: 'center' }}>
           {COPY.lockedModal.body}
         </Text>
-        <Pressable onPress={() => { setShowLockedModal(false); onRecordVibe?.(); }} style={{ width: '100%' }}>
+        <Pressable onPress={() => { setShowLockedModal(false); onRecordVoice?.(); }} style={{ width: '100%' }}>
           <LinearGradient
             colors={[...themeData.ctaGradient]}
             start={{ x: 0, y: 0 }}

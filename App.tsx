@@ -1,6 +1,6 @@
 /* Root application shell — manages navigation state, the Discover feed (FlatList), font loading, and safe-area context. */
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   FlatList,
@@ -32,7 +32,6 @@ import {
   PlayfairDisplay_900Black,
 } from '@expo-google-fonts/playfair-display';
 import {
-  ChevronUp,
   SlidersHorizontal,
   Sparkles,
   User,
@@ -41,13 +40,13 @@ import {
 import { Profile, ColorTheme, Tab, AppState } from './src/types';
 import { COLORS, CTA_GRADIENT, FONT, RADIUS, THEME_GRADIENTS, isHexLight } from './src/theme';
 import { COPY } from './src/copy';
-import { generateNewProfile } from './src/services/geminiService';
+import { generateNewProfile } from './src/services/mockProfilesService';
 
 import SplashScreen from './src/components/onboarding/SplashScreen';
 import HomeScreen from './src/components/onboarding/HomeScreen';
 import PhoneScreen from './src/components/onboarding/PhoneScreen';
-import RecordVibeScreen from './src/components/onboarding/RecordVibeScreen';
-import MyVibeScreen from './src/components/onboarding/MyVibeScreen';
+import RecordVoiceScreen from './src/components/onboarding/RecordVoiceScreen';
+import MyVoiceScreen from './src/components/onboarding/MyVoiceScreen';
 
 import MessagesScreen from './src/components/main/MessagesScreen';
 import LikesScreen from './src/components/main/LikesScreen';
@@ -59,96 +58,6 @@ import BottomNav from './src/components/BottomNav';
 import './global.css';
 
 const LOGO = require('./assets/logo.png');
-
-function SwipeHintOverlay({
-  bottom,
-  onDone,
-}: {
-  bottom: number;
-  onDone: () => void;
-}) {
-  const opacity = useRef(new Animated.Value(0)).current;
-  const translateY = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    const entrance = Animated.sequence([
-      Animated.delay(900),
-      Animated.timing(opacity, {
-        toValue: 1,
-        duration: 350,
-        useNativeDriver: true,
-      }),
-      Animated.delay(2800),
-      Animated.timing(opacity, {
-        toValue: 0,
-        duration: 450,
-        useNativeDriver: true,
-      }),
-    ]);
-    const lift = Animated.loop(
-      Animated.sequence([
-        Animated.timing(translateY, {
-          toValue: -8,
-          duration: 650,
-          useNativeDriver: true,
-        }),
-        Animated.timing(translateY, {
-          toValue: 0,
-          duration: 650,
-          useNativeDriver: true,
-        }),
-      ]),
-      { iterations: 3 },
-    );
-
-    entrance.start(({ finished }) => {
-      if (finished) onDone();
-    });
-    lift.start();
-
-    return () => {
-      entrance.stop();
-      lift.stop();
-    };
-  }, [onDone, opacity, translateY]);
-
-  return (
-    <Animated.View
-      pointerEvents="none"
-      style={{
-        position: 'absolute',
-        left: 0,
-        right: 0,
-        bottom,
-        zIndex: 35,
-        alignItems: 'center',
-        opacity,
-      }}
-    >
-      <Animated.View
-        style={{
-          alignItems: 'center',
-          minWidth: 248,
-          borderRadius: 28,
-          borderWidth: 1,
-          borderColor: 'rgba(255,255,255,0.2)',
-          backgroundColor: 'rgba(255,255,255,0.14)',
-          paddingHorizontal: 24,
-          paddingVertical: 18,
-          transform: [{ translateY }],
-        }}
-      >
-        <ChevronUp size={24} color="rgba(255,255,255,0.9)" />
-        <Text style={{ marginTop: 8, color: 'rgba(255,255,255,0.92)', fontFamily: FONT.semibold, fontSize: 15 }}>
-          {COPY.feed.swipeHintTitle}
-        </Text>
-        <Text style={{ marginTop: 4, color: 'rgba(255,255,255,0.7)', fontFamily: FONT.medium, fontSize: 13 }}>
-          {COPY.feed.swipeHintBody}
-        </Text>
-      </Animated.View>
-    </Animated.View>
-  );
-}
 
 const INITIAL_PROFILES: Profile[] = [
   {
@@ -228,11 +137,10 @@ function AppContent() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [autoplay, setAutoplay] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
-  const [hasRecordedVibe, setHasRecordedVibe] = useState(false);
+  const [hasRecordedVoice, setHasRecordedVoice] = useState(false);
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [activeProfileIndex, setActiveProfileIndex] = useState(0);
-  const [showSwipeHint, setShowSwipeHint] = useState(true);
 
   const flatListRef = useRef<FlatList<Profile>>(null);
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 80 }).current;
@@ -299,15 +207,10 @@ function AppContent() {
     setAppState(next);
   }, []);
 
-  const dismissSwipeHint = useCallback(() => {
-    setShowSwipeHint(false);
-  }, []);
-
   const openProfileFromLike = useCallback((id: string) => {
     const profileIndex = profiles.findIndex((profile) => profile.id === id);
     if (profileIndex === -1) return;
 
-    dismissSwipeHint();
     setActiveProfileIndex(profileIndex);
     setActiveTab('discover');
     setTimeout(() => {
@@ -316,7 +219,7 @@ function AppContent() {
         animated: false,
       });
     }, 80);
-  }, [dismissSwipeHint, profiles]);
+  }, [profiles]);
 
   const isDiscover = activeTab === 'discover';
 
@@ -377,14 +280,14 @@ function AppContent() {
           profile={item}
           togglePlay={togglePlay}
           onFinish={handleTrackFinish}
-          hasRecordedVibe={hasRecordedVibe}
+          hasRecordedVoice={hasRecordedVoice}
           isLiked={likedIds.has(item.id)}
           onToggleLike={() => toggleLike(item.id)}
-          onRecordVibe={() => navigateTo('onboarding_record')}
+          onRecordVoice={() => navigateTo('onboarding_record')}
         />
       </View>
     ),
-    [windowWidth, windowHeight, togglePlay, handleTrackFinish, hasRecordedVibe, toggleLike, likedIds, navigateTo],
+    [windowWidth, windowHeight, togglePlay, handleTrackFinish, hasRecordedVoice, toggleLike, likedIds, navigateTo],
   );
 
   const renderMainScreen = () => (
@@ -457,8 +360,8 @@ function AppContent() {
 
           <Pressable
             onPress={() =>
-              hasRecordedVibe
-                ? setActiveTab('my-vibes')
+              hasRecordedVoice
+                ? setActiveTab('my-voice')
                 : navigateTo('onboarding_record')
             }
             style={{
@@ -496,7 +399,6 @@ function AppContent() {
               snapToAlignment="start"
               viewabilityConfig={viewabilityConfig}
               onViewableItemsChanged={onViewableItemsChanged}
-              onScrollBeginDrag={dismissSwipeHint}
               getItemLayout={(_, index) => ({
                 length: windowHeight,
                 offset: windowHeight * index,
@@ -571,13 +473,6 @@ function AppContent() {
         </>
       )}
 
-      {isDiscover && showSwipeHint && profiles.length > 1 && (
-        <SwipeHintOverlay
-          bottom={windowHeight * 0.44}
-          onDone={dismissSwipeHint}
-        />
-      )}
-
       {activeTab === 'likes' && (
         <View style={{ flex: 1, paddingHorizontal: 16, paddingBottom: 112, paddingTop: insets.top + 56 }}>
           <LikesScreen
@@ -589,22 +484,22 @@ function AppContent() {
         </View>
       )}
 
-      {activeTab === 'my-vibes' && (
+      {activeTab === 'my-voice' && (
         <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 50, backgroundColor: COLORS.background }}>
-          <MyVibeScreen
+          <MyVoiceScreen
             onBack={() => setActiveTab('discover')}
             onSend={() => setActiveTab('discover')}
-            onDeleteVibe={() => {
-              setHasRecordedVibe(false);
+            onDeleteVoice={() => {
+              setHasRecordedVoice(false);
               navigateTo('onboarding_record');
             }}
             onDeleteProfile={() => {
-              setHasRecordedVibe(false);
+              setHasRecordedVoice(false);
               setLikedIds(new Set());
               setActiveTab('discover');
               navigateTo('home');
             }}
-            hasRecordedVibe={hasRecordedVibe}
+            hasRecordedVoice={hasRecordedVoice}
           />
         </View>
       )}
@@ -648,7 +543,7 @@ function AppContent() {
         </Animated.View>
       )}
 
-      {activeTab !== 'my-vibes' && (
+      {activeTab !== 'my-voice' && (
         <BottomNav activeTab={activeTab} setActiveTab={setActiveTab} />
       )}
       {showFilters && <FiltersModal onClose={() => setShowFilters(false)} />}
@@ -682,27 +577,27 @@ function AppContent() {
         );
       case 'onboarding_record':
         return (
-          <RecordVibeScreen
+          <RecordVoiceScreen
             onNext={() => {
-              setHasRecordedVibe(true);
+              setHasRecordedVoice(true);
               navigateTo('onboarding_profile');
             }}
             onSkip={() => {
-              setHasRecordedVibe(false);
+              setHasRecordedVoice(false);
               navigateTo('main');
             }}
           />
         );
       case 'onboarding_profile':
         return (
-          <MyVibeScreen
+          <MyVoiceScreen
             onBack={() => navigateTo('onboarding_record')}
             onSend={() => navigateTo('main')}
-            onDeleteVibe={() => {
-              setHasRecordedVibe(false);
+            onDeleteVoice={() => {
+              setHasRecordedVoice(false);
               navigateTo('onboarding_record');
             }}
-            hasRecordedVibe={hasRecordedVibe}
+            hasRecordedVoice={hasRecordedVoice}
             isOnboarding
           />
         );

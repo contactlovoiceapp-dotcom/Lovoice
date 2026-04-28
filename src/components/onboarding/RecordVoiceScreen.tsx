@@ -1,4 +1,4 @@
-/* Voice recording screen — the key onboarding moment where users create their Vibe. */
+/* Voice recording screen — the key onboarding moment where users record their voice introduction. */
 
 import React, { useEffect, useState } from 'react';
 import {
@@ -155,7 +155,7 @@ function PingRing({
   );
 }
 
-const RecordVibeScreen: React.FC<Props> = ({ onNext, onSkip }) => {
+const RecordVoiceScreen: React.FC<Props> = ({ onNext, onSkip }) => {
   const [recordingState, setRecordingState] = useState<RecordingState>('idle');
   const [time, setTime] = useState(0);
   const [showInspiration, setShowInspiration] = useState(false);
@@ -531,4 +531,4 @@ const RecordVibeScreen: React.FC<Props> = ({ onNext, onSkip }) => {
   );
 };
 
-export default RecordVibeScreen;
+export default RecordVoiceScreen;

@@ -17,7 +17,7 @@ interface Props {
 }
 
 const FiltersModal: React.FC<Props> = ({ onClose }) => {
-  const [newVibes, setNewVibes] = useState(true);
+  const [newVoices, setNewVoices] = useState(true);
   const [newProfiles, setNewProfiles] = useState(false);
   const [ageRange, setAgeRange] = useState<[number, number]>([18, 35]);
   const [city, setCity] = useState<(typeof CITIES)[number]>('Paris');
@@ -79,8 +79,8 @@ const FiltersModal: React.FC<Props> = ({ onClose }) => {
                   {COPY.filters.newVoices}
                 </Text>
                 <Switch
-                  value={newVibes}
-                  onValueChange={setNewVibes}
+                  value={newVoices}
+                  onValueChange={setNewVoices}
                   trackColor={{ false: 'rgba(45,17,54,0.15)', true: COLORS.primary }}
                   thumbColor="#ffffff"
                 />
