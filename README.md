@@ -197,6 +197,7 @@ When starting any task:
 6. **Always propose a commit message** at the end of a phase, following Conventional Commits (`feat:`, `fix:`, `chore:`, `refactor:`, `docs:`).
 7. **No dead code, no commented-out blocks, no obvious comments.** Each file starts with a one-line purpose comment in English.
 8. **TypeScript strict mode is on.** No `any`, no `@ts-ignore` without a comment explaining why.
+9. **Run tests before finishing.** At the end of every phase, run `npm test` and verify all tests pass. Do not propose a commit if any test fails. When adding new logic (helpers, hooks, services), add corresponding unit tests in a `__tests__/` folder colocated with the source file.
 
 ---
 
@@ -207,6 +208,8 @@ npm install
 npm start              # Expo dev server
 npm run ios            # iOS simulator
 npm run android        # Android emulator
+npm test               # Run test suite (Jest + React Testing Library)
+npm run test:watch     # Watch mode for development
 npx supabase start     # local Supabase stack (after Phase 1 setup)
 npx supabase db push   # apply migrations
 npx supabase functions serve <name>  # run Edge Function locally
