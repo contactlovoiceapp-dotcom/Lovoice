@@ -35,28 +35,26 @@ Reactive moderation (block + report + manual takedown by the operator) is part o
 1. **Refactor `App.tsx`** (currently 512 lines, monolithic). Split into:
    - `app/_layout.tsx` (root) using **`expo-router`**,
    - `app/(auth)/` for splash + home + phone + record onboarding,
-   - `app/(main)/` tab navigator: `discover`, `notifications`, `messages`, `profile`.
+   - `app/(main)/` tab navigator: `discover`, `likes`, `messages`, `profile`.
 2. **Remove dead/legacy code** still hinting at swipe/match (none should remain — verify and delete if found).
 3. **Rename "vibe" → "voice" everywhere** (see README §3.bis). Affected files at the time of writing:
    - `src/components/onboarding/RecordVibeScreen.tsx` → `RecordVoiceScreen.tsx`
    - `src/components/onboarding/MyVibeScreen.tsx` → `MyVoiceScreen.tsx`
    - `src/components/main/LikesScreen.tsx`, `src/components/main/FiltersModal.tsx`, `src/components/ProfileCard.tsx`, `App.tsx`, `src/types.ts` (local symbols and FR strings).
    - All FR UI strings: "Ta Vibe" → "Ta voix", "Vibe enregistrée" → "Voix enregistrée", "Découvrir plus de vibes" → "Découvrir plus de voix", `tab 'my-vibes'` → `tab 'my-voice'`, etc.
-4. **Add the `Notifications` screen** (placeholder list with mocked items: like / new message / system).
-5. **Restructure `src/` per target structure** in README §5: introduce `src/features/{feed,voices,chat,notifications,auth,profile}` folders with empty `api/`, `hooks/`, `components/` subfolders.
-6. **Strict TS**: enable `"strict": true` in `tsconfig.json`, fix any resulting errors.
-7. **Install foundational deps**:
+4. **Restructure `src/` per target structure** in README §5: introduce `src/features/{feed,voices,chat,likes,auth,profile,push}` folders with empty `api/`, `hooks/`, `components/` subfolders.
+5. **Strict TS**: enable `"strict": true` in `tsconfig.json`, fix any resulting errors.
+6. **Install foundational deps**:
    - `expo-router`,
    - `@tanstack/react-query`,
    - `zustand`,
    - `expo-secure-store`,
    - `expo-haptics`.
-8. **Replace `geminiService.ts`** mock with a typed in-memory `mockProfilesService.ts` (no API call, no key needed).
-9. **Walk-through with client**: produce a Loom or screenshots of the full nav flow including the new Notifications screen, get sign-off.
+7. **Replace `geminiService.ts`** mock with a typed in-memory `mockProfilesService.ts` (no API call, no key needed).
+8. **Walk-through with client**: produce a Loom or screenshots of the full nav flow, get sign-off.
 
 ### Deliverables
-- Working app with expo-router and the 4 main tabs.
-- Notifications screen visible (mocked).
+- Working app with expo-router and the 4 main tabs (discover, likes, messages, profile).
 - `tsconfig.json` strict.
 - Folder structure matches README §5.
 
@@ -215,12 +213,12 @@ Reactive moderation (block + report + manual takedown by the operator) is part o
 
 ## Phase 6 — Likes, blocks, reports (+ moderation backend) 🟡 ⭐
 
-**Goal**: users can like a voice, block a user, report a voice or a user. Notifications are created. The server-side moderation primitives that the back-office (Phase 6.bis) will consume are in place.
+**Goal**: users can like a voice, block a user, report a voice or a user. Like events appear in the recipient's Likes screen (received tab). The server-side moderation primitives that the back-office (Phase 6.bis) will consume are in place.
 
 ### Scope
 1. Implement `like(voice_id)` / `unlike(voice_id)` mutations.
 2. Heart button in `ProfileCard` with optimistic update.
-3. SQL trigger on `likes` insert → insert into `notifications` with `kind='like'`.
+3. SQL trigger on `likes` insert → insert into `notifications` with `kind='like'` (feeds push delivery in Phase 8 and the "received" tab of the Likes screen).
 4. Block flow from a long-press on the card or from a profile detail sheet. Confirmation modal.
 5. Report flow: list of reasons (harassment, hate, inappropriate, spam, other) + free text. Inserts a `reports` row with `status = 'pending'`.
 6. Filtering: feed query already excludes blocked users (already in §8). Verify likes/messages are blocked too.
@@ -235,7 +233,7 @@ Reactive moderation (block + report + manual takedown by the operator) is part o
 8. PostHog events for like/block/report — **optional**, only wire if PostHog is enabled (Phase 10.bis).
 
 ### Deliverables
-- Like adds a notification for the recipient.
+- Like appears in the recipient's Likes screen (received tab) and creates a `notifications` row for push delivery.
 - Block hides both directions (you don't see them, they don't see you).
 - Report writes a row + sends an internal alert (plain DB row in V1; Slack webhook is post-MVP).
 - All five admin Edge Functions deployed and unit-tested (Deno test runner against local Supabase). Calling them without an admin JWT returns 401.
@@ -332,21 +330,21 @@ This phase produces a **separate Next.js repository** (suggested name `lovoice-a
 
 ---
 
-## Phase 8 — Notifications screen + push 🔴 (Expo Push) ⭐
+## Phase 8 — Push notifications 🔴 (Expo Push) ⭐
 
-**Goal**: in-app notifications page + push notifications for likes and new messages.
+**Goal**: push notifications for likes and new messages, deep-linking to the relevant screen. There is no dedicated Notifications screen — likes appear in the Likes screen (received tab) and messages appear in the Messages screen.
 
 ### Scope
-1. `app/(main)/notifications.tsx`: list `notifications` for the user, grouped by day, with avatars and deep links. Mark-as-read on view.
-2. Realtime subscription to insert new notifications live (badge on tab).
-3. Edge Function `dispatch_push(notification_id)` triggered after `notifications` insert (DB trigger calls `pg_net` to invoke it). Sends to Expo Push API using the recipient's `push_token`.
-4. Debounce rule: max 1 push per (actor → recipient → kind) per hour for likes. Messages always push (unless recipient currently online — checked via Realtime presence).
-5. On app launch, register for push and store/refresh `profiles.push_token`.
-6. Tap a push → deep link to the right screen via expo-router.
+1. Edge Function `dispatch_push(notification_id)` triggered after `notifications` insert (DB trigger calls `pg_net` to invoke it). Sends to Expo Push API using the recipient's `push_token`.
+2. Debounce rule: max 1 push per (actor → recipient → kind) per hour for likes. Messages always push (unless recipient currently online — checked via Realtime presence).
+3. On app launch, register for push and store/refresh `profiles.push_token`.
+4. Tap a push → deep link to the right screen via expo-router (`likes` for a like push, `messages/[id]` for a message push).
+5. Unread badge on the Likes tab (count of unseen received likes) and Messages tab (count of unread conversations). Realtime subscription to update badges live.
 
 ### Deliverables
 - Push received on real device for a like and a message.
-- Notifications page reflects all events with correct deep links.
+- Tapping a like push opens the Likes screen. Tapping a message push opens the conversation.
+- Unread badges update in real time.
 
 ### Acceptance
 - iOS push works in background AND when app is killed.
@@ -354,7 +352,7 @@ This phase produces a **separate Next.js repository** (suggested name `lovoice-a
 - Disabling push in OS settings is handled gracefully.
 
 ### Suggested commit
-`feat(notifications): in-app notifications page and push delivery`
+`feat(push): push delivery with deep links to likes and messages`
 
 ---
 
@@ -475,10 +473,10 @@ This phase produces a **separate Next.js repository** (suggested name `lovoice-a
 | 6 — Likes / blocks / reports + moderation backend | ⭐ MVP | 2 days |
 | 6.bis — Admin back-office (Next.js) | ⭐ MVP | 2 days |
 | 7 — Messaging realtime | ⭐ MVP | 4 days |
-| 8 — Notifications + push | ⭐ MVP | 1.5 days |
+| 8 — Push notifications | ⭐ MVP | 1 day |
 | 10 — RGPD + Sentry + rate limiting | ⭐ MVP | 2 days |
 | 11 — Store submission | ⭐ MVP | 2 days |
-| **MVP subtotal (committed)** | | **≈ 25.5 working days** |
+| **MVP subtotal (committed)** | | **≈ 25 working days** |
 | 9 — Auto-moderation pipeline (+ back-office tab) | ✳️ optional | 2.5 days |
 | 10.bis — PostHog analytics (+ back-office stats tab) | ✳️ optional | 1 day |
 | **Optional subtotal** | | **≈ 3.5 working days** |

@@ -28,7 +28,7 @@ There is **NO swipe-and-match mechanic**. The interactions are:
 - **Like** a voice (the author gets a notification).
 - **Reply** to a voice with a text or voice message → starts a conversation.
 - **Chat** in a built-in messenger (text + voice messages).
-- **Get notified** of likes and new messages on a dedicated Notifications screen.
+- **Get notified** of likes (visible in the Likes screen) and new messages (visible in the Messages screen) via push notifications.
 
 Voice is the core medium. Recording and playback **must feel instant and reliable**.
 
@@ -99,7 +99,7 @@ The product term used in **every UI string (in French)** and in **every code ide
 | The act of listening | **"écouter"** | `play` |
 | The act of recording | **"enregistrer"** | `record` |
 | The Discover feed | **"Découvrir"** | `feed` / `discover` |
-| The Notifications screen | **"Notifications"** | `notifications` |
+| The Likes screen | **"Likes"** | `likes` |
 
 **The word "vibe" is forbidden.** It was used in the prototype and must be removed everywhere it still appears (`App.tsx`, `RecordVibeScreen.tsx`, `MyVibeScreen.tsx`, `ProfileCard.tsx`, `FiltersModal.tsx`, `LikesScreen.tsx`, `src/types.ts`). This rename is part of Phase 0.
 
@@ -140,11 +140,11 @@ LOVOICE_EXPO/
 │   └── CLIENT_SETUP.md        ← accounts/keys checklist for the client
 ├── app/                       ← expo-router routes (introduced in Phase 0)
 │   ├── (auth)/                ← onboarding stack
-│   ├── (main)/                ← tab navigator (discover, notifications, messages, profile)
+│   ├── (main)/                ← tab navigator (discover, likes, messages, profile)
 │   └── _layout.tsx
 ├── src/
 │   ├── components/            ← reusable UI primitives
-│   ├── features/              ← feature folders (auth, voices, feed, chat, notifications)
+│   ├── features/              ← feature folders (auth, voices, feed, chat, likes, push)
 │   │   └── <feature>/
 │   │       ├── api/           ← Supabase queries (React Query hooks)
 │   │       ├── hooks/
