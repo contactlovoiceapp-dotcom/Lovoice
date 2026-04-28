@@ -1,0 +1,53 @@
+/* Root layout — loads custom fonts, provides safe-area context, and renders the router slot. */
+
+import React from 'react';
+import { View } from 'react-native';
+import { Slot } from 'expo-router';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import {
+  useFonts,
+  Outfit_300Light,
+  Outfit_400Regular,
+  Outfit_500Medium,
+  Outfit_600SemiBold,
+  Outfit_700Bold,
+  Outfit_800ExtraBold,
+} from '@expo-google-fonts/outfit';
+import {
+  PlayfairDisplay_400Regular,
+  PlayfairDisplay_400Regular_Italic,
+  PlayfairDisplay_500Medium,
+  PlayfairDisplay_600SemiBold,
+  PlayfairDisplay_700Bold,
+  PlayfairDisplay_900Black,
+} from '@expo-google-fonts/playfair-display';
+
+import { COLORS } from '../src/theme';
+import '../global.css';
+
+export default function RootLayout() {
+  const [fontsLoaded] = useFonts({
+    Outfit_300Light,
+    Outfit_400Regular,
+    Outfit_500Medium,
+    Outfit_600SemiBold,
+    Outfit_700Bold,
+    Outfit_800ExtraBold,
+    PlayfairDisplay_400Regular,
+    PlayfairDisplay_400Regular_Italic,
+    PlayfairDisplay_500Medium,
+    PlayfairDisplay_600SemiBold,
+    PlayfairDisplay_700Bold,
+    PlayfairDisplay_900Black,
+  });
+
+  if (!fontsLoaded) return null;
+
+  return (
+    <SafeAreaProvider>
+      <View style={{ flex: 1, backgroundColor: COLORS.background }}>
+        <Slot />
+      </View>
+    </SafeAreaProvider>
+  );
+}

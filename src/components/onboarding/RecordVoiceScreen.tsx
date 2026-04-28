@@ -23,6 +23,7 @@ import { ArrowRight, Lightbulb, Mic, Pause, Play, Square, X } from 'lucide-react
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS, CTA_GRADIENT, FONT, ONBOARDING_GRADIENT, RADIUS, SHADOW } from '../../theme';
 import { COPY } from '../../copy';
+import { formatTime } from '../../lib/formatTime';
 
 const MIC_SIZE = 128;
 const GLOW_SIZE = 500;
@@ -222,12 +223,6 @@ const RecordVoiceScreen: React.FC<Props> = ({ onNext, onSkip }) => {
       return;
     }
     toggleRecording();
-  };
-
-  const formatTime = (seconds: number) => {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
   return (

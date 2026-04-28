@@ -19,7 +19,7 @@ const GLOW_SIZE = 400;
 const GLOW_BACKGROUND = 'rgba(212,121,236,0.15)';
 
 interface Props {
-  onFinish: () => void;
+  onFinish?: () => void;
 }
 
 /** Decorative pulsing glow — invisible if animation fails, no impact on usability. */
@@ -92,6 +92,7 @@ const SplashScreen: React.FC<Props> = ({ onFinish }) => {
   const { width, height } = useWindowDimensions();
 
   useEffect(() => {
+    if (!onFinish) return;
     const timer = setTimeout(onFinish, 2800);
     return () => clearTimeout(timer);
   }, [onFinish]);

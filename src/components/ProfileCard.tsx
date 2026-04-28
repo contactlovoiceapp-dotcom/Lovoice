@@ -40,6 +40,7 @@ import * as Haptics from 'expo-haptics';
 import type { Profile } from '../types';
 import { COLORS, FONT, RADIUS, SHADOW, THEME_GRADIENTS, hexToRgba } from '../theme';
 import { COPY } from '../copy';
+import { formatTime } from '../lib/formatTime';
 import Waveform from './Waveform';
 
 interface ProfileCardProps {
@@ -176,12 +177,6 @@ function FadeWhen({ visible, children }: { visible: boolean; children: React.Rea
 }
 
 /* ─── Helpers ──────────────────────────────────────────────────────────────── */
-
-function formatTime(sec: number): string {
-  const m = Math.floor(sec / 60);
-  const s = Math.floor(sec % 60);
-  return `${m}:${s.toString().padStart(2, '0')}`;
-}
 
 function ModalOverlay({
   visible,

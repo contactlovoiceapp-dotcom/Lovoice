@@ -20,13 +20,4 @@ export interface Profile {
   audioDurationSec: number;
 }
 
-export type Tab = 'discover' | 'likes' | 'messages' | 'my-voice';
-
-export type AppState =
-  | 'splash'
-  | 'home'
-  | 'login_phone'
-  | 'onboarding_phone'
-  | 'onboarding_record'
-  | 'onboarding_profile'
-  | 'main';
+export type Tab = 'discover' | 'likes' | 'messages' | 'profile';

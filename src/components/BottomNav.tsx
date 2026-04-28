@@ -1,12 +1,12 @@
-/* Floating pill bottom nav — stable icon tabs over the main app content. */
+/* Floating pill bottom nav — custom tab bar for the expo-router Tabs navigator. */
 
 import React from 'react';
 import { Pressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Compass, Heart, MessageCircle } from 'lucide-react-native';
+import { Compass, Heart, MessageCircle, User } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
+import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 
-import type { Tab } from '../types';
 import { RADIUS } from '../theme';
 import { COPY } from '../copy';
 
@@ -14,15 +14,11 @@ const ICON_SIZE = 22;
 const PILL_HEIGHT = 64;
 const ITEM_WIDTH = 56;
 
-interface BottomNavProps {
-  activeTab: Tab;
-  setActiveTab: (tab: Tab) => void;
-}
-
-const TABS: { id: Tab; label: string; icon: LucideIcon }[] = [
-  { id: 'discover', label: COPY.nav.discover, icon: Compass },
-  { id: 'likes', label: COPY.nav.likes, icon: Heart },
-  { id: 'messages', label: COPY.nav.messages, icon: MessageCircle },
+const TAB_CONFIG: { key: string; label: string; icon: LucideIcon }[] = [
+  { key: 'discover', label: COPY.nav.discover, icon: Compass },
+  { key: 'likes', label: COPY.nav.likes, icon: Heart },
+  { key: 'messages', label: COPY.nav.messages, icon: MessageCircle },
+  { key: 'profile', label: COPY.nav.profile, icon: User },
 ];
 
 function TabItem({
@@ -61,7 +57,7 @@ function TabItem({
   );
 }
 
-const BottomNav: React.FC<BottomNavProps> = ({ activeTab, setActiveTab }) => {
+const BottomNav: React.FC<BottomTabBarProps> = ({ state, navigation }) => {
   const insets = useSafeAreaInsets();
 
   return (
@@ -94,13 +90,13 @@ const BottomNav: React.FC<BottomNavProps> = ({ activeTab, setActiveTab }) => {
           elevation: 12,
         }}
       >
-        {TABS.map((tab) => (
+        {TAB_CONFIG.map((tab, index) => (
           <TabItem
-            key={tab.id}
+            key={tab.key}
             label={tab.label}
             icon={tab.icon}
-            isActive={activeTab === tab.id}
-            onPress={() => setActiveTab(tab.id)}
+            isActive={state.index === index}
+            onPress={() => navigation.navigate(state.routes[index].name)}
           />
         ))}
       </View>

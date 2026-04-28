@@ -187,6 +187,7 @@ export const COPY = {
     discover: 'Écoute',
     likes: 'Likes',
     messages: 'Messages',
+    profile: 'Profil',
   },
 
   likesScreen: {
