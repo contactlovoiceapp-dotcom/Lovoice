@@ -41,8 +41,7 @@ if (missingEnvVars.length > 0) {
   console.error(
     "Create or update .env.local with the public Supabase URL and publishable key.",
   );
-  process.exit(1);
+  process.exitCode = 1;
+} else {
+  console.log("Required public Supabase environment variables are present.");
 }
-
-console.log("Required public Supabase environment variables are present.");
-process.exit(0);
