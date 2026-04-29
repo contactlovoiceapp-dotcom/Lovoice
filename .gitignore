@@ -31,7 +31,8 @@ yarn-error.*
 *.pem
 
 # local env files
-.env*.local
+.env*
+!.env.example
 
 # Google Play API (EAS Submit) — never commit
 google-play-service-account.json
