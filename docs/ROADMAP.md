@@ -104,6 +104,9 @@ Reactive moderation (block + report + manual takedown by the operator) is part o
 
 **Goal**: a user can sign in or sign up with their phone number, restricted to FR/BE/CH.
 
+### Cleanup before scope
+- Remove the temporary `[Supabase smoke test]` `useEffect` in `app/_layout.tsx` (added in Phase 1 Bloc E to validate the connection). The auth-aware redirect introduced by this phase replaces it.
+
 ### Scope
 1. In Supabase Auth, enable **Phone provider with Twilio Verify**. Store Twilio Account SID + Auth Token + Verify Service SID in Supabase secrets.
 2. Build `app/(auth)/phone.tsx`: country picker locked to FR/BE/CH (E.164 input), call `supabase.auth.signInWithOtp({ phone })`.

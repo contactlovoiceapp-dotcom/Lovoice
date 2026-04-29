@@ -198,6 +198,7 @@ When starting any task:
 7. **No dead code, no commented-out blocks, no obvious comments.** Each file starts with a one-line purpose comment in English.
 8. **TypeScript strict mode is on.** No `any`, no `@ts-ignore` without a comment explaining why.
 9. **Run tests before finishing.** At the end of every phase, run `npm test` and verify all tests pass. Do not propose a commit if any test fails. When adding new logic (helpers, hooks, services), add corresponding unit tests in a `__tests__/` folder colocated with the source file.
+10. **Address pending follow-ups before adding scope.** Before starting a phase, grep for `TODO(phase-N)` and `TODO(any-phase)` in the codebase, and read the "Cleanup before scope" subsection (if any) of the phase in `docs/ROADMAP.md`. Resolve what applies as the first step of the phase, in its own dedicated commit before the scope work.
 
 ---
 

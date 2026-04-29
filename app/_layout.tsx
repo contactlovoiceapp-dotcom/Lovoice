@@ -55,6 +55,7 @@ export default function RootLayout() {
     PlayfairDisplay_900Black,
   });
 
+  // TODO(phase-2): remove this temporary smoke test once auth gating is in place at the root layout.
   useEffect(() => {
     void supabase
       .from('prompts')
