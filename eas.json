@@ -1,36 +1,33 @@
 {
   "cli": {
-    "version": ">= 15.0.0",
+    "version": ">= 16.0.0",
     "appVersionSource": "remote"
   },
   "build": {
-    "development": {
-      "developmentClient": true,
-      "distribution": "internal"
-    },
-    "preview": {
-      "distribution": "internal",
-      "ios": {
-        "simulator": false
-      }
-    },
-    "production": {
-      "autoIncrement": true,
+    "base": {
       "env": {
         "EAS_BUILD_NO_EXPO_GO_WARNING": "true"
       }
-    }
-  },
-  "submit": {
-    "production": {
+    },
+    "development": {
+      "extends": "base",
+      "developmentClient": true,
+      "distribution": "internal",
+      "channel": "development",
       "ios": {
-        "ascAppId": "6762983554",
-        "appleTeamId": "95YWU24BBF"
-      },
-      "android": {
-        "track": "internal",
-        "serviceAccountKeyPath": "./google-play-service-account.json"
+        "simulator": true
       }
+    },
+    "preview": {
+      "extends": "base",
+      "distribution": "internal",
+      "channel": "preview"
+    },
+    "production": {
+      "extends": "base",
+      "distribution": "store",
+      "channel": "production",
+      "autoIncrement": true
     }
   }
 }
