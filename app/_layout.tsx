@@ -24,7 +24,7 @@ import {
 } from '@expo-google-fonts/playfair-display';
 
 import { COLORS } from '../src/theme';
-import { supabase } from '../src/lib/supabase';
+import { getSupabaseClient, getSupabaseConfig } from '../src/lib/supabase';
 import '../global.css';
 
 export default function RootLayout() {
@@ -57,15 +57,35 @@ export default function RootLayout() {
 
   // TODO(phase-2): remove this temporary smoke test once auth gating is in place at the root layout.
   useEffect(() => {
-    void supabase
-      .from('prompts')
-      .select('id')
-      .then(({ data, error }) => {
+    void (async () => {
+      const supabase = getSupabaseClient();
+
+      if (!supabase) {
+        const configResult = getSupabaseConfig();
+        console.log(
+          '[Supabase smoke test]',
+          configResult.ok
+            ? 'ERROR: Client unavailable.'
+            : `ERROR: ${configResult.error}`,
+        );
+        return;
+      }
+
+      try {
+        const { data, error } = await supabase.from('prompts').select('id');
         console.log(
           '[Supabase smoke test]',
           error ? `ERROR: ${error.message}` : `OK - ${data?.length} prompts`,
         );
-      });
+      } catch (error: unknown) {
+        console.log(
+          '[Supabase smoke test]',
+          error instanceof Error
+            ? `ERROR: ${error.message}`
+            : 'ERROR: Unknown failure.',
+        );
+      }
+    })();
   }, []);
 
   if (!fontsLoaded) return null;
