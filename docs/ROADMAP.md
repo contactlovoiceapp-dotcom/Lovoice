@@ -72,6 +72,10 @@ Reactive moderation (block + report + manual takedown by the operator) is part o
 
 **Goal**: the cloud project exists, the mobile app is connected to it, and the deployment pipeline works.
 
+**Status:** Done  
+**Completed:** 2026-04-29  
+**Ref:** `phase-1-backend-bootstrap`
+
 ### Scope
 1. Create **Supabase project in `eu-central-1`** (Frankfurt).
 2. Initialize local Supabase: `supabase init`, commit the `supabase/` folder.
@@ -94,6 +98,20 @@ Reactive moderation (block + report + manual takedown by the operator) is part o
 - `supabase db push` is idempotent.
 - `npx supabase test db` (basic) passes.
 - App reads env vars from EAS in a build, from `.env.local` in dev.
+
+### Phase log
+- Completed in Bloc A-F: local Supabase init/link, public env setup, initial schema, RLS policies, storage buckets, generated TypeScript types, typed Supabase client, `app.config.ts`, React Query provider, env check script, and EAS profiles.
+- Validation performed:
+  - Remote `supabase db push` applies cleanly and is idempotent.
+  - Local Supabase starts after CLI/cache cleanup and applies migrations + seed.
+  - RLS is enabled on all 12 public tables.
+  - Storage buckets `voices` and `messages` exist.
+  - Mobile app boots and runs the temporary `[Supabase smoke test]` against `prompts` without error.
+  - `npm run check-env`, `npx tsc --noEmit`, and `eas build:configure --platform all` pass.
+- Follow-ups:
+  - Push EAS project secrets manually using `docs/EAS_SECRETS.md` before the first remote EAS build.
+  - Remove the temporary `[Supabase smoke test]` in Phase 2 before adding auth-aware redirects.
+  - Run the first EAS development build on a real device when device-only auth/build validation starts.
 
 ### Suggested commit
 `feat(infra): bootstrap supabase project, schema, rls and EAS pipeline`
