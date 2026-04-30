@@ -189,12 +189,12 @@ Reactive moderation (block + report + manual takedown by the operator) is part o
 
 ### Scope
 
-1. Multi-step wizard under `app/(auth)/onboarding/`: `name`, `birthdate` (must be ≥ 18), `gender`, `looking-for`, `city` (city/village autocomplete that stores both display name and coordinates).
+1. Multi-step wizard under `app/(auth)/onboarding/`: `name`, `birthdate` (must be ≥ 18), `gender`, `looking-for`, `city` (city/village search that stores both display name and coordinates).
 2. On finish, `upsert` into `profiles` (insert if not exists).
 3. Validation server-side via a `before insert` trigger on `profiles`: age ≥ 18, country in (FR,BE,CH), name length 2–30.
 4. Edit profile screen reachable from `(main)/profile`.
 5. CGU + Privacy Policy acceptance (checkbox + links).
-6. No device geolocation in V1: do not install `expo-location`. City autocomplete must use a geocoding provider that supports autocomplete and keep any API key outside the mobile bundle.
+6. No device geolocation in V1: do not install `expo-location`. City lookup uses an explicit Nominatim search action, not live autocomplete, so no geocoding API key is needed in this version.
 
 ### Deliverables
 

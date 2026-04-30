@@ -311,14 +311,17 @@ export const COPY = {
 
     city: {
       title: 'Tu vis où ?',
-      subtitle: 'Tape le nom de ta ville ou de ton village.',
-      placeholder: 'Paris, Lyon, Bruxelles...',
-      searching: 'Recherche en cours...',
+      subtitle: 'Tape le nom de ta ville ou de ton village, puis lance la recherche.',
+      placeholder: 'Ex. Paris, Namur, Lausanne',
+      searchCta: 'Rechercher',
+      searching: 'Recherche...',
+      selectResult: 'Choisis ta ville dans la liste.',
       noResults: 'Aucun résultat. Essaie un autre terme.',
       // Shown below the selected city to explain why we need coordinates.
       coordinatesHint: 'Tes coordonnées sont utilisées uniquement pour calculer les distances.',
       errors: {
         required: 'Indique ta ville pour continuer.',
+        select_result: 'Sélectionne une ville dans les résultats.',
       },
     },
   },
