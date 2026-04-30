@@ -6,6 +6,7 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
@@ -52,18 +53,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const profileRequestIdRef = useRef(0);
 
   const loadProfile = useCallback(async (nextSession: Session | null) => {
+    const requestId = profileRequestIdRef.current + 1;
+    profileRequestIdRef.current = requestId;
+
     if (!nextSession) {
       setProfile(null);
+      setError(null);
       return;
     }
 
     try {
       const nextProfile = await fetchProfile(nextSession.user.id);
+
+      if (profileRequestIdRef.current !== requestId) {
+        return;
+      }
+
       setProfile(nextProfile);
       setError(null);
     } catch (profileError: unknown) {
+      if (profileRequestIdRef.current !== requestId) {
+        return;
+      }
+
       setProfile(null);
       setError(
         profileError instanceof Error
@@ -90,8 +105,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error(signOutError.message);
     }
 
+    profileRequestIdRef.current += 1;
     setSession(null);
     setProfile(null);
+    setError(null);
   }, []);
 
   useEffect(() => {
