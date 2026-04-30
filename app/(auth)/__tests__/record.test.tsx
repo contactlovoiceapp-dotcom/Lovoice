@@ -1,4 +1,4 @@
-/* Record route tests — protect onboarding state updates before entering the feed. */
+/* Record route tests — protect onboarding navigation and voice-gate state updates. */
 
 import React from 'react';
 import { render } from '@testing-library/react-native';
@@ -40,14 +40,14 @@ describe('RecordRoute', () => {
     useFeedState.getState().setHasRecordedVoice(false);
   });
 
-  it('unlocks the feed before continuing to profile setup', () => {
+  it('marks the voice as recorded and navigates to the onboarding wizard', () => {
     render(<RecordRoute />);
 
     expect(useFeedState.getState().hasRecordedVoice).toBe(false);
     mockRecordVoiceScreenProps?.onNext?.();
 
     expect(useFeedState.getState().hasRecordedVoice).toBe(true);
-    expect(mockPush).toHaveBeenCalledWith('/(auth)/profile-setup');
+    expect(mockPush).toHaveBeenCalledWith('/(auth)/onboarding/name');
   });
 
   it('keeps voices locked when the user skips recording', () => {

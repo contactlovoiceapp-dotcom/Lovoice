@@ -385,7 +385,8 @@ When enabled, `commit_upload` switches the default row status to `'pending'` and
 ## 7. Geo and country gating
 
 - At signup, derive country from the verified phone number's country code (`+33` → FR, `+32` → BE, `+41` → CH). Reject anything else.
-- Optional location capture (precise lat/lng) is asked separately in onboarding, with explanation. Stored in `profiles.location` (PostGIS point).
+- During profile onboarding, the user types their city or village and selects a geocoded suggestion. The app stores the selected display city in `profiles.city` and the returned coordinates in `profiles.location` (PostGIS point). V1 does not request device GPS permission and does not use `expo-location`.
+- City autocomplete must go through a provider that explicitly supports autocomplete, ideally via a Supabase Edge Function so API keys stay server-side. The public Nominatim endpoint must not be used for typeahead because its usage policy forbids autocomplete.
 - Distance filter uses `ST_DWithin(profiles.location, $1::geography, $2)` in the feed query.
 
 ---

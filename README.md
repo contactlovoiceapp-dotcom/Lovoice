@@ -52,6 +52,7 @@ Voice is the core medium. Recording and playback **must feel instant and reliabl
 - **`expo-audio`** for recording and playback (NOT `expo-av`, which is deprecated since SDK 54).
 - **`expo-secure-store`** for tokens.
 - **`expo-notifications`** for push.
+- **City autocomplete geocoding** for profile location: the app asks for a city/village name, resolves it to coordinates through a server-side geocoding endpoint, and stores only `profiles.city` + `profiles.location`. V1 does **not** request device GPS permission and does **not** use `expo-location`.
 - State: React Query (`@tanstack/react-query`) for server state, Zustand for local UI state. No Redux.
 
 ### Admin back-office (companion web app, separate repo) — committed in V1 MVP

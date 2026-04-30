@@ -12,6 +12,7 @@ Each phase below is **self-contained**: it has a clear scope, deliverables, acce
 Before starting any phase, **re-read `README.md` and `docs/ARCHITECTURE.md`**.
 
 Legend:
+
 - 🟢 = can be done with mocked data, no external account needed
 - 🟡 = needs Supabase project + keys
 - 🔴 = needs additional third-party (Twilio / AssemblyAI / Hive / Sentry / PostHog / EAS)
@@ -19,6 +20,7 @@ Legend:
 - ✳️ = **optional / post-MVP** (to do later in V1 if time allows, or in a subsequent version)
 
 The V1 MVP commitment covers all features described in this roadmap **except**:
+
 - automatic voice transcription (AssemblyAI),
 - automatic moderation (Hive — see `docs/ARCHITECTURE.md` §4.3.b),
 - product analytics (PostHog).
@@ -27,11 +29,12 @@ Reactive moderation (block + report + manual takedown by the operator) is part o
 
 ---
 
-## Phase 0 — Foundation refactor & UX/UI finalization 🟢 ⭐
+## Phase 0 — Foundation refactor & UX/UI finalization 🟢
 
 **Goal**: clean the prototype, finish the visual UX with the client, and put the codebase in a state where every following phase can plug in cleanly.
 
 ### Scope
+
 1. **Refactor `App.tsx`** (currently 512 lines, monolithic). Split into:
    - `app/_layout.tsx` (root) using **`expo-router`**,
    - `app/(auth)/` for splash + home + phone + record onboarding,
@@ -54,21 +57,24 @@ Reactive moderation (block + report + manual takedown by the operator) is part o
 8. **Walk-through with client**: produce a Loom or screenshots of the full nav flow, get sign-off.
 
 ### Deliverables
+
 - Working app with expo-router and the 4 main tabs (discover, likes, messages, profile).
 - `tsconfig.json` strict.
 - Folder structure matches README §5.
 
 ### Acceptance
+
 - App builds on iOS and Android without warnings related to deprecated APIs.
 - No `expo-av` references anywhere.
 - Client signs off on the screens.
 
 ### Suggested commit
+
 `refactor(app): migrate to expo-router and finalize prototype UX`
 
 ---
 
-## Phase 1 — Backend bootstrap (Supabase + EAS + envs) 🟡 ⭐
+## Phase 1 — Backend bootstrap (Supabase + EAS + envs) 🟢
 
 **Goal**: the cloud project exists, the mobile app is connected to it, and the deployment pipeline works.
 
@@ -77,6 +83,7 @@ Reactive moderation (block + report + manual takedown by the operator) is part o
 **Ref:** `phase-1-backend-bootstrap`
 
 ### Scope
+
 1. Create **Supabase project in `eu-central-1`** (Frankfurt).
 2. Initialize local Supabase: `supabase init`, commit the `supabase/` folder.
 3. Create migration `0001_init.sql` with: extensions (`postgis`, `pgcrypto`), all tables from `ARCHITECTURE.md` §2, indexes, FKs.
@@ -90,16 +97,19 @@ Reactive moderation (block + report + manual takedown by the operator) is part o
 11. Add a `scripts/check-env.ts` that fails the build if required env vars are missing.
 
 ### Deliverables
+
 - Supabase project live, schema applied, RLS on every table.
 - Mobile app boots and successfully calls `supabase.from('prompts').select()` (returns empty).
 - EAS dev build runs on device.
 
 ### Acceptance
+
 - `supabase db push` is idempotent.
 - `npx supabase test db` (basic) passes.
 - App reads env vars from EAS in a build, from `.env.local` in dev.
 
 ### Phase log
+
 - Completed in Bloc A-F: local Supabase init/link, public env setup, initial schema, RLS policies, storage buckets, generated TypeScript types, typed Supabase client, `app.config.ts`, React Query provider, env check script, and EAS profiles.
 - Validation performed:
   - Remote `supabase db push` applies cleanly and is idempotent.
@@ -114,18 +124,21 @@ Reactive moderation (block + report + manual takedown by the operator) is part o
   - Run the first EAS development build on a real device when device-only auth/build validation starts.
 
 ### Suggested commit
+
 `feat(infra): bootstrap supabase project, schema, rls and EAS pipeline`
 
 ---
 
-## Phase 2 — Phone authentication (FR/BE/CH only) 🔴 (Twilio) ⭐
+## Phase 2 — Phone authentication (FR/BE/CH only) 🟢
 
 **Goal**: a user can sign in or sign up with their phone number, restricted to FR/BE/CH.
 
 ### Cleanup before scope
+
 - Remove the temporary `[Supabase smoke test]` `useEffect` in `app/_layout.tsx` (added in Phase 1 Bloc E to validate the connection). The auth-aware redirect introduced by this phase replaces it.
 
 ### Scope
+
 1. In Supabase Auth, enable **Phone provider with Twilio Verify**. Store Twilio Account SID + Auth Token + Verify Service SID in Supabase secrets.
 2. Build `app/(auth)/phone.tsx`: country picker locked to FR/BE/CH (E.164 input), call `supabase.auth.signInWithOtp({ phone })`.
 3. Build `app/(auth)/otp.tsx`: 6-digit code input, call `supabase.auth.verifyOtp`.
@@ -135,16 +148,19 @@ Reactive moderation (block + report + manual takedown by the operator) is part o
 7. Persist session via `expo-secure-store` (custom `auth.storage`).
 
 ### Deliverables
+
 - End-to-end phone signup works on a real device for one French number.
 - Belgian and Swiss numbers are accepted; any other country is blocked with a clear message.
 - Session persists across app restarts.
 
 ### Acceptance
+
 - A user with a `+1` number cannot sign up.
 - Logout clears the session and redirects to `(auth)/home`.
 - Unit test on the country detection helper.
 
 ### Phase log
+
 - Implemented in Bloc A-E:
   - Removed the temporary Supabase smoke test from `app/_layout.tsx`.
   - Added FR/BE/CH phone helpers and unit tests.
@@ -162,31 +178,38 @@ Reactive moderation (block + report + manual takedown by the operator) is part o
   - `npm test -- --runInBand`
 
 ### Suggested commit
+
 `feat(auth): phone OTP authentication restricted to FR/BE/CH`
 
 ---
 
 ## Phase 3 — Profile onboarding 🟡 ⭐
 
-**Goal**: after auth, the user creates their profile (name, birthdate, gender, looking-for, city, optional location).
+**Goal**: after auth, the user creates their profile (name, birthdate, gender, looking-for, city with coordinates).
 
 ### Scope
-1. Multi-step wizard under `app/(auth)/onboarding/`: `name`, `birthdate` (must be ≥ 18), `gender`, `looking-for`, `city` (text), `location` (optional, `expo-location`).
+
+1. Multi-step wizard under `app/(auth)/onboarding/`: `name`, `birthdate` (must be ≥ 18), `gender`, `looking-for`, `city` (city/village autocomplete that stores both display name and coordinates).
 2. On finish, `upsert` into `profiles` (insert if not exists).
 3. Validation server-side via a `before insert` trigger on `profiles`: age ≥ 18, country in (FR,BE,CH), name length 2–30.
 4. Edit profile screen reachable from `(main)/profile`.
 5. CGU + Privacy Policy acceptance (checkbox + links).
+6. No device geolocation in V1: do not install `expo-location`. City autocomplete must use a geocoding provider that supports autocomplete and keep any API key outside the mobile bundle.
 
 ### Deliverables
+
 - Profile creation wizard fully working.
 - A profile row is created with all required fields.
+- `profiles.location` is populated from the selected city/village coordinates.
 - Edit profile updates the row.
 
 ### Acceptance
+
 - Trying to set birthdate < 18 is blocked client and server side.
 - Required fields cannot be skipped.
 
 ### Suggested commit
+
 `feat(profile): onboarding wizard with age and country gating`
 
 ---
@@ -196,6 +219,7 @@ Reactive moderation (block + report + manual takedown by the operator) is part o
 **Goal**: user can record, re-record, listen back, and publish their voice.
 
 ### Scope
+
 1. Install **`expo-audio`**. Configure `AVAudioSession` defaults in `src/lib/audio.ts`.
 2. Build `useVoiceRecorder` hook: start, stop, pause, resume, metering at 50 ms, hard cap at 300_000 ms.
 3. Build `useVoicePlayer` hook (single-instance variant for preview).
@@ -206,16 +230,19 @@ Reactive moderation (block + report + manual takedown by the operator) is part o
 8. Display the user's current voice on the profile screen with replay.
 
 ### Deliverables
+
 - A user can record, listen, re-record, and publish a voice.
 - Storage object exists at `voices/{user_id}/{voice_id}.m4a`.
 - DB row `voices` created with `status = 'approved'` (V1 MVP) — and immediately visible in the feed.
 
 ### Acceptance
+
 - Recording auto-stops at 5:00.
 - Files are 32 kbps mono AAC, ~240 KB/min ±10%.
 - Upload works on flaky network (manual test: airplane mode mid-upload → retry).
 
 ### Suggested commit
+
 `feat(voices): recording, signed upload pipeline, profile voice management`
 
 ---
@@ -225,6 +252,7 @@ Reactive moderation (block + report + manual takedown by the operator) is part o
 **Goal**: the TikTok-style feed loads real voices from Supabase and plays them with zero perceived latency.
 
 ### Scope
+
 1. Replace mocked `INITIAL_PROFILES` with a paginated query to `get_feed()` (security-definer SQL function from ARCHITECTURE §8).
 2. React Query `useInfiniteQuery` with cursor on `created_at`.
 3. Build the **3-instance ring buffer player** in `src/lib/feedPlayer.ts`. Preload `current+1` and `current+2` on `prepareAsync` using signed URLs.
@@ -235,16 +263,19 @@ Reactive moderation (block + report + manual takedown by the operator) is part o
 8. Filters modal: gender, age range, max distance km. Persisted in Zustand + reflected in query params.
 
 ### Deliverables
+
 - Real feed scrolling with live audio from Storage.
 - Autoplay mode chains voices with no audible gap.
 - `feed_seen` populated.
 
 ### Acceptance
+
 - First playback of any voice starts < 500 ms after tap on a 4G connection.
 - Scrolling 20 cards never throws an unhandled promise rejection.
 - Filters change updates the feed within 1 query.
 
 ### Suggested commit
+
 `feat(feed): live discover feed with preloaded ring playback`
 
 ---
@@ -254,6 +285,7 @@ Reactive moderation (block + report + manual takedown by the operator) is part o
 **Goal**: users can like a voice, block a user, report a voice or a user. Like events appear in the recipient's Likes screen (received tab). The server-side moderation primitives that the back-office (Phase 6.bis) will consume are in place.
 
 ### Scope
+
 1. Implement `like(voice_id)` / `unlike(voice_id)` mutations.
 2. Heart button in `ProfileCard` with optimistic update.
 3. SQL trigger on `likes` insert → insert into `notifications` with `kind='like'` (feeds push delivery in Phase 8 and the "received" tab of the Likes screen).
@@ -271,18 +303,21 @@ Reactive moderation (block + report + manual takedown by the operator) is part o
 8. PostHog events for like/block/report — **optional**, only wire if PostHog is enabled (Phase 10.bis).
 
 ### Deliverables
+
 - Like appears in the recipient's Likes screen (received tab) and creates a `notifications` row for push delivery.
 - Block hides both directions (you don't see them, they don't see you).
 - Report writes a row + sends an internal alert (plain DB row in V1; Slack webhook is post-MVP).
 - All five admin Edge Functions deployed and unit-tested (Deno test runner against local Supabase). Calling them without an admin JWT returns 401.
 
 ### Acceptance
+
 - Liking a voice twice does not create two notifications (unique index `(liker_id, voice_id)`).
 - A blocked user cannot send you a new message.
 - Calling `moderate()` from a non-admin JWT is rejected with 401 and no row is touched.
 - Every successful admin Edge Function call appends one row to `audit_log`.
 
 ### Suggested commit
+
 `feat(social): likes, blocks, reports and moderation backend primitives`
 
 ---
@@ -294,11 +329,13 @@ Reactive moderation (block + report + manual takedown by the operator) is part o
 This phase produces a **separate Next.js repository** (suggested name `lovoice-admin`) that consumes the same Supabase project as the mobile app. See `docs/ARCHITECTURE.md` §13 for the full design.
 
 ### Pre-requisites
+
 - Phase 6 merged (admin Edge Functions and RLS policies live).
 - A Vercel account (free) connected to the new `lovoice-admin` repo, EU region (`fra1`).
 - At least one admin email seeded in `admin_users` (the operator's email).
 
 ### Scope
+
 1. **Bootstrap the repo**:
    - `npx create-next-app@latest lovoice-admin --typescript --tailwind --app --eslint`,
    - configure TypeScript strict mode (same level as the mobile app),
@@ -322,18 +359,21 @@ This phase produces a **separate Next.js repository** (suggested name `lovoice-a
 10. **Smoke test plan** (manual, documented in the back-office README): login flow, take down a test report, ban a test user, unban, delete a test account, check `audit_log`.
 
 ### Deliverables
+
 - `lovoice-admin` repo deployed on Vercel at a stable URL (`admin.lovoice.app` or similar).
 - Operator can log in with her email and complete the full moderation loop point-and-click.
 - Every action she performs leaves a trace in `audit_log`.
 - Zero SQL written by the operator.
 
 ### Acceptance
+
 - Login by an email NOT in `admin_users` is rejected with a clear error and the user is signed out.
 - Calling any of the five admin Edge Functions from the browser DevTools console with a stolen non-admin JWT returns 401.
 - The service-role key does not appear in any built bundle (verified by grep on the `.next` build output).
 - Lighthouse score on `/reports` ≥ 90 (perf and a11y).
 
 ### Suggested commit (in the `lovoice-admin` repo)
+
 `feat(admin): initial back-office for reports, bans and audit log`
 
 ---
@@ -343,6 +383,7 @@ This phase produces a **separate Next.js repository** (suggested name `lovoice-a
 **Goal**: full chat with text and voice messages, real-time updates, read receipts.
 
 ### Scope
+
 1. Conversation creation: when a user sends a first message in response to a voice, lazily create the `conversations` row (sorted user_a/user_b).
 2. `MessagesScreen` (inbox): list conversations with last message preview + unread badge. Realtime subscription on `notifications` for unread updates.
 3. `ConversationScreen` (`app/(main)/messages/[id].tsx`): paginated message list (cursor on `created_at` desc), Realtime subscription on `messages` filtered by conversation.
@@ -354,16 +395,19 @@ This phase produces a **separate Next.js repository** (suggested name `lovoice-a
 9. Optimistic send + retry queue.
 
 ### Deliverables
+
 - Two devices can text-chat in real time (< 500 ms perceived latency).
 - Voice messages can be sent, received, and played within the same conversation.
 - Read receipts appear live for the sender.
 
 ### Acceptance
+
 - App reconnects after network loss and replays missed messages.
 - Killing the app and reopening a conversation shows all history.
 - Recording indicator disappears within 2s of stop.
 
 ### Suggested commit
+
 `feat(chat): realtime messaging with text and voice messages`
 
 ---
@@ -373,6 +417,7 @@ This phase produces a **separate Next.js repository** (suggested name `lovoice-a
 **Goal**: push notifications for likes and new messages, deep-linking to the relevant screen. There is no dedicated Notifications screen — likes appear in the Likes screen (received tab) and messages appear in the Messages screen.
 
 ### Scope
+
 1. Edge Function `dispatch_push(notification_id)` triggered after `notifications` insert (DB trigger calls `pg_net` to invoke it). Sends to Expo Push API using the recipient's `push_token`.
 2. Debounce rule: max 1 push per (actor → recipient → kind) per hour for likes. Messages always push (unless recipient currently online — checked via Realtime presence).
 3. On app launch, register for push and store/refresh `profiles.push_token`.
@@ -380,16 +425,19 @@ This phase produces a **separate Next.js repository** (suggested name `lovoice-a
 5. Unread badge on the Likes tab (count of unseen received likes) and Messages tab (count of unread conversations). Realtime subscription to update badges live.
 
 ### Deliverables
+
 - Push received on real device for a like and a message.
 - Tapping a like push opens the Likes screen. Tapping a message push opens the conversation.
 - Unread badges update in real time.
 
 ### Acceptance
+
 - iOS push works in background AND when app is killed.
 - Android push works on a Pixel with Play Services.
 - Disabling push in OS settings is handled gracefully.
 
 ### Suggested commit
+
 `feat(push): push delivery with deep links to likes and messages`
 
 ---
@@ -401,10 +449,12 @@ This phase produces a **separate Next.js repository** (suggested name `lovoice-a
 **Goal**: every uploaded voice and voice message is automatically transcribed and moderated before being visible.
 
 ### Pre-requisites
+
 - Client has AssemblyAI and Hive accounts with EU DPA signed.
 - `ASSEMBLYAI_KEY`, `HIVE_KEY`, `OPENAI_API_KEY` are set as Edge Function secrets.
 
 ### Scope
+
 1. Flip `voices.status` and `messages.status` defaults from `'approved'` back to `'pending'` (one migration).
 2. Toggle the env flag `AUTO_MODERATION_ENABLED = true` so `commit_upload` enqueues moderation jobs (the code path was prepared in Phase 4).
 3. Create `moderation_jobs` table + Edge Function `process_moderation_jobs` scheduled every 30s (Supabase scheduled cron).
@@ -416,15 +466,18 @@ This phase produces a **separate Next.js repository** (suggested name `lovoice-a
 9. **Back-office extension** (in the `lovoice-admin` repo): add a new `/manual-review` route that lists items with `status = 'manual_review'` and reuses the same row component and the same `moderate()` action as `/reports`. Add a transcript column on both routes (reads `voices.transcript` / `messages.transcript`). No new Edge Function needed.
 
 ### Deliverables
+
 - A clean voice goes from `pending` to `approved` within 60s of upload.
 - A voice with explicit content goes to `rejected` and is invisible in the feed.
 - Author sees the rejection in their notifications with a reason.
 
 ### Acceptance
+
 - No voice with `status != 'approved'` ever appears in `get_feed()`.
 - Moderation throughput keeps up with upload throughput at the projected volume (no growing backlog in `moderation_jobs`).
 
 ### Suggested commit
+
 `feat(moderation): async transcription and safety pipeline for voices and messages`
 
 ---
@@ -434,6 +487,7 @@ This phase produces a **separate Next.js repository** (suggested name `lovoice-a
 **Goal**: app is store-ready and compliant.
 
 ### Scope (V1 MVP — committed)
+
 1. Edge Function `delete_account` per ARCHITECTURE §9. Reachable from a Profile → Danger Zone screen.
 2. Data export (RGPD right to portability): Edge Function `export_my_data` returns a JSON of all the user's data + signed URLs to their audio files (1h TTL).
 3. CGU + Privacy Policy hosted (Notion / Webflow) and linked from the app.
@@ -442,15 +496,18 @@ This phase produces a **separate Next.js repository** (suggested name `lovoice-a
 6. Audit table `audit_log(actor_id, action, target, created_at)` for security-sensitive actions (block, report, delete, moderate).
 
 ### Deliverables
+
 - Account deletion fully purges user data.
 - Data export downloads a complete archive.
 - Sentry receives a test crash from mobile and from an Edge Function.
 
 ### Acceptance
+
 - Test that after `delete_account`, no row referencing the user remains except anonymized message tombstones.
 - App passes Apple's 5.1.1(v) account-deletion requirement.
 
 ### Suggested commit
+
 `feat(compliance): account deletion, data export, sentry and rate limiting`
 
 ---
@@ -460,10 +517,12 @@ This phase produces a **separate Next.js repository** (suggested name `lovoice-a
 **Status**: **NOT in the V1 MVP commitment.** Ship in V1 if time allows, otherwise schedule later.
 
 ### Pre-requisites
+
 - Client has a PostHog Cloud EU account with DPA signed.
 - `POSTHOG_KEY` set in EAS env.
 
 ### Scope
+
 1. Install `posthog-react-native` and initialize in `src/lib/analytics.ts` with EU host.
 2. Wire the events listed in ARCHITECTURE §10: `voice_recorded`, `voice_played` (with `pct_listened`), `voice_liked`, `message_sent` (with `kind`), `conversation_opened`, `signup_completed`, `block`, `report`. **No content fields, only counts and IDs.**
 3. PII scrubbing pass: ensure no phone, transcript or message body ever ends up in a property.
@@ -472,6 +531,7 @@ This phase produces a **separate Next.js repository** (suggested name `lovoice-a
 6. **Back-office extension** (in the `lovoice-admin` repo): add a `/stats` route that embeds the operator's chosen PostHog insights as iframes (PostHog supports public iframe sharing per insight). Read-only, no new Edge Function.
 
 ### Suggested commit
+
 `feat(analytics): posthog integration with PII-safe event tracking`
 
 ---
@@ -481,6 +541,7 @@ This phase produces a **separate Next.js repository** (suggested name `lovoice-a
 **Goal**: app is in TestFlight and Google Play Internal Testing.
 
 ### Scope
+
 1. App icons, splash, adaptive icons (1024 + Android adaptive).
 2. App Store Connect: app record, screenshots (FR), description, age rating (17+), privacy nutrition labels.
 3. Google Play Console: app record, screenshots, content rating, data safety form.
@@ -489,35 +550,37 @@ This phase produces a **separate Next.js repository** (suggested name `lovoice-a
 6. Smoke test plan executed on iOS + Android.
 
 ### Deliverables
+
 - Build available in TestFlight.
 - Build available in Internal Testing on Play.
 - Crash-free rate > 99% on the smoke run.
 
 ### Suggested commit
+
 `chore(release): v1.0.0 production build for TestFlight and Play Internal`
 
 ---
 
 ## Estimated effort (single dev + LLM)
 
-| Phase | Scope | Estimate |
-|---|---|---|
-| 0 — Foundation refactor | ⭐ MVP | 2 days |
-| 1 — Backend bootstrap | ⭐ MVP | 1.5 days |
-| 2 — Phone auth | ⭐ MVP | 1 day |
-| 3 — Profile onboarding | ⭐ MVP | 1.5 days |
-| 4 — Voice recording + upload | ⭐ MVP | 3 days |
-| 5 — Discover feed playback | ⭐ MVP | 3 days |
-| 6 — Likes / blocks / reports + moderation backend | ⭐ MVP | 2 days |
-| 6.bis — Admin back-office (Next.js) | ⭐ MVP | 2 days |
-| 7 — Messaging realtime | ⭐ MVP | 4 days |
-| 8 — Push notifications | ⭐ MVP | 1 day |
-| 10 — RGPD + Sentry + rate limiting | ⭐ MVP | 2 days |
-| 11 — Store submission | ⭐ MVP | 2 days |
-| **MVP subtotal (committed)** | | **≈ 25 working days** |
-| 9 — Auto-moderation pipeline (+ back-office tab) | ✳️ optional | 2.5 days |
-| 10.bis — PostHog analytics (+ back-office stats tab) | ✳️ optional | 1 day |
-| **Optional subtotal** | | **≈ 3.5 working days** |
+| Phase                                                | Scope       | Estimate               |
+| ---------------------------------------------------- | ----------- | ---------------------- |
+| 0 — Foundation refactor                              | ⭐ MVP      | 2 days                 |
+| 1 — Backend bootstrap                                | ⭐ MVP      | 1.5 days               |
+| 2 — Phone auth                                       | ⭐ MVP      | 1 day                  |
+| 3 — Profile onboarding                               | ⭐ MVP      | 1.5 days               |
+| 4 — Voice recording + upload                         | ⭐ MVP      | 3 days                 |
+| 5 — Discover feed playback                           | ⭐ MVP      | 3 days                 |
+| 6 — Likes / blocks / reports + moderation backend    | ⭐ MVP      | 2 days                 |
+| 6.bis — Admin back-office (Next.js)                  | ⭐ MVP      | 2 days                 |
+| 7 — Messaging realtime                               | ⭐ MVP      | 4 days                 |
+| 8 — Push notifications                               | ⭐ MVP      | 1 day                  |
+| 10 — RGPD + Sentry + rate limiting                   | ⭐ MVP      | 2 days                 |
+| 11 — Store submission                                | ⭐ MVP      | 2 days                 |
+| **MVP subtotal (committed)**                         |             | **≈ 25 working days**  |
+| 9 — Auto-moderation pipeline (+ back-office tab)     | ✳️ optional | 2.5 days               |
+| 10.bis — PostHog analytics (+ back-office stats tab) | ✳️ optional | 1 day                  |
+| **Optional subtotal**                                |             | **≈ 3.5 working days** |
 
 ---
 

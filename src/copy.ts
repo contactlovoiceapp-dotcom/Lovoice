@@ -244,4 +244,82 @@ export const COPY = {
     location: 'Localisation',
     apply: 'Appliquer les filtres',
   },
+
+  onboarding: {
+    // Shared step indicator — "2 / 6"
+    step: (current: number, total: number) => `${current} / ${total}`,
+
+    terms: {
+      title: 'Bienvenue sur LOVoice',
+      subtitle: 'Avant de continuer, prends un moment pour lire et accepter nos conditions.',
+      checkboxLabel: "J'accepte les ",
+      cguLink: "Conditions d'utilisation",
+      andSeparator: ' et la ',
+      privacyLink: 'Politique de confidentialité',
+      cta: "C'est parti !",
+      errorRequired: 'Tu dois accepter les conditions pour continuer.',
+    },
+
+    name: {
+      title: 'Comment tu t\'appelles ?',
+      subtitle: "C'est le prénom qui apparaîtra sur ton profil.",
+      placeholder: 'Ton prénom',
+      errors: {
+        too_short: 'Ton prénom doit contenir au moins 2 caractères.',
+        too_long: 'Ton prénom ne peut pas dépasser 30 caractères.',
+      },
+    },
+
+    birthdate: {
+      title: 'Ta date de naissance',
+      subtitle: 'Tu dois avoir au moins 18 ans pour rejoindre LOVoice.',
+      placeholder: 'JJ / MM / AAAA',
+      errors: {
+        invalid_date: 'Entre une date valide.',
+        underage: 'Tu dois avoir au moins 18 ans pour rejoindre LOVoice.',
+      },
+    },
+
+    gender: {
+      title: 'Tu es...',
+      subtitle: 'Choisis le genre qui te correspond.',
+      options: {
+        female: 'Une femme',
+        male: 'Un homme',
+        nonbinary: 'Non-binaire',
+        other: 'Autre identité',
+      },
+      errors: {
+        invalid: 'Sélectionne un genre pour continuer.',
+      },
+    },
+
+    lookingFor: {
+      title: 'Tu cherches...',
+      subtitle: 'Tu peux choisir plusieurs options.',
+      options: {
+        female: 'Des femmes',
+        male: 'Des hommes',
+        nonbinary: 'Des personnes non-binaires',
+        other: 'Toute identité',
+      },
+      errors: {
+        empty: 'Choisis au moins une option.',
+        invalid_value: 'Une ou plusieurs options sont invalides.',
+      },
+    },
+
+    city: {
+      title: 'Tu vis où ?',
+      subtitle: 'Tape le nom de ta ville ou de ton village.',
+      placeholder: 'Paris, Lyon, Bruxelles...',
+      searching: 'Recherche en cours...',
+      noResults: 'Aucun résultat. Essaie un autre terme.',
+      // Shown below the selected city to explain why we need coordinates.
+      coordinatesHint: 'Tes coordonnées sont utilisées uniquement pour calculer les distances.',
+      errors: {
+        required: 'Indique ta ville pour continuer.',
+      },
+    },
+  },
 } as const;
