@@ -68,6 +68,13 @@ One row per user. `id` is `auth.users.id` (one-to-one).
 | `is_banned` | `boolean` default false | |
 | `deleted_at` | `timestamptz` | soft delete; hard purge via Edge Function |
 
+Profile validation is enforced by a `BEFORE INSERT OR UPDATE` trigger. The mobile client should map SQLSTATE `23514` with these stable messages:
+
+- `profile.display_name_length`
+- `profile.birthdate_age_minimum`
+- `profile.looking_for_required`
+- `profile.looking_for_invalid`
+
 ### 2.2 `voices`
 The voice introduction. A user can have multiple voices but only **one `is_active = true`** at a time.
 
