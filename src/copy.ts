@@ -322,6 +322,9 @@ export const COPY = {
       errors: {
         required: 'Indique ta ville pour continuer.',
         select_result: 'Sélectionne une ville dans les résultats.',
+        query_too_short: 'Entre au moins 2 caractères avant de rechercher.',
+        search_failed: 'La recherche est momentanément indisponible. Réessaie dans quelques instants.',
+        incomplete_profile: 'Reprends les étapes précédentes pour compléter ton profil.',
       },
     },
   },
