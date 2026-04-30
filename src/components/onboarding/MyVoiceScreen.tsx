@@ -22,7 +22,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ArrowLeft, ArrowRight, ChevronDown, Pause, Play, Trash2 } from 'lucide-react-native';
+import { ArrowLeft, ArrowRight, ChevronDown, LogOut, Pause, Play, Trash2 } from 'lucide-react-native';
 import {
   SafeAreaView,
   useSafeAreaInsets,
@@ -39,7 +39,7 @@ interface Props {
   onBack?: () => void;
   onSend?: () => void;
   onDeleteVoice?: () => void;
-  onDeleteProfile?: () => void;
+  onSignOut?: () => void;
   hasRecordedVoice?: boolean;
   isOnboarding?: boolean;
 }
@@ -128,7 +128,7 @@ const MyVoiceScreen: React.FC<Props> = ({
   onBack,
   onSend,
   onDeleteVoice,
-  onDeleteProfile,
+  onSignOut,
   hasRecordedVoice = true,
   isOnboarding = false,
 }) => {
@@ -142,7 +142,7 @@ const MyVoiceScreen: React.FC<Props> = ({
   const [gender, setGender] = useState('');
   const [interestedIn, setInterestedIn] = useState<string[]>([]);
   const [showGenderPicker, setShowGenderPicker] = useState(false);
-  const [showDeleteProfileModal, setShowDeleteProfileModal] = useState(false);
+  const [showSignOutModal, setShowSignOutModal] = useState(false);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
 
   const { width: windowWidth } = useWindowDimensions();
@@ -634,14 +634,14 @@ const MyVoiceScreen: React.FC<Props> = ({
                   }}
                 >
                   <Text style={{ fontFamily: FONT.bold, fontSize: 16, color: '#dc2626' }}>
-                    {COPY.profile.dangerTitle}
+                    {COPY.profile.signOutTitle}
                   </Text>
                   <Text style={{ fontFamily: FONT.regular, fontSize: 13, lineHeight: 19, color: COLORS.textSecondary }}>
-                    {COPY.profile.dangerBody}
+                    {COPY.profile.signOutBody}
                   </Text>
                   <Pressable
                     accessibilityRole="button"
-                    onPress={() => setShowDeleteProfileModal(true)}
+                    onPress={() => setShowSignOutModal(true)}
                     style={{
                       alignSelf: 'flex-start',
                       borderRadius: RADIUS.full,
@@ -653,7 +653,7 @@ const MyVoiceScreen: React.FC<Props> = ({
                     }}
                   >
                     <Text style={{ fontFamily: FONT.semibold, fontSize: 13, color: '#dc2626' }}>
-                      {COPY.profile.dangerCta}
+                      {COPY.profile.signOutCta}
                     </Text>
                   </Pressable>
                 </View>
@@ -776,14 +776,14 @@ const MyVoiceScreen: React.FC<Props> = ({
       </Modal>
 
       <Modal
-        visible={showDeleteProfileModal}
+        visible={showSignOutModal}
         transparent
         animationType="fade"
-        onRequestClose={() => setShowDeleteProfileModal(false)}
+        onRequestClose={() => setShowSignOutModal(false)}
       >
         <Pressable
           style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', padding: 24 }}
-          onPress={() => setShowDeleteProfileModal(false)}
+          onPress={() => setShowSignOutModal(false)}
         >
           <View
             onStartShouldSetResponder={() => true}
@@ -810,20 +810,20 @@ const MyVoiceScreen: React.FC<Props> = ({
                 marginBottom: 16,
               }}
             >
-              <Trash2 size={22} color="#dc2626" />
+              <LogOut size={22} color="#dc2626" />
             </View>
             <Text style={{ fontFamily: FONT.bold, fontSize: 20, color: COLORS.dark, marginBottom: 8 }}>
-              {COPY.profile.deleteConfirmTitle}
+              {COPY.profile.signOutConfirmTitle}
             </Text>
             <Text style={{ fontFamily: FONT.regular, fontSize: 14, lineHeight: 20, color: COLORS.textSecondary, marginBottom: 24 }}>
-              {COPY.profile.deleteConfirmBody}
+              {COPY.profile.signOutConfirmBody}
             </Text>
 
             <Pressable
               accessibilityRole="button"
               onPress={() => {
-                setShowDeleteProfileModal(false);
-                onDeleteProfile?.();
+                setShowSignOutModal(false);
+                onSignOut?.();
               }}
               style={{
                 borderRadius: RADIUS.full,
@@ -834,13 +834,13 @@ const MyVoiceScreen: React.FC<Props> = ({
               }}
             >
               <Text style={{ fontFamily: FONT.bold, color: COLORS.surface }}>
-                {COPY.profile.deleteConfirmCta}
+                {COPY.profile.signOutConfirmCta}
               </Text>
             </Pressable>
 
             <Pressable
               accessibilityRole="button"
-              onPress={() => setShowDeleteProfileModal(false)}
+              onPress={() => setShowSignOutModal(false)}
               style={{ borderRadius: RADIUS.full, paddingVertical: 12, alignItems: 'center' }}
             >
               <Text style={{ fontFamily: FONT.medium, color: COLORS.textTertiary }}>

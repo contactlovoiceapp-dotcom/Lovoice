@@ -144,6 +144,23 @@ Reactive moderation (block + report + manual takedown by the operator) is part o
 - Logout clears the session and redirects to `(auth)/home`.
 - Unit test on the country detection helper.
 
+### Phase log
+- Implemented in Bloc A-E:
+  - Removed the temporary Supabase smoke test from `app/_layout.tsx`.
+  - Added FR/BE/CH phone helpers and unit tests.
+  - Added a Phase 2 migration for explicit `profiles.country` gating and `insert_own_profile` RLS.
+  - Documented Twilio Verify + Supabase Phone provider setup in `docs/TWILIO_SETUP.md`.
+  - Added `AuthProvider`, `useAuth`, auth-aware redirects, real phone OTP request, 6-digit OTP verification, resend, and a profile logout flow.
+- Manual setup completed:
+  - Supabase migration applied.
+  - Twilio Verify configured in Supabase Phone Auth.
+  - French phone number OTP flow smoke-tested on device.
+- Scope note:
+  - The roadmap originally said Phase 2 creates a `profiles` row immediately after OTP with `country`. The current schema requires `display_name`, `birthdate`, `gender`, and `city`, so Phase 2 keeps the valid state "authenticated without profile"; full profile creation, including persisted `country`, remains Phase 3.
+- Validation performed:
+  - `npx tsc --noEmit`
+  - `npm test -- --runInBand`
+
 ### Suggested commit
 `feat(auth): phone OTP authentication restricted to FR/BE/CH`
 
