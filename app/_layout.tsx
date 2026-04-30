@@ -1,6 +1,6 @@
 /* Root layout — loads custom fonts, provides safe-area context, and renders the router slot. */
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { View } from 'react-native';
 import { Slot } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -24,7 +24,6 @@ import {
 } from '@expo-google-fonts/playfair-display';
 
 import { COLORS } from '../src/theme';
-import { getSupabaseClient, getSupabaseConfig } from '../src/lib/supabase';
 import '../global.css';
 
 export default function RootLayout() {
@@ -54,39 +53,6 @@ export default function RootLayout() {
     PlayfairDisplay_700Bold,
     PlayfairDisplay_900Black,
   });
-
-  // TODO(phase-2): remove this temporary smoke test once auth gating is in place at the root layout.
-  useEffect(() => {
-    void (async () => {
-      const supabase = getSupabaseClient();
-
-      if (!supabase) {
-        const configResult = getSupabaseConfig();
-        console.log(
-          '[Supabase smoke test]',
-          configResult.ok
-            ? 'ERROR: Client unavailable.'
-            : `ERROR: ${configResult.error}`,
-        );
-        return;
-      }
-
-      try {
-        const { data, error } = await supabase.from('prompts').select('id');
-        console.log(
-          '[Supabase smoke test]',
-          error ? `ERROR: ${error.message}` : `OK - ${data?.length} prompts`,
-        );
-      } catch (error: unknown) {
-        console.log(
-          '[Supabase smoke test]',
-          error instanceof Error
-            ? `ERROR: ${error.message}`
-            : 'ERROR: Unknown failure.',
-        );
-      }
-    })();
-  }, []);
 
   if (!fontsLoaded) return null;
 
