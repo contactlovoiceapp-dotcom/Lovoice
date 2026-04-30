@@ -61,13 +61,18 @@ export const COPY = {
   phone: {
     title: 'Ton numéro',
     subtitle: "Nous t'enverrons un code pour vérifier ton compte.",
-    prefix: '+33',
-    placeholder: '6 12 34 56 78',
     sendCode: 'Recevoir le code',
+    sendingCode: 'Envoi du code...',
     codeTitle: 'Code de vérification',
-    codeSubtitle: (phone: string) => `Saisis le code envoyé au +33 ${phone}`,
-    codePlaceholder: '0000',
+    codeSubtitle: (phone: string) => `Saisis le code envoyé au ${phone}`,
+    codePlaceholder: '000000',
     verify: 'Vérifier',
+    verifying: 'Vérification...',
+    resendCode: 'Renvoyer le code',
+    invalidCountry: 'Lovoice est disponible uniquement en France, Belgique et Suisse.',
+    invalidPhone: 'Entre un numéro valide pour le pays sélectionné.',
+    missingOtpParams: 'Le numéro à vérifier est manquant. Recommence depuis la saisie du téléphone.',
+    authUnavailable: "La connexion est momentanément indisponible. Réessaie dans quelques instants.",
   },
 
   record: {

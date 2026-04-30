@@ -24,6 +24,8 @@ import {
 } from '@expo-google-fonts/playfair-display';
 
 import { COLORS } from '../src/theme';
+import AuthRedirector from '../src/features/auth/components/AuthRedirector';
+import { AuthProvider } from '../src/features/auth/hooks/useAuth';
 import '../global.css';
 
 export default function RootLayout() {
@@ -58,11 +60,14 @@ export default function RootLayout() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <SafeAreaProvider>
-        <View style={{ flex: 1, backgroundColor: COLORS.background }}>
-          <Slot />
-        </View>
-      </SafeAreaProvider>
+      <AuthProvider>
+        <SafeAreaProvider>
+          <View style={{ flex: 1, backgroundColor: COLORS.background }}>
+            <AuthRedirector />
+            <Slot />
+          </View>
+        </SafeAreaProvider>
+      </AuthProvider>
     </QueryClientProvider>
   );
 }

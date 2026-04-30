@@ -1,26 +1,65 @@
 /* Phone verification route — handles both signup and login flows via query param. */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 
 import PhoneScreen from '../../src/components/onboarding/PhoneScreen';
+import { COPY } from '../../src/copy';
+import {
+  getCountryFromE164Phone,
+  type SupportedPhoneCountry,
+} from '../../src/features/auth/helpers/country';
+import { getSupabaseClient } from '../../src/lib/supabase';
 
 export default function PhoneRoute() {
   const router = useRouter();
   const { mode } = useLocalSearchParams<{ mode?: string }>();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const handleNext = () => {
-    if (mode === 'login') {
-      router.replace('/(main)/discover');
-    } else {
-      router.push('/(auth)/record');
+  const handleSubmit = async (phone: string, country: SupportedPhoneCountry) => {
+    const detectedCountry = getCountryFromE164Phone(phone);
+
+    if (!detectedCountry || detectedCountry !== country) {
+      setErrorMessage(COPY.phone.invalidCountry);
+      return;
     }
+
+    const supabase = getSupabaseClient();
+
+    if (!supabase) {
+      setErrorMessage(COPY.phone.authUnavailable);
+      return;
+    }
+
+    setIsSubmitting(true);
+    setErrorMessage(null);
+
+    const { error } = await supabase.auth.signInWithOtp({ phone });
+
+    setIsSubmitting(false);
+
+    if (error) {
+      setErrorMessage(error.message);
+      return;
+    }
+
+    router.push({
+      pathname: '/(auth)/otp',
+      params: {
+        phone,
+        country,
+        mode: mode === 'login' ? 'login' : 'signup',
+      },
+    });
   };
 
   return (
     <PhoneScreen
-      onNext={handleNext}
+      onSubmit={handleSubmit}
       onBack={() => router.back()}
+      isSubmitting={isSubmitting}
+      errorMessage={errorMessage}
     />
   );
 }

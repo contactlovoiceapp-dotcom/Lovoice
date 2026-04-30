@@ -1,6 +1,6 @@
-/* Phone verification flow: collects a mobile number and a short OTP before onboarding continues. */
+/* Phone entry screen for Supabase OTP authentication in supported countries. */
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -11,35 +11,47 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowLeft, ArrowRight, Phone } from 'lucide-react-native';
-import { COLORS, CTA_GRADIENT, FONT, ONBOARDING_GRADIENT, RADIUS } from '../../theme';
+
 import { COPY } from '../../copy';
+import { COLORS, CTA_GRADIENT, FONT, ONBOARDING_GRADIENT, RADIUS } from '../../theme';
+import {
+  formatPhoneAsE164,
+  SUPPORTED_PHONE_COUNTRIES,
+  type SupportedPhoneCountryConfig,
+} from '../../features/auth/helpers/country';
 
 const AMBIENT_GLOW_SIZE = 280;
 
-interface Props {
-  onNext: () => void;
+type Props = {
+  onSubmit: (phone: string, country: SupportedPhoneCountryConfig['country']) => void;
   onBack: () => void;
-}
+  isSubmitting?: boolean;
+  errorMessage?: string | null;
+};
 
-const PhoneScreen: React.FC<Props> = ({ onNext, onBack }) => {
+export default function PhoneScreen({
+  onSubmit,
+  onBack,
+  isSubmitting = false,
+  errorMessage,
+}: Props) {
+  const [selectedCountry, setSelectedCountry] = useState<SupportedPhoneCountryConfig>(
+    SUPPORTED_PHONE_COUNTRIES[0],
+  );
   const [phone, setPhone] = useState('');
-  const [code, setCode] = useState('');
-  const [step, setStep] = useState<'phone' | 'code'>('phone');
 
-  const goToCode = () => {
-    setStep('code');
-  };
+  const formattedPhone = useMemo(
+    () => formatPhoneAsE164(phone, selectedCountry.callingCode),
+    [phone, selectedCountry.callingCode],
+  );
+  const canSubmit = formattedPhone !== null && !isSubmitting;
 
-  const goToPhone = () => {
-    setStep('phone');
-  };
+  const handleSubmit = () => {
+    if (!formattedPhone) {
+      return;
+    }
 
-  const handlePhoneSubmit = () => {
-    if (phone.length > 8) goToCode();
-  };
-
-  const handleCodeSubmit = () => {
-    if (code.length >= 4) onNext();
+    onSubmit(formattedPhone, selectedCountry.country);
   };
 
   return (
@@ -65,7 +77,10 @@ const PhoneScreen: React.FC<Props> = ({ onNext, onBack }) => {
               width: AMBIENT_GLOW_SIZE,
               height: AMBIENT_GLOW_SIZE,
               borderRadius: AMBIENT_GLOW_SIZE / 2,
-              transform: [{ translateX: -(AMBIENT_GLOW_SIZE / 2) }, { translateY: -(AMBIENT_GLOW_SIZE / 2) }],
+              transform: [
+                { translateX: -(AMBIENT_GLOW_SIZE / 2) },
+                { translateY: -(AMBIENT_GLOW_SIZE / 2) },
+              ],
               backgroundColor: 'rgba(212,121,236,0.08)',
             }}
           />
@@ -74,7 +89,8 @@ const PhoneScreen: React.FC<Props> = ({ onNext, onBack }) => {
         <View style={{ position: 'relative', zIndex: 10, flex: 1, paddingHorizontal: 24, paddingVertical: 32 }}>
           <Pressable
             accessibilityRole="button"
-            onPress={step === 'phone' ? onBack : goToPhone}
+            accessibilityLabel={COPY.common.back}
+            onPress={onBack}
             style={{
               marginBottom: 32,
               width: 40,
@@ -104,114 +120,98 @@ const PhoneScreen: React.FC<Props> = ({ onNext, onBack }) => {
               <Phone size={28} color={COLORS.primary} />
             </View>
 
-            {step === 'phone' ? (
-              <View>
-                <Text style={{ marginBottom: 12, textAlign: 'center', fontSize: 28, fontFamily: FONT.bold, color: COLORS.dark }}>
-                  {COPY.phone.title}
-                </Text>
-                <Text style={{ marginBottom: 32, textAlign: 'center', fontFamily: FONT.regular, color: COLORS.textSecondary }}>
-                  {COPY.phone.subtitle}
-                </Text>
+            <Text style={{ marginBottom: 12, textAlign: 'center', fontSize: 28, fontFamily: FONT.bold, color: COLORS.dark }}>
+              {COPY.phone.title}
+            </Text>
+            <Text style={{ marginBottom: 32, textAlign: 'center', fontFamily: FONT.regular, color: COLORS.textSecondary }}>
+              {COPY.phone.subtitle}
+            </Text>
 
-                <View style={{ gap: 24 }}>
-                  <View
-                    style={{
-                      width: '100%',
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      borderRadius: RADIUS.lg,
-                      borderWidth: 1,
-                      borderColor: COLORS.border,
-                      backgroundColor: COLORS.surfaceMuted,
-                      paddingVertical: 16,
-                      paddingHorizontal: 16,
-                    }}
-                  >
-                    <Text style={{ marginRight: 8, fontFamily: FONT.medium, color: COLORS.textTertiary }}>{COPY.phone.prefix}</Text>
-                    <TextInput
-                      value={phone}
-                      onChangeText={setPhone}
-                      placeholder={COPY.phone.placeholder}
-                      placeholderTextColor={COLORS.textTertiary}
-                      keyboardType="number-pad"
-                      style={{ flex: 1, minWidth: 0, fontSize: 18, fontFamily: FONT.regular, color: COLORS.dark }}
-                    />
-                  </View>
-                  <Pressable
-                    accessibilityRole="button"
-                    disabled={phone.length < 9}
-                    onPress={handlePhoneSubmit}
-                    style={{ width: '100%', borderRadius: RADIUS.full, overflow: 'hidden', opacity: phone.length < 9 ? 0.3 : 1 }}
-                  >
-                    <LinearGradient
-                      colors={[...CTA_GRADIENT]}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 0 }}
-                      style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 16 }}
-                    >
-                      <Text style={{ fontFamily: FONT.bold, color: 'white' }}>{COPY.phone.sendCode}</Text>
-                      <ArrowRight size={20} color="#ffffff" />
-                    </LinearGradient>
-                  </Pressable>
-                </View>
-              </View>
-            ) : (
-              <View>
-                <Text style={{ marginBottom: 12, textAlign: 'center', fontSize: 28, fontFamily: FONT.bold, color: COLORS.dark }}>
-                  {COPY.phone.codeTitle}
-                </Text>
-                <Text style={{ marginBottom: 32, textAlign: 'center', fontFamily: FONT.regular, color: COLORS.textSecondary }}>
-                  {COPY.phone.codeSubtitle(phone)}
-                </Text>
+            <View style={{ gap: 16 }}>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                {SUPPORTED_PHONE_COUNTRIES.map((country) => {
+                  const isSelected = country.country === selectedCountry.country;
 
-                <View style={{ gap: 24 }}>
-                  <TextInput
-                    value={code}
-                    onChangeText={(t) => setCode(t.replace(/\D/g, ''))}
-                    placeholder={COPY.phone.codePlaceholder}
-                    placeholderTextColor={COLORS.textTertiary}
-                    keyboardType="number-pad"
-                    maxLength={4}
-                    autoFocus
-                    style={{
-                      width: '100%',
-                      borderRadius: RADIUS.lg,
-                      borderWidth: 1,
-                      borderColor: COLORS.border,
-                      backgroundColor: COLORS.surfaceMuted,
-                      paddingVertical: 16,
-                      paddingHorizontal: 16,
-                      textAlign: 'center',
-                      fontSize: 24,
-                      letterSpacing: 16,
-                      fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-                      color: COLORS.dark,
-                    }}
-                  />
-                  <Pressable
-                    accessibilityRole="button"
-                    disabled={code.length < 4}
-                    onPress={handleCodeSubmit}
-                    style={{ width: '100%', borderRadius: RADIUS.full, overflow: 'hidden', opacity: code.length < 4 ? 0.3 : 1 }}
-                  >
-                    <LinearGradient
-                      colors={[...CTA_GRADIENT]}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 0 }}
-                      style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 16 }}
+                  return (
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={country.label}
+                      key={country.country}
+                      onPress={() => setSelectedCountry(country)}
+                      style={{
+                        flex: 1,
+                        alignItems: 'center',
+                        borderRadius: RADIUS.full,
+                        borderWidth: 1,
+                        borderColor: isSelected ? COLORS.primary : COLORS.border,
+                        backgroundColor: isSelected ? COLORS.primaryMuted : COLORS.surfaceMuted,
+                        paddingVertical: 10,
+                      }}
                     >
-                      <Text style={{ fontFamily: FONT.bold, color: 'white' }}>{COPY.phone.verify}</Text>
-                      <ArrowRight size={20} color="#ffffff" />
-                    </LinearGradient>
-                  </Pressable>
-                </View>
+                      <Text style={{ fontFamily: FONT.bold, color: isSelected ? COLORS.primary : COLORS.textSecondary }}>
+                        {country.country} {country.callingCode}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
               </View>
-            )}
+
+              <View
+                style={{
+                  width: '100%',
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  borderRadius: RADIUS.lg,
+                  borderWidth: 1,
+                  borderColor: COLORS.border,
+                  backgroundColor: COLORS.surfaceMuted,
+                  paddingVertical: 16,
+                  paddingHorizontal: 16,
+                }}
+              >
+                <Text style={{ marginRight: 8, fontFamily: FONT.medium, color: COLORS.textTertiary }}>
+                  {selectedCountry.callingCode}
+                </Text>
+                <TextInput
+                  value={phone}
+                  onChangeText={setPhone}
+                  placeholder={selectedCountry.example}
+                  placeholderTextColor={COLORS.textTertiary}
+                  keyboardType="phone-pad"
+                  textContentType="telephoneNumber"
+                  autoComplete="tel"
+                  style={{ flex: 1, minWidth: 0, fontSize: 18, fontFamily: FONT.regular, color: COLORS.dark }}
+                />
+              </View>
+
+              {errorMessage ? (
+                <Text style={{ textAlign: 'center', fontFamily: FONT.medium, color: COLORS.primary }}>
+                  {errorMessage}
+                </Text>
+              ) : null}
+
+              <Pressable
+                accessibilityRole="button"
+                disabled={!canSubmit}
+                onPress={handleSubmit}
+                style={{ width: '100%', borderRadius: RADIUS.full, overflow: 'hidden', opacity: canSubmit ? 1 : 0.3 }}
+              >
+                <LinearGradient
+                  colors={[...CTA_GRADIENT]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 16 }}
+                >
+                  <Text style={{ fontFamily: FONT.bold, color: 'white' }}>
+                    {isSubmitting ? COPY.phone.sendingCode : COPY.phone.sendCode}
+                  </Text>
+                  <ArrowRight size={20} color="#ffffff" />
+                </LinearGradient>
+              </Pressable>
+            </View>
           </View>
         </View>
       </KeyboardAvoidingView>
     </LinearGradient>
   );
-};
-
-export default PhoneScreen;
+}
