@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   Keyboard,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   Pressable,
@@ -22,7 +23,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ArrowLeft, ArrowRight, ChevronDown, LogOut, Pause, Play, Trash2 } from 'lucide-react-native';
+import { ArrowLeft, ArrowRight, Check, ChevronDown, LogOut, Pause, Play, Trash2 } from 'lucide-react-native';
 import {
   SafeAreaView,
   useSafeAreaInsets,
@@ -34,6 +35,10 @@ import { COPY } from '../../copy';
 const WAVE_CONTAINER_HEIGHT = 32;
 const WAVE_BAR_WIDTH = 4;
 const WAVE_BAR_COUNT = 40;
+
+// Public legal pages — kept inline here because this is the only place we surface them in V1.
+const TERMS_URL = 'https://lovoice.app/conditions-utilisation';
+const PRIVACY_URL = 'https://lovoice.app/politique-confidentialite';
 
 interface Props {
   onBack?: () => void;
@@ -144,6 +149,8 @@ const MyVoiceScreen: React.FC<Props> = ({
   const [showGenderPicker, setShowGenderPicker] = useState(false);
   const [showSignOutModal, setShowSignOutModal] = useState(false);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  // CGU acceptance is only required during onboarding; the edit flow keeps the previous behavior.
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   const { width: windowWidth } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -169,7 +176,7 @@ const MyVoiceScreen: React.FC<Props> = ({
     city.trim() !== '' &&
     gender !== '' &&
     interestedIn.length > 0;
-  const canSubmit = isOnboarding ? hasRecordedVoice : isFormValid;
+  const canSubmit = isOnboarding ? hasRecordedVoice && acceptedTerms : isFormValid;
 
   useEffect(() => {
     const showSub = Keyboard.addListener('keyboardWillShow', () => {
@@ -330,7 +337,8 @@ const MyVoiceScreen: React.FC<Props> = ({
               keyboardShouldPersistTaps="handled"
               contentContainerStyle={{
                 gap: 24,
-                paddingBottom: 112,
+                // Larger bottom padding in onboarding to leave room for the CGU checkbox above the CTA.
+                paddingBottom: isOnboarding ? 168 : 112,
                 paddingHorizontal: 4,
                 maxWidth: contentMaxWidth,
                 alignSelf: 'center',
@@ -676,8 +684,83 @@ const MyVoiceScreen: React.FC<Props> = ({
                 zIndex: 20,
                 paddingHorizontal: 16,
                 paddingBottom: Math.max(insets.bottom, 16) + 8,
+                gap: 12,
               }}
             >
+              {isOnboarding && (
+                <Pressable
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: acceptedTerms }}
+                  accessibilityLabel={COPY.onboarding.terms.checkboxLabel.trim()}
+                  onPress={() => setAcceptedTerms((current) => !current)}
+                  style={{
+                    width: '100%',
+                    maxWidth: contentMaxWidth,
+                    alignSelf: 'center',
+                    flexDirection: 'row',
+                    alignItems: 'flex-start',
+                    gap: 12,
+                    paddingVertical: 4,
+                  }}
+                >
+                  <View
+                    style={{
+                      marginTop: 1,
+                      width: 22,
+                      height: 22,
+                      flexShrink: 0,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderRadius: 6,
+                      borderWidth: 2,
+                      borderColor: acceptedTerms ? COLORS.primary : COLORS.textTertiary,
+                      backgroundColor: acceptedTerms ? COLORS.primary : 'transparent',
+                    }}
+                  >
+                    {acceptedTerms ? <Check size={14} color={COLORS.surface} strokeWidth={3} /> : null}
+                  </View>
+                  <Text
+                    style={{
+                      flex: 1,
+                      fontFamily: FONT.regular,
+                      fontSize: 13,
+                      lineHeight: 19,
+                      color: COLORS.textSecondary,
+                    }}
+                  >
+                    {COPY.onboarding.terms.checkboxLabel}
+                    <Text
+                      accessibilityRole="link"
+                      onPress={() => {
+                        void Linking.openURL(TERMS_URL);
+                      }}
+                      style={{
+                        fontFamily: FONT.semibold,
+                        color: COLORS.dark,
+                        textDecorationLine: 'underline',
+                      }}
+                    >
+                      {COPY.onboarding.terms.cguLink}
+                    </Text>
+                    {COPY.onboarding.terms.andSeparator}
+                    <Text
+                      accessibilityRole="link"
+                      onPress={() => {
+                        void Linking.openURL(PRIVACY_URL);
+                      }}
+                      style={{
+                        fontFamily: FONT.semibold,
+                        color: COLORS.dark,
+                        textDecorationLine: 'underline',
+                      }}
+                    >
+                      {COPY.onboarding.terms.privacyLink}
+                    </Text>
+                    .
+                  </Text>
+                </Pressable>
+              )}
+
               <Pressable
                 accessibilityRole="button"
                 disabled={!canSubmit}

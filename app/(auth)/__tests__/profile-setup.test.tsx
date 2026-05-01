@@ -1,16 +1,16 @@
-/* Voice profile setup route tests — protect the final voice review step before the feed. */
+/* Voice profile setup route tests — guard the CGU gate before entering the feed. */
 
-import React from 'react';
-import { act, render, waitFor } from '@testing-library/react-native';
+import React, { type ReactNode } from 'react';
+import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import ProfileSetupRoute from '../profile-setup';
+import { COPY } from '../../../src/copy';
 import { useFeedState } from '../../../src/features/feed/hooks/useFeedState';
-import type MyVoiceScreen from '../../../src/components/onboarding/MyVoiceScreen';
 
 const mockBack = jest.fn();
 const mockReplace = jest.fn();
 const mockRefreshProfile = jest.fn();
-let mockMyVoiceScreenProps: React.ComponentProps<typeof MyVoiceScreen> | null = null;
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({
@@ -25,17 +25,9 @@ jest.mock('../../../src/features/auth/hooks/useAuth', () => ({
   }),
 }));
 
-jest.mock('../../../src/components/onboarding/MyVoiceScreen', () => {
-  const MockMyVoiceScreen = (props: React.ComponentProps<typeof MyVoiceScreen>) => {
-    mockMyVoiceScreenProps = props;
-    return null;
-  };
-
-  return {
-    __esModule: true,
-    default: MockMyVoiceScreen,
-  };
-});
+function Wrapper({ children }: { children: ReactNode }) {
+  return <SafeAreaProvider>{children}</SafeAreaProvider>;
+}
 
 describe('ProfileSetupRoute', () => {
   beforeEach(() => {
@@ -43,20 +35,35 @@ describe('ProfileSetupRoute', () => {
     mockReplace.mockClear();
     mockRefreshProfile.mockReset();
     mockRefreshProfile.mockResolvedValue(undefined);
-    mockMyVoiceScreenProps = null;
     useFeedState.getState().setHasRecordedVoice(false);
   });
 
-  it('shows the onboarding voice editor and enters the feed on send', async () => {
-    render(<ProfileSetupRoute />);
+  it('keeps the user on the screen when CGU is not accepted', async () => {
+    const { getByRole } = render(<ProfileSetupRoute />, { wrapper: Wrapper });
+    const cta = getByRole('button', { name: COPY.profile.submitOnboarding });
 
-    expect(mockMyVoiceScreenProps).toMatchObject({
-      hasRecordedVoice: true,
-      isOnboarding: true,
-    });
+    expect(cta.props.accessibilityState?.disabled).toBe(true);
 
     await act(async () => {
-      mockMyVoiceScreenProps?.onSend?.();
+      fireEvent.press(cta);
+    });
+
+    expect(useFeedState.getState().hasRecordedVoice).toBe(false);
+    expect(mockRefreshProfile).not.toHaveBeenCalled();
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it('navigates to discover after the user accepts the CGU and submits', async () => {
+    const { getByRole } = render(<ProfileSetupRoute />, { wrapper: Wrapper });
+
+    const checkbox = getByRole('checkbox');
+    fireEvent.press(checkbox);
+
+    const cta = getByRole('button', { name: COPY.profile.submitOnboarding });
+    expect(cta.props.accessibilityState?.disabled).toBe(false);
+
+    await act(async () => {
+      fireEvent.press(cta);
     });
 
     expect(useFeedState.getState().hasRecordedVoice).toBe(true);
@@ -69,9 +76,9 @@ describe('ProfileSetupRoute', () => {
   it('returns to recording when the user deletes the voice', () => {
     useFeedState.getState().setHasRecordedVoice(true);
 
-    render(<ProfileSetupRoute />);
+    const { getByLabelText } = render(<ProfileSetupRoute />, { wrapper: Wrapper });
 
-    mockMyVoiceScreenProps?.onDeleteVoice?.();
+    fireEvent.press(getByLabelText(COPY.a11y.deleteVoice));
 
     expect(useFeedState.getState().hasRecordedVoice).toBe(false);
     expect(mockReplace).toHaveBeenCalledWith('/(auth)/record');
