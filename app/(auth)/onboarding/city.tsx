@@ -21,9 +21,15 @@ import {
 } from '@/features/profile/helpers/validation';
 import { useProfileOnboardingState } from '@/features/profile/hooks/useProfileOnboardingState';
 
-const TOTAL_STEPS = 5;
+const TOTAL_STEPS = 6;
 
-type CityError = 'required' | 'select_result' | 'query_too_short' | 'search_failed' | 'incomplete_profile';
+type CityError =
+  | 'required'
+  | 'select_result'
+  | 'query_too_short'
+  | 'search_failed'
+  | 'incomplete_profile'
+  | 'terms_required';
 
 function mapCitySearchError(error: unknown): CityError {
   if (error instanceof Error && error.message === 'profile.city_query_too_short') {
@@ -35,8 +41,18 @@ function mapCitySearchError(error: unknown): CityError {
 
 export default function OnboardingCityRoute() {
   const router = useRouter();
-  const { displayName, birthdate, gender, lookingFor, city, coordinates, setCitySelection, clearCitySelection, reset } =
-    useProfileOnboardingState();
+  const {
+    acceptedTerms,
+    displayName,
+    birthdate,
+    gender,
+    lookingFor,
+    city,
+    coordinates,
+    setCitySelection,
+    clearCitySelection,
+    reset,
+  } = useProfileOnboardingState();
   const upsertProfile = useUpsertProfile();
   const [query, setQuery] = useState(city);
   const [results, setResults] = useState<CitySearchResult[]>([]);
@@ -75,6 +91,11 @@ export default function OnboardingCityRoute() {
   };
 
   const handleFinish = async () => {
+    if (!acceptedTerms) {
+      setError('terms_required');
+      return;
+    }
+
     if (query.trim().length === 0) {
       setError('required');
       return;
@@ -112,11 +133,17 @@ export default function OnboardingCityRoute() {
 
   return (
     <ProfileOnboardingStep
-      currentStep={5}
+      currentStep={6}
       totalSteps={TOTAL_STEPS}
       title={COPY.onboarding.city.title}
       subtitle={COPY.onboarding.city.subtitle}
-      errorMessage={error ? COPY.onboarding.city.errors[error] : null}
+      errorMessage={
+        error
+          ? error === 'terms_required'
+            ? COPY.onboarding.terms.errorRequired
+            : COPY.onboarding.city.errors[error]
+          : null
+      }
       isSubmitting={upsertProfile.isPending}
       onBack={() => router.back()}
       onNext={handleFinish}
@@ -128,7 +155,7 @@ export default function OnboardingCityRoute() {
             setQuery(text);
             setError(null);
             setSelectedResultId(null);
-          clearCitySelection();
+            clearCitySelection();
           }}
           placeholder={COPY.onboarding.city.placeholder}
           autoCapitalize="words"

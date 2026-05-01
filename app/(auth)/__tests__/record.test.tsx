@@ -47,7 +47,7 @@ describe('RecordRoute', () => {
     mockRecordVoiceScreenProps?.onNext?.();
 
     expect(useFeedState.getState().hasRecordedVoice).toBe(true);
-    expect(mockPush).toHaveBeenCalledWith('/(auth)/onboarding/name');
+    expect(mockPush).toHaveBeenCalledWith('/(auth)/onboarding/terms');
   });
 
   it('keeps voices locked when the user skips recording', () => {

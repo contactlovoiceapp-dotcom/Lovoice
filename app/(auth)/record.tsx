@@ -15,7 +15,7 @@ export default function RecordRoute() {
       onNext={() => {
         // Mark voice as recorded to unlock feed interactions (Phase 4 will replace this with real voice state).
         setHasRecordedVoice(true);
-        router.push('/(auth)/onboarding/name');
+        router.push('/(auth)/onboarding/terms');
       }}
       onSkip={() => router.replace('/(main)/discover')}
     />

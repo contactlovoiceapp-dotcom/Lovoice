@@ -15,7 +15,7 @@ import {
 import { validateAge, type BirthdateError } from '@/features/profile/helpers/validation';
 import { useProfileOnboardingState } from '@/features/profile/hooks/useProfileOnboardingState';
 
-const TOTAL_STEPS = 5;
+const TOTAL_STEPS = 6;
 
 export default function OnboardingBirthdateRoute() {
   const router = useRouter();
@@ -38,7 +38,7 @@ export default function OnboardingBirthdateRoute() {
 
   return (
     <ProfileOnboardingStep
-      currentStep={2}
+      currentStep={3}
       totalSteps={TOTAL_STEPS}
       title={COPY.onboarding.birthdate.title}
       subtitle={COPY.onboarding.birthdate.subtitle}

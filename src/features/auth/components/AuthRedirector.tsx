@@ -26,7 +26,7 @@ export default function AuthRedirector() {
     }
 
     if (session && !profile && !isInAuthGroup) {
-      router.replace('/(auth)/onboarding/name');
+      router.replace('/(auth)/onboarding/terms');
       return;
     }
 

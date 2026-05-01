@@ -16,7 +16,7 @@ import {
 } from '@/features/profile/helpers/validation';
 import { useProfileOnboardingState } from '@/features/profile/hooks/useProfileOnboardingState';
 
-const TOTAL_STEPS = 5;
+const TOTAL_STEPS = 6;
 
 export default function OnboardingGenderRoute() {
   const router = useRouter();
@@ -38,7 +38,7 @@ export default function OnboardingGenderRoute() {
 
   return (
     <ProfileOnboardingStep
-      currentStep={3}
+      currentStep={4}
       totalSteps={TOTAL_STEPS}
       title={COPY.onboarding.gender.title}
       subtitle={COPY.onboarding.gender.subtitle}

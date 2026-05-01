@@ -21,7 +21,7 @@ export default function SplashRoute() {
         return;
       }
 
-      router.replace(profile ? '/(main)/discover' : '/(auth)/onboarding/name');
+      router.replace(profile ? '/(main)/discover' : '/(auth)/onboarding/terms');
     }, 2800);
 
     return () => clearTimeout(timer);

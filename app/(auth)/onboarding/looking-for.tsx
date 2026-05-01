@@ -16,7 +16,7 @@ import {
 } from '@/features/profile/helpers/validation';
 import { useProfileOnboardingState } from '@/features/profile/hooks/useProfileOnboardingState';
 
-const TOTAL_STEPS = 5;
+const TOTAL_STEPS = 6;
 
 export default function OnboardingLookingForRoute() {
   const router = useRouter();
@@ -38,7 +38,7 @@ export default function OnboardingLookingForRoute() {
 
   return (
     <ProfileOnboardingStep
-      currentStep={4}
+      currentStep={5}
       totalSteps={TOTAL_STEPS}
       title={COPY.onboarding.lookingFor.title}
       subtitle={COPY.onboarding.lookingFor.subtitle}
