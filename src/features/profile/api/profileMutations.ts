@@ -25,6 +25,9 @@ export type UpsertProfileInput = {
   city: string;
   coordinates?: ProfileCoordinates | null;
   bioEmojis?: string[];
+  // When the caller already holds the country (e.g. profile edit), pass it to avoid
+  // re-deriving it from session.user.phone, which may not be set in refreshed JWTs.
+  country?: string;
 };
 
 export const profileQueryKeys = {
@@ -107,7 +110,7 @@ export function useUpsertProfile() {
         throw new Error('Supabase is not configured.');
       }
 
-      const payload = buildProfileUpsertPayload(input, session);
+      const payload = buildProfileUpsertPayload(input, session, input.country);
       const { data, error } = await supabase
         .from('profiles')
         .upsert(payload, { onConflict: 'id' })

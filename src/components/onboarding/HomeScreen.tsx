@@ -176,7 +176,6 @@ const HomeScreen: React.FC<Props> = ({ onSubmit, isSubmitting = false, errorMess
                 keyboardType="phone-pad"
                 textContentType="telephoneNumber"
                 autoComplete="tel"
-                returnKeyType="go"
                 onSubmitEditing={canSubmit ? handleSubmit : undefined}
                 style={{ flex: 1, minWidth: 0, fontSize: 18, fontFamily: FONT.regular, color: COLORS.dark }}
               />

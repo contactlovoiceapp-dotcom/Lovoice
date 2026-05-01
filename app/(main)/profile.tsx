@@ -265,6 +265,9 @@ export default function ProfileRoute() {
         city: confirmedCity,
         coordinates: newCoordinates ?? undefined,
         bioEmojis,
+        // Re-use the country already stored on the profile so we don't have to
+        // re-derive it from session.user.phone (which may be absent in refreshed JWTs).
+        country: profile?.country ?? undefined,
       });
       setSaveSuccess(true);
       setCityChanged(false);
