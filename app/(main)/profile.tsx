@@ -293,7 +293,13 @@ export default function ProfileRoute() {
     .filter(Boolean)
     .join(' · ');
 
-  const currentCtaGradient = THEME_GRADIENTS[mood].ctaGradient;
+  // Use the mood's circle colors so the play button visually matches the selected mood.
+  // ctaGradient is intentionally NOT used here — for Mystère it's magenta which clashes
+  // with the dark grey circle that the user just selected.
+  const currentMoodColors = [
+    THEME_GRADIENTS[mood].colors[0],
+    THEME_GRADIENTS[mood].colors[1],
+  ] as const;
 
   return (
     <>
@@ -506,7 +512,7 @@ export default function ProfileRoute() {
                     style={{ width: 48, height: 48, borderRadius: 24, overflow: 'hidden' }}
                   >
                     <LinearGradient
-                      colors={[...currentCtaGradient]}
+                      colors={[...currentMoodColors]}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 1 }}
                       style={{ width: 48, height: 48, alignItems: 'center', justifyContent: 'center' }}
