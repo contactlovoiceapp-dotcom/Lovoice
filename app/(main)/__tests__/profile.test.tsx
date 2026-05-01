@@ -34,6 +34,10 @@ jest.mock('../../../src/features/profile/api/profileMutations', () => ({
   }),
 }));
 
+jest.mock('../../../src/features/profile/api/citySearch', () => ({
+  searchCities: jest.fn().mockResolvedValue([]),
+}));
+
 function Wrapper({ children }: { children: ReactNode }) {
   return <SafeAreaProvider>{children}</SafeAreaProvider>;
 }

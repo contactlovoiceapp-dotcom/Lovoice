@@ -1,4 +1,9 @@
-/* Voice recording route — standalone step where the user records their introduction voice. */
+/* Voice recording route — standalone step where the user records their introduction voice.
+ *
+ * Two entry points:
+ *   1. Onboarding (no `source` param) → after recording, push to profile-setup for CGU + mood.
+ *   2. Profile re-record (`source=profile`) → after recording, go back to the profile tab.
+ */
 
 import React from 'react';
 import { Alert } from 'react-native';
@@ -14,6 +19,7 @@ export default function RecordRoute() {
   const { refreshProfile } = useAuth();
   const { source } = useLocalSearchParams<{ source?: string }>();
   const setHasRecordedVoice = useFeedState((state) => state.setHasRecordedVoice);
+  const fromProfile = source === 'profile';
 
   const goToDiscover = async () => {
     try {
@@ -24,17 +30,21 @@ export default function RecordRoute() {
     }
   };
 
+  const handleNext = () => {
+    setHasRecordedVoice(true);
+
+    if (fromProfile) {
+      router.back();
+    } else {
+      router.push('/(auth)/profile-setup');
+    }
+  };
+
   return (
     <RecordVoiceScreen
-      onNext={() => {
-        setHasRecordedVoice(true);
-        router.push('/(auth)/profile-setup');
-      }}
-      onSkip={() => {
-        void goToDiscover();
-      }}
-      // Go back without touching hasRecordedVoice so the previous recording is preserved.
-      onCancel={source === 'profile' ? () => router.back() : undefined}
+      onNext={handleNext}
+      onSkip={fromProfile ? undefined : () => { void goToDiscover(); }}
+      onCancel={fromProfile ? () => router.back() : undefined}
     />
   );
 }

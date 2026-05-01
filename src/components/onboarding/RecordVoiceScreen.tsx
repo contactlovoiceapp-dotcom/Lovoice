@@ -34,7 +34,8 @@ type RecordingState = 'idle' | 'recording' | 'tooShort' | 'recorded' | 'playingP
 
 interface Props {
   onNext: () => void;
-  onSkip: () => void;
+  /** When omitted the "skip" link is hidden (e.g. profile re-record). */
+  onSkip?: () => void;
   /** When provided, a cancel button is shown so the user can abort without losing existing data. */
   onCancel?: () => void;
 }
@@ -455,7 +456,7 @@ const RecordVoiceScreen: React.FC<Props> = ({ onNext, onSkip, onCancel }) => {
               </LinearGradient>
             </Pressable>
 
-            {!hasRecorded && (
+            {!hasRecorded && onSkip ? (
               <Pressable
                 accessibilityRole="button"
                 onPress={onSkip}
@@ -465,7 +466,7 @@ const RecordVoiceScreen: React.FC<Props> = ({ onNext, onSkip, onCancel }) => {
                   {COPY.record.skip}
                 </Text>
               </Pressable>
-            )}
+            ) : null}
           </View>
         </View>
       </SafeAreaView>

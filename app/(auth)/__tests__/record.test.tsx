@@ -54,49 +54,72 @@ describe('RecordRoute', () => {
     useFeedState.getState().setHasRecordedVoice(false);
   });
 
-  it('marks the voice as recorded and opens voice profile setup', async () => {
-    render(<RecordRoute />);
+  describe('onboarding flow (no source param)', () => {
+    it('marks the voice as recorded and opens voice profile setup', () => {
+      render(<RecordRoute />);
 
-    expect(useFeedState.getState().hasRecordedVoice).toBe(false);
-    mockRecordVoiceScreenProps?.onNext?.();
+      expect(useFeedState.getState().hasRecordedVoice).toBe(false);
+      mockRecordVoiceScreenProps?.onNext?.();
 
-    expect(useFeedState.getState().hasRecordedVoice).toBe(true);
-    expect(mockRefreshProfile).not.toHaveBeenCalled();
-    expect(mockPush).toHaveBeenCalledWith('/(auth)/profile-setup');
-  });
-
-  it('keeps voices locked when the user skips recording', async () => {
-    render(<RecordRoute />);
-
-    await act(async () => {
-      mockRecordVoiceScreenProps?.onSkip?.();
+      expect(useFeedState.getState().hasRecordedVoice).toBe(true);
+      expect(mockPush).toHaveBeenCalledWith('/(auth)/profile-setup');
+      expect(mockBack).not.toHaveBeenCalled();
     });
 
-    expect(useFeedState.getState().hasRecordedVoice).toBe(false);
-    await waitFor(() => {
-      expect(mockRefreshProfile).toHaveBeenCalledTimes(1);
-      expect(mockReplace).toHaveBeenCalledWith('/(main)/discover');
+    it('keeps voices locked when the user skips recording', async () => {
+      render(<RecordRoute />);
+
+      await act(async () => {
+        mockRecordVoiceScreenProps?.onSkip?.();
+      });
+
+      expect(useFeedState.getState().hasRecordedVoice).toBe(false);
+      await waitFor(() => {
+        expect(mockRefreshProfile).toHaveBeenCalledTimes(1);
+        expect(mockReplace).toHaveBeenCalledWith('/(main)/discover');
+      });
+    });
+
+    it('does not expose onCancel or hide onSkip', () => {
+      render(<RecordRoute />);
+
+      expect(mockRecordVoiceScreenProps?.onCancel).toBeUndefined();
+      expect(mockRecordVoiceScreenProps?.onSkip).toBeDefined();
     });
   });
 
-  it('does not expose onCancel when source is not profile', () => {
-    mockLocalSearchParams = {};
-    render(<RecordRoute />);
+  describe('profile re-record flow (source=profile)', () => {
+    beforeEach(() => {
+      mockLocalSearchParams = { source: 'profile' };
+    });
 
-    expect(mockRecordVoiceScreenProps?.onCancel).toBeUndefined();
-  });
+    it('marks the voice as recorded and goes back to the profile', () => {
+      useFeedState.getState().setHasRecordedVoice(false);
+      render(<RecordRoute />);
 
-  it('goes back without changing voice state when cancelled from profile', () => {
-    mockLocalSearchParams = { source: 'profile' };
-    useFeedState.getState().setHasRecordedVoice(true);
+      mockRecordVoiceScreenProps?.onNext?.();
 
-    render(<RecordRoute />);
+      expect(useFeedState.getState().hasRecordedVoice).toBe(true);
+      expect(mockBack).toHaveBeenCalledTimes(1);
+      expect(mockPush).not.toHaveBeenCalled();
+    });
 
-    expect(mockRecordVoiceScreenProps?.onCancel).toBeDefined();
-    mockRecordVoiceScreenProps?.onCancel?.();
+    it('goes back without changing voice state when cancelled', () => {
+      useFeedState.getState().setHasRecordedVoice(true);
+      render(<RecordRoute />);
 
-    expect(useFeedState.getState().hasRecordedVoice).toBe(true);
-    expect(mockBack).toHaveBeenCalledTimes(1);
-    expect(mockReplace).not.toHaveBeenCalled();
+      expect(mockRecordVoiceScreenProps?.onCancel).toBeDefined();
+      mockRecordVoiceScreenProps?.onCancel?.();
+
+      expect(useFeedState.getState().hasRecordedVoice).toBe(true);
+      expect(mockBack).toHaveBeenCalledTimes(1);
+      expect(mockReplace).not.toHaveBeenCalled();
+    });
+
+    it('does not expose onSkip from the profile', () => {
+      render(<RecordRoute />);
+
+      expect(mockRecordVoiceScreenProps?.onSkip).toBeUndefined();
+    });
   });
 });
