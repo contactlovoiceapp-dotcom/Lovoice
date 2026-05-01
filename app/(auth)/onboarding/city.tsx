@@ -1,4 +1,4 @@
-/* City onboarding route — resolves a manually searched city to coordinates before authentication. */
+/* City onboarding route — final wizard step: resolves a city to coordinates and persists the profile. */
 
 import React, { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
@@ -11,6 +11,8 @@ import {
   OnboardingTextInput,
   ProfileOnboardingStep,
 } from '@/features/profile/components/ProfileOnboardingStep';
+import { useUpsertProfile } from '@/features/profile/api/profileMutations';
+import { frenchBirthdateToIso } from '@/features/profile/helpers/birthdateInput';
 import { useProfileOnboardingState } from '@/features/profile/hooks/useProfileOnboardingState';
 
 const TOTAL_STEPS = 5;
@@ -19,7 +21,9 @@ type CityError =
   | 'required'
   | 'select_result'
   | 'query_too_short'
-  | 'search_failed';
+  | 'search_failed'
+  | 'wizard_incomplete'
+  | 'save_failed';
 
 function mapCitySearchError(error: unknown): CityError {
   if (error instanceof Error && error.message === 'profile.city_query_too_short') {
@@ -31,8 +35,17 @@ function mapCitySearchError(error: unknown): CityError {
 
 export default function OnboardingCityRoute() {
   const router = useRouter();
-  const { city, coordinates, setCitySelection, clearCitySelection } =
-    useProfileOnboardingState();
+  const {
+    displayName,
+    birthdate,
+    gender,
+    lookingFor,
+    city,
+    coordinates,
+    setCitySelection,
+    clearCitySelection,
+  } = useProfileOnboardingState();
+  const upsertProfile = useUpsertProfile();
   const [query, setQuery] = useState(city);
   const [results, setResults] = useState<CitySearchResult[]>([]);
   const [selectedResultId, setSelectedResultId] = useState<string | null>(null);
@@ -63,7 +76,7 @@ export default function OnboardingCityRoute() {
     }
   };
 
-  const handleFinish = () => {
+  const handleFinish = async () => {
     if (query.trim().length === 0) {
       setError('required');
       return;
@@ -74,8 +87,29 @@ export default function OnboardingCityRoute() {
       return;
     }
 
+    // The wizard enforces these client-side already, but we guard before hitting the server
+    // so a corrupted Zustand state surfaces a clear error instead of an opaque 23514.
+    const isoBirthdate = frenchBirthdateToIso(birthdate);
+    if (!displayName.trim() || !isoBirthdate || !gender || lookingFor.length === 0) {
+      setError('wizard_incomplete');
+      return;
+    }
+
     setError(null);
-    router.push('/(auth)/phone?mode=signup');
+
+    try {
+      await upsertProfile.mutateAsync({
+        displayName,
+        birthdate: isoBirthdate,
+        gender,
+        lookingFor,
+        city,
+        coordinates,
+      });
+      router.push('/(auth)/record');
+    } catch {
+      setError('save_failed');
+    }
   };
 
   return (
@@ -85,6 +119,8 @@ export default function OnboardingCityRoute() {
       title={COPY.onboarding.city.title}
       subtitle={COPY.onboarding.city.subtitle}
       errorMessage={error ? COPY.onboarding.city.errors[error] : null}
+      isSubmitting={upsertProfile.isPending}
+      ctaLabel={upsertProfile.isPending ? COPY.onboarding.city.saving : COPY.common.continue}
       onBack={() => router.back()}
       onNext={handleFinish}
     >

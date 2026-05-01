@@ -1,4 +1,4 @@
-/* OTP verification route — validates the SMS code and persists the profile for signup. */
+/* OTP verification route — validates the SMS code through Supabase Auth. */
 
 import React, { useState } from 'react';
 import {
@@ -20,10 +20,6 @@ import {
   type SupportedPhoneCountry,
 } from '../../src/features/auth/helpers/country';
 import { getSupabaseClient } from '../../src/lib/supabase';
-import { buildProfileUpsertPayload } from '../../src/features/profile/api/profileMutations';
-import { frenchBirthdateToIso } from '../../src/features/profile/helpers/birthdateInput';
-import { useProfileOnboardingState } from '../../src/features/profile/hooks/useProfileOnboardingState';
-import { useAuth } from '../../src/features/auth/hooks/useAuth';
 
 const OTP_LENGTH = 6;
 
@@ -37,15 +33,12 @@ function getParamValue(value: string | string[] | undefined): string | null {
 
 export default function OtpRoute() {
   const router = useRouter();
-  const { refreshProfile } = useAuth();
   const params = useLocalSearchParams<{
     phone?: string | string[];
     country?: SupportedPhoneCountry | SupportedPhoneCountry[];
-    mode?: string | string[];
   }>();
   const phone = getParamValue(params.phone);
   const country = getParamValue(params.country);
-  const mode = getParamValue(params.mode);
   const [code, setCode] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isResending, setIsResending] = useState(false);
@@ -54,9 +47,7 @@ export default function OtpRoute() {
   const canVerify = code.length === OTP_LENGTH && !isSubmitting && !!phone;
 
   const handleVerify = async () => {
-    const verifiedCountry = phone ? getCountryFromE164Phone(phone) : null;
-
-    if (!phone || !country || verifiedCountry !== country) {
+    if (!phone || !country || getCountryFromE164Phone(phone) !== country) {
       setErrorMessage(COPY.phone.missingOtpParams);
       return;
     }
@@ -77,68 +68,14 @@ export default function OtpRoute() {
       type: 'sms',
     });
 
+    setIsSubmitting(false);
+
     if (error) {
       setErrorMessage(error.message);
-      setIsSubmitting(false);
       return;
     }
 
-    // Signup flow: persist the profile collected in the onboarding wizard.
-    if (mode === 'signup') {
-      const store = useProfileOnboardingState.getState();
-      const isoBirthdate = frenchBirthdateToIso(store.birthdate);
-
-      if (store.displayName && isoBirthdate && store.gender && store.city && store.coordinates && verifiedCountry) {
-        const { data: sessionData } = await supabase.auth.getSession();
-
-        if (sessionData.session) {
-          try {
-            const payload = buildProfileUpsertPayload(
-              {
-                displayName: store.displayName,
-                birthdate: isoBirthdate,
-                gender: store.gender,
-                lookingFor: store.lookingFor,
-                city: store.city,
-                coordinates: store.coordinates,
-              },
-              sessionData.session,
-              verifiedCountry,
-            );
-
-            const { error: upsertError } = await supabase
-              .from('profiles')
-              .upsert(payload, { onConflict: 'id' })
-              .select('*')
-              .single();
-
-            if (upsertError) {
-              setErrorMessage(upsertError.message);
-              setIsSubmitting(false);
-              return;
-            }
-
-            await refreshProfile();
-          } catch {
-            setErrorMessage(COPY.phone.profileSaveFailed);
-            setIsSubmitting(false);
-            return;
-          }
-
-          useProfileOnboardingState.getState().reset();
-          setIsSubmitting(false);
-          router.replace('/(auth)/record');
-          return;
-        }
-      }
-
-      setErrorMessage(COPY.phone.profileSaveFailed);
-      setIsSubmitting(false);
-      return;
-    }
-
-    // Login flow or fallback — splash handles routing based on session/profile state.
-    setIsSubmitting(false);
+    // AuthRedirector routes based on session/profile state.
     router.replace('/');
   };
 

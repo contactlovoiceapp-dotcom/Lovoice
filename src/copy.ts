@@ -53,11 +53,9 @@ export const COPY = {
         desc: "Ici, pas de photo à perfectionner. Juste ta voix et ce qu'elle dit de toi.",
       },
     ] as const,
-    acceptCheckbox:
-      "Je m'engage à respecter les valeurs de bienveillance de la communauté Lovoice et j'accepte les ",
-    acceptCguLink: 'CGU',
-    signUp: 'Créer un compte',
-    logIn: 'Se connecter',
+    phoneHint: 'Entre ton numéro pour commencer.',
+    cta: "C'est parti !",
+    sending: 'Envoi du code...',
   },
 
   phone: {
@@ -349,11 +347,14 @@ export const COPY = {
       noResults: 'Aucun résultat. Essaie un autre terme.',
       // Shown below the selected city to explain why we need coordinates.
       coordinatesHint: 'Tes coordonnées sont utilisées uniquement pour calculer les distances.',
+      saving: 'Création de ton profil...',
       errors: {
         required: 'Indique ta ville pour continuer.',
         select_result: 'Sélectionne une ville dans les résultats.',
         query_too_short: 'Entre au moins 2 caractères avant de rechercher.',
         search_failed: 'La recherche est momentanément indisponible. Réessaie dans quelques instants.',
+        wizard_incomplete: "Une étape précédente est manquante. Reprends l'onboarding depuis le début.",
+        save_failed: "Impossible d'enregistrer ton profil. Réessaie dans quelques instants.",
       },
     },
   },

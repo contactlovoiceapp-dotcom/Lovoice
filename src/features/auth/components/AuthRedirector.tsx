@@ -5,6 +5,14 @@ import { usePathname, useRouter, useSegments } from 'expo-router';
 
 import { useAuth } from '../hooks/useAuth';
 
+// Auth-group routes that legitimately host a session without a complete profile yet.
+// Reaching any of them must NOT trigger a redirect to the wizard.
+const SIGNUP_FLOW_PATH_SUFFIXES = ['/onboarding', '/record', '/profile-setup'];
+
+function isOnSignupFlow(pathname: string): boolean {
+  return SIGNUP_FLOW_PATH_SUFFIXES.some((suffix) => pathname.includes(suffix));
+}
+
 export default function AuthRedirector() {
   const router = useRouter();
   const pathname = usePathname();
@@ -25,17 +33,19 @@ export default function AuthRedirector() {
       return;
     }
 
-    if (session && !profile && !isInAuthGroup) {
-      router.replace('/(auth)/home');
+    // Authenticated but no profile yet: push to the signup wizard, even when the user is still
+    // inside the auth group (e.g. just landed here from OTP verification on a fresh account).
+    // The signup-flow paths are excluded so the user can complete name/birthdate/.../record/setup.
+    if (session && !profile && !isOnSignupFlow(pathname)) {
+      router.replace('/(auth)/onboarding/name');
       return;
     }
 
     if (session && profile && !isInMainGroup) {
-      // Signup finishes inside the auth stack: OTP creates the profile, then record gates the feed.
+      // The post-auth flow finishes inside the auth stack (record, profile-setup).
       if (
         isInAuthGroup &&
-        (pathname.endsWith('/otp') ||
-          pathname.endsWith('/record') ||
+        (pathname.endsWith('/record') ||
           pathname.endsWith('/profile-setup'))
       ) {
         return;

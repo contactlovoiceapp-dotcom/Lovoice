@@ -21,6 +21,13 @@ export default function SplashRoute() {
         return;
       }
 
+      // Authenticated but profile incomplete (returning user who never finished signup):
+      // resume the wizard instead of dumping them on a phone-entry screen they can't use.
+      if (session && !profile) {
+        router.replace('/(auth)/onboarding/name');
+        return;
+      }
+
       router.replace('/(auth)/home');
     }, 2800);
 

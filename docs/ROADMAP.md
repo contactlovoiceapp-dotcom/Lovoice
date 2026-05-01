@@ -189,12 +189,13 @@ Reactive moderation (block + report + manual takedown by the operator) is part o
 
 ### Scope
 
-1. Multi-step wizard under `app/(auth)/onboarding/`: `name`, `birthdate` (must be ≥ 18), `gender`, `looking-for`, `city` (city/village search that stores both display name and coordinates).
-2. On finish, `upsert` into `profiles` (insert if not exists).
-3. Validation server-side via a `before insert` trigger on `profiles`: age ≥ 18, country in (FR,BE,CH), name length 2–30.
-4. Edit profile screen reachable from `(main)/profile`.
-5. CGU + Privacy Policy acceptance (checkbox + links).
-6. No device geolocation in V1: do not install `expo-location`. City lookup uses an explicit Nominatim search action, not live autocomplete, so no geocoding API key is needed in this version.
+1. **Phone-first signup flow.** The landing home screen takes the phone number directly and triggers Supabase OTP. After OTP verification, `AuthRedirector` decides where to go: profile exists → `/(main)/discover`, no profile → signup wizard. There is no separate "Créer un compte / Se connecter" choice — the same entry flow handles both signup and login.
+2. Multi-step wizard under `app/(auth)/onboarding/`: `name`, `birthdate` (must be ≥ 18), `gender`, `looking-for`, `city` (city/village search that stores both display name and coordinates). The wizard runs **after** OTP verification on a fresh account.
+3. On the city step, `useUpsertProfile()` persists the wizard data into `profiles`, then the user is routed to `/(auth)/record` for voice recording, then to `/(auth)/profile-setup` for voice metadata + CGU acceptance.
+4. Validation server-side via a `before insert` trigger on `profiles`: age ≥ 18, country in (FR,BE,CH), name length 2–30.
+5. Edit profile screen reachable from `(main)/profile`.
+6. **CGU + Privacy Policy acceptance**: placed on the final `profile-setup` step (`MyVoiceScreen` in onboarding mode). The "Discover" CTA is disabled until the box is checked. CGU is **not** asked on the landing home anymore (it would gate the phone input which adds friction without legal benefit at that stage).
+7. No device geolocation in V1: do not install `expo-location`. City lookup uses an explicit Nominatim search action, not live autocomplete, so no geocoding API key is needed in this version.
 
 ### Deliverables
 
@@ -243,6 +244,15 @@ Reactive moderation (block + report + manual takedown by the operator) is part o
   - `npx tsc --noEmit`
   - `npm test -- --runInBand`
   - Lints checked on edited Phase 3 files.
+- Navigation simplification (Bloc J — **canonical V1 design, supersedes Blocs A-I in case of conflict**):
+  - **Home** is now phone-first: the user enters their phone number directly on the landing screen. No "Créer un compte" / "Se connecter" buttons (the same flow covers both), no CGU checkbox at this stage, and no second phone screen.
+  - **OTP** verifies the code and lets `AuthRedirector` decide where to go: existing profile → `/(main)/discover`, no profile → `/(auth)/onboarding/name` (signup wizard).
+  - **Wizard** (`name → birthdate → gender → looking-for → city`) is unchanged in steps; only the city step now persists the profile via `useUpsertProfile`, then routes to `/(auth)/record`.
+  - **Record** is the standalone voice recording step. The "Passer" shortcut is kept but the Discover feed stays gated by `useFeedState.hasRecordedVoice` until a real voice exists.
+  - **Profile setup** (`MyVoiceScreen` in onboarding mode) is the final step before Discover — title, mood, 3 emojis, and a **mandatory CGU acceptance checkbox** that must be ticked before the user can enter the feed.
+  - Removed the obsolete `app/(auth)/phone.tsx` route and `src/components/onboarding/PhoneScreen.tsx` (the phone entry now lives only on the landing home screen).
+  - `AuthRedirector` was strengthened to handle "session without profile" even while inside the `(auth)` group, so a newly authenticated user is always pushed to the wizard (and can never get stranded on Home with an active session).
+  - Splash (`app/index.tsx`) gained a third branch (`session && !profile`) that redirects to the wizard, in addition to the existing two branches.
 
 ### Suggested commit
 
