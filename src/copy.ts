@@ -340,6 +340,7 @@ export const COPY = {
       searchCta: 'Rechercher',
       searching: 'Recherche...',
       selectResult: 'Choisis ta ville dans la liste.',
+      selectedResult: 'Ville sélectionnée',
       noResults: 'Aucun résultat. Essaie un autre terme.',
       // Shown below the selected city to explain why we need coordinates.
       coordinatesHint: 'Tes coordonnées sont utilisées uniquement pour calculer les distances.',

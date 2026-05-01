@@ -123,10 +123,10 @@ export default function OtpRoute() {
             return;
           }
 
-          await refreshProfile();
           useProfileOnboardingState.getState().reset();
           setIsSubmitting(false);
           router.replace('/(auth)/record');
+          void refreshProfile();
           return;
         }
       }

@@ -173,12 +173,17 @@ export default function OnboardingCityRoute() {
           style={{
             borderRadius: RADIUS.md,
             borderWidth: 1,
-            borderColor: COLORS.border,
-            backgroundColor: COLORS.surfaceMuted,
+            borderColor: COLORS.primary,
+            backgroundColor: COLORS.primaryMuted,
             padding: 14,
           }}
         >
-          <Text style={{ marginBottom: 4, fontFamily: FONT.bold, color: COLORS.dark }}>{city}</Text>
+          <Text style={{ marginBottom: 6, fontFamily: FONT.bold, color: COLORS.primary }}>
+            {COPY.onboarding.city.selectedResult}
+          </Text>
+          <Text style={{ marginBottom: 4, fontSize: 17, fontFamily: FONT.bold, color: COLORS.dark }}>
+            {city}
+          </Text>
           <Text style={{ fontSize: 12, lineHeight: 18, fontFamily: FONT.regular, color: COLORS.textSecondary }}>
             {COPY.onboarding.city.coordinatesHint}
           </Text>

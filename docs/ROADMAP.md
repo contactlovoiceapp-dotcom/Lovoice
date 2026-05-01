@@ -228,7 +228,8 @@ Reactive moderation (block + report + manual takedown by the operator) is part o
   - `city.tsx`: no longer calls `upsertProfile` — validates city selection and routes to `/(auth)/phone?mode=signup`.
   - `otp.tsx`: after OTP success in signup mode, reads Zustand store, calls profile upsert directly via Supabase, then routes to `/(auth)/record`. Login mode falls back to splash.
   - `otp.tsx`: uses the already validated OTP country when building the profile payload, avoiding session phone formatting issues.
-  - `city.tsx`: deduplicates identical search results and clears the result list after selection so the chosen city appears only once.
+  - `city.tsx`: deduplicates identical search results, clears the result list after selection, and highlights the confirmed city.
+  - `AuthRedirector`: allows OTP/record to finish the signup path after profile creation, preventing a premature jump to Discover.
   - `AuthRedirector`: `session && !profile` redirects to `/(auth)/home` (not the wizard, since auth comes after the wizard).
   - `index.tsx` (splash): `session && profile` → discover, otherwise → home.
   - `record.tsx`: routes to `/(main)/discover` after recording (unchanged from Bloc H).

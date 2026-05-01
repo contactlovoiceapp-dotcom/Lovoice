@@ -31,8 +31,8 @@ export default function AuthRedirector() {
     }
 
     if (session && profile && !isInMainGroup) {
-      // Allow the voice recording route — the user may have just completed the profile wizard.
-      if (isInAuthGroup && pathname === '/record') return;
+      // Signup finishes inside the auth stack: OTP creates the profile, then record gates the feed.
+      if (isInAuthGroup && (pathname.endsWith('/otp') || pathname.endsWith('/record'))) return;
       router.replace('/(main)/discover');
     }
   }, [isLoading, pathname, profile, router, segments, session]);
