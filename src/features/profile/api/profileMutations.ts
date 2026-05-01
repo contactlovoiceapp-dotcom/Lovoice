@@ -73,6 +73,7 @@ export function getProfileCountryFromSession(session: Session): ProfileInsert['c
 export function buildProfileUpsertPayload(
   input: UpsertProfileInput,
   session: Session,
+  countryOverride?: ProfileInsert['country'],
 ): ProfileInsert {
   return {
     id: session.user.id,
@@ -81,7 +82,7 @@ export function buildProfileUpsertPayload(
     gender: input.gender,
     looking_for: input.lookingFor,
     city: input.city.trim(),
-    country: getProfileCountryFromSession(session),
+    country: countryOverride ?? getProfileCountryFromSession(session),
     location: coordinatesToPostgisPoint(input.coordinates),
   };
 }

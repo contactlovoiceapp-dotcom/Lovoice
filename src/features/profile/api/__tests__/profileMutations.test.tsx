@@ -166,6 +166,12 @@ describe('buildProfileUpsertPayload', () => {
       location: 'POINT(2.3522 48.8566)',
     });
   });
+
+  it('uses a verified country override when Supabase stores the session phone without +', () => {
+    expect(buildProfileUpsertPayload(validInput, createSession('33612345678'), 'FR')).toMatchObject({
+      country: 'FR',
+    });
+  });
 });
 
 describe('useUpsertProfile', () => {

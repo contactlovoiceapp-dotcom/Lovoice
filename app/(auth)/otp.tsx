@@ -54,7 +54,9 @@ export default function OtpRoute() {
   const canVerify = code.length === OTP_LENGTH && !isSubmitting && !!phone;
 
   const handleVerify = async () => {
-    if (!phone || !country || getCountryFromE164Phone(phone) !== country) {
+    const verifiedCountry = phone ? getCountryFromE164Phone(phone) : null;
+
+    if (!phone || !country || verifiedCountry !== country) {
       setErrorMessage(COPY.phone.missingOtpParams);
       return;
     }
@@ -86,30 +88,37 @@ export default function OtpRoute() {
       const store = useProfileOnboardingState.getState();
       const isoBirthdate = frenchBirthdateToIso(store.birthdate);
 
-      if (store.displayName && isoBirthdate && store.gender && store.city && store.coordinates) {
+      if (store.displayName && isoBirthdate && store.gender && store.city && store.coordinates && verifiedCountry) {
         const { data: sessionData } = await supabase.auth.getSession();
 
         if (sessionData.session) {
-          const payload = buildProfileUpsertPayload(
-            {
-              displayName: store.displayName,
-              birthdate: isoBirthdate,
-              gender: store.gender,
-              lookingFor: store.lookingFor,
-              city: store.city,
-              coordinates: store.coordinates,
-            },
-            sessionData.session,
-          );
+          try {
+            const payload = buildProfileUpsertPayload(
+              {
+                displayName: store.displayName,
+                birthdate: isoBirthdate,
+                gender: store.gender,
+                lookingFor: store.lookingFor,
+                city: store.city,
+                coordinates: store.coordinates,
+              },
+              sessionData.session,
+              verifiedCountry,
+            );
 
-          const { error: upsertError } = await supabase
-            .from('profiles')
-            .upsert(payload, { onConflict: 'id' })
-            .select('*')
-            .single();
+            const { error: upsertError } = await supabase
+              .from('profiles')
+              .upsert(payload, { onConflict: 'id' })
+              .select('*')
+              .single();
 
-          if (upsertError) {
-            setErrorMessage(upsertError.message);
+            if (upsertError) {
+              setErrorMessage(upsertError.message);
+              setIsSubmitting(false);
+              return;
+            }
+          } catch {
+            setErrorMessage(COPY.phone.profileSaveFailed);
             setIsSubmitting(false);
             return;
           }
@@ -121,6 +130,10 @@ export default function OtpRoute() {
           return;
         }
       }
+
+      setErrorMessage(COPY.phone.profileSaveFailed);
+      setIsSubmitting(false);
+      return;
     }
 
     // Login flow or fallback — splash handles routing based on session/profile state.

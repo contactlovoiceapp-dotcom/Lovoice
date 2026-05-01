@@ -46,8 +46,13 @@ export default function OnboardingCityRoute() {
 
     try {
       const nextResults = await searchCities(query);
-      setResults(nextResults);
-      if (nextResults.length === 0) {
+      const uniqueResults = nextResults.filter(
+        (result, index, list) =>
+          index === list.findIndex((item) => item.city === result.city && item.displayName === result.displayName),
+      );
+
+      setResults(uniqueResults);
+      if (uniqueResults.length === 0) {
         setError('select_result');
       }
     } catch (searchError) {
@@ -132,7 +137,9 @@ export default function OnboardingCityRoute() {
                 accessibilityState={{ selected }}
                 onPress={() => {
                   setSelectedResultId(result.id);
+                  setQuery(result.city);
                   setCitySelection(result.city, result.coordinates);
+                  setResults([]);
                   setError(null);
                 }}
                 style={{

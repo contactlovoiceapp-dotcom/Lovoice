@@ -73,6 +73,7 @@ export const COPY = {
     invalidPhone: 'Entre un numéro valide pour le pays sélectionné.',
     missingOtpParams: 'Le numéro à vérifier est manquant. Recommence depuis la saisie du téléphone.',
     authUnavailable: "La connexion est momentanément indisponible. Réessaie dans quelques instants.",
+    profileSaveFailed: "Impossible d'enregistrer ton profil. Recommence l'onboarding depuis le début.",
   },
 
   record: {
