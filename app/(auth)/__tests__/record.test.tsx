@@ -1,4 +1,4 @@
-/* Record route tests — protect onboarding navigation and voice-gate state updates. */
+/* Record route tests — protect voice-gate state updates and navigation to the feed. */
 
 import React from 'react';
 import { render } from '@testing-library/react-native';
@@ -7,13 +7,11 @@ import RecordRoute from '../record';
 import { useFeedState } from '../../../src/features/feed/hooks/useFeedState';
 import type RecordVoiceScreen from '../../../src/components/onboarding/RecordVoiceScreen';
 
-const mockPush = jest.fn();
 const mockReplace = jest.fn();
 let mockRecordVoiceScreenProps: React.ComponentProps<typeof RecordVoiceScreen> | null = null;
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({
-    push: mockPush,
     replace: mockReplace,
     back: jest.fn(),
     navigate: jest.fn(),
@@ -34,20 +32,19 @@ jest.mock('../../../src/components/onboarding/RecordVoiceScreen', () => {
 
 describe('RecordRoute', () => {
   beforeEach(() => {
-    mockPush.mockClear();
     mockReplace.mockClear();
     mockRecordVoiceScreenProps = null;
     useFeedState.getState().setHasRecordedVoice(false);
   });
 
-  it('marks the voice as recorded and navigates to the onboarding wizard', () => {
+  it('marks the voice as recorded and navigates to the feed', () => {
     render(<RecordRoute />);
 
     expect(useFeedState.getState().hasRecordedVoice).toBe(false);
     mockRecordVoiceScreenProps?.onNext?.();
 
     expect(useFeedState.getState().hasRecordedVoice).toBe(true);
-    expect(mockPush).toHaveBeenCalledWith('/(auth)/onboarding/terms');
+    expect(mockReplace).toHaveBeenCalledWith('/(main)/discover');
   });
 
   it('keeps voices locked when the user skips recording', () => {

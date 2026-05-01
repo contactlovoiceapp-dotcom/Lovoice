@@ -6,14 +6,12 @@ import type { ProfileCoordinates } from '../api/profileMutations';
 import type { GenderValue } from '../helpers/validation';
 
 type ProfileOnboardingState = {
-  acceptedTerms: boolean;
   displayName: string;
   birthdate: string;
   gender: GenderValue | null;
   lookingFor: GenderValue[];
   city: string;
   coordinates: ProfileCoordinates | null;
-  setAcceptedTerms: (acceptedTerms: boolean) => void;
   setDisplayName: (displayName: string) => void;
   setBirthdate: (birthdate: string) => void;
   setGender: (gender: GenderValue) => void;
@@ -24,7 +22,6 @@ type ProfileOnboardingState = {
 };
 
 const initialState = {
-  acceptedTerms: false,
   displayName: '',
   birthdate: '',
   gender: null,
@@ -33,12 +30,11 @@ const initialState = {
   coordinates: null,
 } satisfies Pick<
   ProfileOnboardingState,
-  'acceptedTerms' | 'displayName' | 'birthdate' | 'gender' | 'lookingFor' | 'city' | 'coordinates'
+  'displayName' | 'birthdate' | 'gender' | 'lookingFor' | 'city' | 'coordinates'
 >;
 
 export const useProfileOnboardingState = create<ProfileOnboardingState>()((set) => ({
   ...initialState,
-  setAcceptedTerms: (acceptedTerms) => set({ acceptedTerms }),
   setDisplayName: (displayName) => set({ displayName }),
   setBirthdate: (birthdate) => set({ birthdate }),
   setGender: (gender) => set({ gender }),

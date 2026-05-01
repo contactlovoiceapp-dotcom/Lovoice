@@ -26,11 +26,13 @@ export default function AuthRedirector() {
     }
 
     if (session && !profile && !isInAuthGroup) {
-      router.replace('/(auth)/onboarding/terms');
+      router.replace('/(auth)/home');
       return;
     }
 
     if (session && profile && !isInMainGroup) {
+      // Allow the voice recording route — the user may have just completed the profile wizard.
+      if (isInAuthGroup && pathname === '/record') return;
       router.replace('/(main)/discover');
     }
   }, [isLoading, pathname, profile, router, segments, session]);

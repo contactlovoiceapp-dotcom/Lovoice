@@ -16,12 +16,12 @@ export default function SplashRoute() {
     }
 
     const timer = setTimeout(() => {
-      if (!session) {
-        router.replace('/(auth)/home');
+      if (session && profile) {
+        router.replace('/(main)/discover');
         return;
       }
 
-      router.replace(profile ? '/(main)/discover' : '/(auth)/onboarding/terms');
+      router.replace('/(auth)/home');
     }, 2800);
 
     return () => clearTimeout(timer);

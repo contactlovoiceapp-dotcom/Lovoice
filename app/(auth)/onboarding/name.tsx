@@ -11,7 +11,7 @@ import {
 import { useProfileOnboardingState } from '@/features/profile/hooks/useProfileOnboardingState';
 import { validateDisplayName, type DisplayNameError } from '@/features/profile/helpers/validation';
 
-const TOTAL_STEPS = 6;
+const TOTAL_STEPS = 5;
 
 export default function OnboardingNameRoute() {
   const router = useRouter();
@@ -33,7 +33,7 @@ export default function OnboardingNameRoute() {
 
   return (
     <ProfileOnboardingStep
-      currentStep={2}
+      currentStep={1}
       totalSteps={TOTAL_STEPS}
       title={COPY.onboarding.name.title}
       subtitle={COPY.onboarding.name.subtitle}

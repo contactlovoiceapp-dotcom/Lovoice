@@ -9,14 +9,15 @@ import {
   SelectableOption,
 } from '@/features/profile/components/ProfileOnboardingStep';
 import {
-  GENDER_VALUES,
   validateLookingFor,
   type GenderValue,
   type LookingForError,
 } from '@/features/profile/helpers/validation';
 import { useProfileOnboardingState } from '@/features/profile/hooks/useProfileOnboardingState';
 
-const TOTAL_STEPS = 6;
+const TOTAL_STEPS = 5;
+
+const ONBOARDING_GENDERS: GenderValue[] = ['male', 'female', 'other'];
 
 export default function OnboardingLookingForRoute() {
   const router = useRouter();
@@ -38,7 +39,7 @@ export default function OnboardingLookingForRoute() {
 
   return (
     <ProfileOnboardingStep
-      currentStep={5}
+      currentStep={4}
       totalSteps={TOTAL_STEPS}
       title={COPY.onboarding.lookingFor.title}
       subtitle={COPY.onboarding.lookingFor.subtitle}
@@ -46,7 +47,7 @@ export default function OnboardingLookingForRoute() {
       onBack={() => router.back()}
       onNext={handleNext}
     >
-      {GENDER_VALUES.map((value: GenderValue) => (
+      {ONBOARDING_GENDERS.map((value) => (
         <SelectableOption
           key={value}
           label={COPY.onboarding.lookingFor.options[value]}

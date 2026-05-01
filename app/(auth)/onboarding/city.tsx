@@ -1,4 +1,4 @@
-/* City onboarding route — resolves a manually searched city to coordinates before profile upsert. */
+/* City onboarding route — resolves a manually searched city to coordinates before authentication. */
 
 import React, { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
@@ -7,29 +7,19 @@ import { useRouter } from 'expo-router';
 import { COPY } from '@/copy';
 import { COLORS, FONT, RADIUS } from '@/theme';
 import { searchCities, type CitySearchResult } from '@/features/profile/api/citySearch';
-import { useUpsertProfile } from '@/features/profile/api/profileMutations';
 import {
   OnboardingTextInput,
   ProfileOnboardingStep,
 } from '@/features/profile/components/ProfileOnboardingStep';
-import { frenchBirthdateToIso } from '@/features/profile/helpers/birthdateInput';
-import {
-  validateAge,
-  validateDisplayName,
-  validateGender,
-  validateLookingFor,
-} from '@/features/profile/helpers/validation';
 import { useProfileOnboardingState } from '@/features/profile/hooks/useProfileOnboardingState';
 
-const TOTAL_STEPS = 6;
+const TOTAL_STEPS = 5;
 
 type CityError =
   | 'required'
   | 'select_result'
   | 'query_too_short'
-  | 'search_failed'
-  | 'incomplete_profile'
-  | 'terms_required';
+  | 'search_failed';
 
 function mapCitySearchError(error: unknown): CityError {
   if (error instanceof Error && error.message === 'profile.city_query_too_short') {
@@ -41,19 +31,8 @@ function mapCitySearchError(error: unknown): CityError {
 
 export default function OnboardingCityRoute() {
   const router = useRouter();
-  const {
-    acceptedTerms,
-    displayName,
-    birthdate,
-    gender,
-    lookingFor,
-    city,
-    coordinates,
-    setCitySelection,
-    clearCitySelection,
-    reset,
-  } = useProfileOnboardingState();
-  const upsertProfile = useUpsertProfile();
+  const { city, coordinates, setCitySelection, clearCitySelection } =
+    useProfileOnboardingState();
   const [query, setQuery] = useState(city);
   const [results, setResults] = useState<CitySearchResult[]>([]);
   const [selectedResultId, setSelectedResultId] = useState<string | null>(null);
@@ -79,23 +58,7 @@ export default function OnboardingCityRoute() {
     }
   };
 
-  const validatePreviousSteps = (): string | null => {
-    const isoBirthdate = frenchBirthdateToIso(birthdate);
-
-    if (!validateDisplayName(displayName).valid) return null;
-    if (!isoBirthdate || !validateAge(isoBirthdate).valid) return null;
-    if (!gender || !validateGender(gender).valid) return null;
-    if (!validateLookingFor(lookingFor).valid) return null;
-
-    return isoBirthdate;
-  };
-
-  const handleFinish = async () => {
-    if (!acceptedTerms) {
-      setError('terms_required');
-      return;
-    }
-
+  const handleFinish = () => {
     if (query.trim().length === 0) {
       setError('required');
       return;
@@ -106,45 +69,17 @@ export default function OnboardingCityRoute() {
       return;
     }
 
-    const isoBirthdate = validatePreviousSteps();
-
-    if (!isoBirthdate || !gender) {
-      setError('incomplete_profile');
-      return;
-    }
-
     setError(null);
-
-    try {
-      await upsertProfile.mutateAsync({
-        displayName,
-        birthdate: isoBirthdate,
-        gender,
-        lookingFor,
-        city,
-        coordinates,
-      });
-      reset();
-      router.replace('/(main)/discover');
-    } catch {
-      setError('search_failed');
-    }
+    router.push('/(auth)/phone?mode=signup');
   };
 
   return (
     <ProfileOnboardingStep
-      currentStep={6}
+      currentStep={5}
       totalSteps={TOTAL_STEPS}
       title={COPY.onboarding.city.title}
       subtitle={COPY.onboarding.city.subtitle}
-      errorMessage={
-        error
-          ? error === 'terms_required'
-            ? COPY.onboarding.terms.errorRequired
-            : COPY.onboarding.city.errors[error]
-          : null
-      }
-      isSubmitting={upsertProfile.isPending}
+      errorMessage={error ? COPY.onboarding.city.errors[error] : null}
       onBack={() => router.back()}
       onNext={handleFinish}
     >

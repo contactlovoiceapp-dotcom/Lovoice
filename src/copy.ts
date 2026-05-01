@@ -269,7 +269,7 @@ export const COPY = {
   },
 
   onboarding: {
-    // Shared step indicator — "2 / 6"
+    // Shared step indicator — "1 / 5"
     step: (current: number, total: number) => `${current} / ${total}`,
 
     terms: {
@@ -307,10 +307,10 @@ export const COPY = {
       title: 'Tu es...',
       subtitle: 'Choisis le genre qui te correspond.',
       options: {
-        female: 'Une femme',
-        male: 'Un homme',
+        female: 'Femme',
+        male: 'Homme',
         nonbinary: 'Non-binaire',
-        other: 'Autre identité',
+        other: 'Autre',
       },
       errors: {
         invalid: 'Sélectionne un genre pour continuer.',
@@ -321,10 +321,10 @@ export const COPY = {
       title: 'Tu cherches...',
       subtitle: 'Tu peux choisir plusieurs options.',
       options: {
-        female: 'Des femmes',
-        male: 'Des hommes',
-        nonbinary: 'Des personnes non-binaires',
-        other: 'Toute identité',
+        female: 'Femme',
+        male: 'Homme',
+        nonbinary: 'Non-binaire',
+        other: 'Autre',
       },
       errors: {
         empty: 'Choisis au moins une option.',
@@ -347,7 +347,6 @@ export const COPY = {
         select_result: 'Sélectionne une ville dans les résultats.',
         query_too_short: 'Entre au moins 2 caractères avant de rechercher.',
         search_failed: 'La recherche est momentanément indisponible. Réessaie dans quelques instants.',
-        incomplete_profile: 'Reprends les étapes précédentes pour compléter ton profil.',
       },
     },
   },

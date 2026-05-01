@@ -10,7 +10,7 @@ export default function HomeRoute() {
 
   return (
     <HomeScreen
-      onSignUp={() => router.push('/(auth)/phone?mode=signup')}
+      onSignUp={() => router.push('/(auth)/onboarding/name')}
       onLogin={() => router.push('/(auth)/phone?mode=login')}
     />
   );

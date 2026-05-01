@@ -215,9 +215,22 @@ Reactive moderation (block + report + manual takedown by the operator) is part o
   - Added profile field validators and tests for display name, age, gender, and looking-for values.
   - Added server-side profile validation trigger with stable `23514` messages.
   - Added `useUpsertProfile()` with React Query invalidation, country derivation from the verified phone number, and PostGIS point formatting.
-  - Built the `app/(auth)/onboarding/` wizard with ephemeral Zustand state, terms acceptance, required field validation, explicit Nominatim city search, and final Supabase profile upsert.
+  - Built the `app/(auth)/onboarding/` wizard with ephemeral Zustand state, required field validation, explicit Nominatim city search, and final Supabase profile upsert.
   - Replaced the main profile tab with an editable profile form that reuses the same validation and upsert path.
   - Kept V1 location aligned with product decisions: no device GPS, no `expo-location`, no live autocomplete, and no country filtering from selected city.
+- Navigation correction (Bloc H):
+  - Removed the separate `terms.tsx` wizard step — CGU acceptance is handled by `HomeScreen`.
+  - Reduced the wizard from 6 to 5 steps (name → birthdate → gender → looking-for → city).
+  - Restored validated gender labels to Homme / Femme / Autre (3 options) in the wizard.
+  - Removed `acceptedTerms` from the ephemeral onboarding Zustand store.
+- Navigation rework (Bloc I) — restored validated design: HomeScreen → wizard → phone → OTP → record → discover:
+  - `home.tsx`: "Créer un compte" now routes to `/(auth)/onboarding/name` (wizard first, auth after).
+  - `city.tsx`: no longer calls `upsertProfile` — validates city selection and routes to `/(auth)/phone?mode=signup`.
+  - `otp.tsx`: after OTP success in signup mode, reads Zustand store, calls profile upsert directly via Supabase, then routes to `/(auth)/record`. Login mode falls back to splash.
+  - `AuthRedirector`: `session && !profile` redirects to `/(auth)/home` (not the wizard, since auth comes after the wizard).
+  - `index.tsx` (splash): `session && profile` → discover, otherwise → home.
+  - `record.tsx`: routes to `/(main)/discover` after recording (unchanged from Bloc H).
+  - Removed `incomplete_profile` copy entry (no longer used since city doesn't validate previous steps).
 - Validation performed:
   - `npx tsc --noEmit`
   - `npm test -- --runInBand`

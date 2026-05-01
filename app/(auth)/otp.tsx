@@ -1,4 +1,4 @@
-/* OTP verification route — validates the SMS code through Supabase Auth. */
+/* OTP verification route — validates the SMS code and persists the profile for signup. */
 
 import React, { useState } from 'react';
 import {
@@ -20,6 +20,10 @@ import {
   type SupportedPhoneCountry,
 } from '../../src/features/auth/helpers/country';
 import { getSupabaseClient } from '../../src/lib/supabase';
+import { buildProfileUpsertPayload } from '../../src/features/profile/api/profileMutations';
+import { frenchBirthdateToIso } from '../../src/features/profile/helpers/birthdateInput';
+import { useProfileOnboardingState } from '../../src/features/profile/hooks/useProfileOnboardingState';
+import { useAuth } from '../../src/features/auth/hooks/useAuth';
 
 const OTP_LENGTH = 6;
 
@@ -33,6 +37,7 @@ function getParamValue(value: string | string[] | undefined): string | null {
 
 export default function OtpRoute() {
   const router = useRouter();
+  const { refreshProfile } = useAuth();
   const params = useLocalSearchParams<{
     phone?: string | string[];
     country?: SupportedPhoneCountry | SupportedPhoneCountry[];
@@ -40,6 +45,7 @@ export default function OtpRoute() {
   }>();
   const phone = getParamValue(params.phone);
   const country = getParamValue(params.country);
+  const mode = getParamValue(params.mode);
   const [code, setCode] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isResending, setIsResending] = useState(false);
@@ -69,13 +75,56 @@ export default function OtpRoute() {
       type: 'sms',
     });
 
-    setIsSubmitting(false);
-
     if (error) {
       setErrorMessage(error.message);
+      setIsSubmitting(false);
       return;
     }
 
+    // Signup flow: persist the profile collected in the onboarding wizard.
+    if (mode === 'signup') {
+      const store = useProfileOnboardingState.getState();
+      const isoBirthdate = frenchBirthdateToIso(store.birthdate);
+
+      if (store.displayName && isoBirthdate && store.gender && store.city && store.coordinates) {
+        const { data: sessionData } = await supabase.auth.getSession();
+
+        if (sessionData.session) {
+          const payload = buildProfileUpsertPayload(
+            {
+              displayName: store.displayName,
+              birthdate: isoBirthdate,
+              gender: store.gender,
+              lookingFor: store.lookingFor,
+              city: store.city,
+              coordinates: store.coordinates,
+            },
+            sessionData.session,
+          );
+
+          const { error: upsertError } = await supabase
+            .from('profiles')
+            .upsert(payload, { onConflict: 'id' })
+            .select('*')
+            .single();
+
+          if (upsertError) {
+            setErrorMessage(upsertError.message);
+            setIsSubmitting(false);
+            return;
+          }
+
+          await refreshProfile();
+          useProfileOnboardingState.getState().reset();
+          setIsSubmitting(false);
+          router.replace('/(auth)/record');
+          return;
+        }
+      }
+    }
+
+    // Login flow or fallback — splash handles routing based on session/profile state.
+    setIsSubmitting(false);
     router.replace('/');
   };
 

@@ -9,7 +9,6 @@ describe('useProfileOnboardingState', () => {
 
   it('stores wizard fields without persistence middleware', () => {
     useProfileOnboardingState.getState().setDisplayName('Alice');
-    useProfileOnboardingState.getState().setAcceptedTerms(true);
     useProfileOnboardingState.getState().setBirthdate('01 / 02 / 1995');
     useProfileOnboardingState.getState().setGender('female');
     useProfileOnboardingState.getState().toggleLookingFor('male');
@@ -19,7 +18,6 @@ describe('useProfileOnboardingState', () => {
     });
 
     expect(useProfileOnboardingState.getState()).toMatchObject({
-      acceptedTerms: true,
       displayName: 'Alice',
       birthdate: '01 / 02 / 1995',
       gender: 'female',
