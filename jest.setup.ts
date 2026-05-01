@@ -2,6 +2,19 @@
 
 import '@testing-library/react-native/build/matchers/extend-expect';
 
+jest.mock('react-native-safe-area-context', () => {
+  const { View } = require('react-native');
+  const insets = { top: 0, bottom: 0, left: 0, right: 0 };
+
+  return {
+    SafeAreaProvider: ({ children }: { children: React.ReactNode }) => children,
+    SafeAreaView: View,
+    useSafeAreaInsets: () => insets,
+    useSafeAreaFrame: () => ({ x: 0, y: 0, width: 375, height: 812 }),
+    initialWindowMetrics: { insets, frame: { x: 0, y: 0, width: 375, height: 812 } },
+  };
+});
+
 jest.mock('expo-haptics', () => ({
   impactAsync: jest.fn(),
   ImpactFeedbackStyle: { Light: 'light', Medium: 'medium', Heavy: 'heavy' },

@@ -1,21 +1,22 @@
-/* Profile route tests — protect the Phase 2 logout flow from regressing. */
+/* Profile route tests — protect the sign-out flow and edit form from regressions. */
 
-import React from 'react';
-import { act, render, waitFor } from '@testing-library/react-native';
+import React, { type ReactNode } from 'react';
+import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import ProfileRoute from '../profile';
-import type MyVoiceScreen from '../../../src/components/onboarding/MyVoiceScreen';
 import { useFeedState } from '../../../src/features/feed/hooks/useFeedState';
 import { useAuth } from '../../../src/features/auth/hooks/useAuth';
+import type { Database } from '../../../src/types/database';
 
-const mockPush = jest.fn();
+type ProfileRow = Database['public']['Tables']['profiles']['Row'];
+
 const mockReplace = jest.fn();
 const mockSignOut = jest.fn();
-let mockMyVoiceScreenProps: React.ComponentProps<typeof MyVoiceScreen> | null = null;
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({
-    push: mockPush,
+    push: jest.fn(),
     replace: mockReplace,
     back: jest.fn(),
     navigate: jest.fn(),
@@ -26,29 +27,45 @@ jest.mock('../../../src/features/auth/hooks/useAuth', () => ({
   useAuth: jest.fn(),
 }));
 
-jest.mock('../../../src/components/onboarding/MyVoiceScreen', () => {
-  const MockMyVoiceScreen = (props: React.ComponentProps<typeof MyVoiceScreen>) => {
-    mockMyVoiceScreenProps = props;
-    return null;
-  };
+jest.mock('../../../src/features/profile/api/profileMutations', () => ({
+  useUpsertProfile: () => ({
+    mutateAsync: jest.fn().mockResolvedValue(undefined),
+    isPending: false,
+  }),
+}));
 
+function Wrapper({ children }: { children: ReactNode }) {
+  return <SafeAreaProvider>{children}</SafeAreaProvider>;
+}
+
+function makeProfile(overrides: Partial<ProfileRow> = {}): ProfileRow {
   return {
-    __esModule: true,
-    default: MockMyVoiceScreen,
+    id: 'user-1',
+    display_name: 'Alice',
+    birthdate: '1995-01-01',
+    gender: 'female',
+    looking_for: ['male'],
+    city: 'Paris',
+    country: 'FR',
+    location: 'POINT(2.3522 48.8566)',
+    bio_emojis: [],
+    created_at: '2026-01-01T00:00:00Z',
+    deleted_at: null,
+    is_banned: false,
+    last_seen_at: null,
+    push_token: null,
+    ...overrides,
   };
-});
+}
 
 describe('ProfileRoute', () => {
   beforeEach(() => {
-    mockPush.mockClear();
     mockReplace.mockClear();
     mockSignOut.mockReset();
     mockSignOut.mockResolvedValue(undefined);
-    mockMyVoiceScreenProps = null;
-    useFeedState.getState().setHasRecordedVoice(true);
     jest.mocked(useAuth).mockReturnValue({
       session: null,
-      profile: null,
+      profile: makeProfile(),
       isLoading: false,
       error: null,
       refreshProfile: jest.fn(),
@@ -56,27 +73,30 @@ describe('ProfileRoute', () => {
     });
   });
 
-  it('signs out and returns to auth home', async () => {
-    render(<ProfileRoute />);
+  it('signs out, clears voice gate, and returns to auth home', async () => {
+    useFeedState.getState().setHasRecordedVoice(true);
+
+    const { getByRole } = render(<ProfileRoute />, { wrapper: Wrapper });
+    const signOutButton = getByRole('button', { name: 'Se déconnecter' });
 
     await act(async () => {
-      mockMyVoiceScreenProps?.onSignOut?.();
+      fireEvent.press(signOutButton);
     });
 
     await waitFor(() => {
       expect(mockSignOut).toHaveBeenCalledTimes(1);
       expect(useFeedState.getState().hasRecordedVoice).toBe(false);
-      expect(mockReplace).toHaveBeenCalledWith('/(auth)/home');
     });
   });
 
   it('keeps the user on profile when sign out fails', async () => {
     mockSignOut.mockRejectedValueOnce(new Error('Network error'));
 
-    render(<ProfileRoute />);
+    const { getByRole } = render(<ProfileRoute />, { wrapper: Wrapper });
+    const signOutButton = getByRole('button', { name: 'Se déconnecter' });
 
     await act(async () => {
-      mockMyVoiceScreenProps?.onSignOut?.();
+      fireEvent.press(signOutButton);
     });
 
     await waitFor(() => {

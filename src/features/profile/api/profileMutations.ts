@@ -33,8 +33,10 @@ export const profileQueryKeys = {
 
 export function coordinatesToPostgisPoint(
   coordinates: ProfileCoordinates | null | undefined,
-): string | null {
-  if (!coordinates) return null;
+): string | undefined {
+  // Return undefined (not null) so that Supabase excludes the field from upsert SQL when
+  // no coordinates are provided — avoiding accidental location erasure during profile edits.
+  if (!coordinates) return undefined;
 
   if (!Number.isFinite(coordinates.latitude) || !Number.isFinite(coordinates.longitude)) {
     throw new Error('profile.location_invalid');

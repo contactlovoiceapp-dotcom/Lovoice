@@ -22,3 +22,15 @@ export function frenchBirthdateToIso(value: string): string | null {
 
   return `${year}-${month}-${day}`;
 }
+
+export function isoBirthdateToFrench(isoDate: string): string {
+  const parts = isoDate.split('-');
+
+  if (parts.length !== 3) {
+    return isoDate;
+  }
+
+  const [year, month, day] = parts;
+
+  return `${day ?? ''} / ${month ?? ''} / ${year ?? ''}`;
+}

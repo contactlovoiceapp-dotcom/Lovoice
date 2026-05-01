@@ -21,3 +21,10 @@ describe('frenchBirthdateToIso', () => {
     expect(frenchBirthdateToIso('01 / 02')).toBeNull();
   });
 });
+
+describe('isoBirthdateToFrench', () => {
+  it('converts an ISO date to the French display format', () => {
+    const { isoBirthdateToFrench } = require('../birthdateInput');
+    expect(isoBirthdateToFrench('1995-02-01')).toBe('01 / 02 / 1995');
+  });
+});

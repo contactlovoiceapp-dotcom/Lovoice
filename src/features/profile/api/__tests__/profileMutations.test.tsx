@@ -113,9 +113,9 @@ describe('coordinatesToPostgisPoint', () => {
     );
   });
 
-  it('returns null when coordinates are omitted', () => {
-    expect(coordinatesToPostgisPoint(null)).toBeNull();
-    expect(coordinatesToPostgisPoint(undefined)).toBeNull();
+  it('returns undefined when coordinates are omitted', () => {
+    expect(coordinatesToPostgisPoint(null)).toBeUndefined();
+    expect(coordinatesToPostgisPoint(undefined)).toBeUndefined();
   });
 
   it('rejects impossible latitude values', () => {
