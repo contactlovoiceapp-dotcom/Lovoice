@@ -504,6 +504,7 @@ export default function ProfileRoute() {
                   </Pressable>
                 </View>
 
+                {/* Play button + inline title — row height is always 48px. TextInput stays perfectly centered. */}
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
                   <Pressable
                     accessibilityRole="button"
@@ -525,42 +526,41 @@ export default function ProfileRoute() {
                     </LinearGradient>
                   </Pressable>
 
-                  <View style={{ flex: 1, gap: 3 }}>
-                    <Text style={{ fontFamily: FONT.semibold, color: COLORS.dark }}>
-                      {voiceTitle.trim() || COPY.profile.catchphraseHint}
-                    </Text>
-                    <Text style={{ fontFamily: FONT.regular, fontSize: 12, color: COLORS.textTertiary }}>
-                      {bioEmojis.filter(Boolean).join(' ') || COPY.profile.emojisLabel.trim()}
-                    </Text>
-                  </View>
+                  <TextInput
+                    value={voiceTitle}
+                    onChangeText={(text) => {
+                      setVoiceTitle(text.slice(0, 60));
+                      setSaveSuccess(false);
+                    }}
+                    placeholder={COPY.profile.catchphraseHint}
+                    placeholderTextColor={COLORS.textTertiary}
+                    maxLength={60}
+                    style={{
+                      flex: 1,
+                      fontFamily: FONT.semibold,
+                      fontSize: 14,
+                      color: COLORS.dark,
+                      padding: 0,
+                    }}
+                  />
                 </View>
-              </View>
 
-              {/* Voice title input */}
-              <View style={{ gap: 8 }}>
-                <Text style={{ fontFamily: FONT.medium, color: COLORS.textSecondary }}>
-                  {COPY.profile.catchphraseLabel}
-                </Text>
-                <TextInput
-                  value={voiceTitle}
-                  onChangeText={(text) => {
-                    setVoiceTitle(text.slice(0, 60));
-                    setSaveSuccess(false);
-                  }}
-                  placeholder={COPY.profile.catchphrasePlaceholder}
-                  placeholderTextColor={COLORS.textTertiary}
-                  maxLength={60}
+                {/* Always rendered (card height stays fixed). Opacity hides it when the title is filled. */}
+                {/* Negative marginTop compensates for the dead space below the vertically-centered TextInput. */}
+                <Text
                   style={{
-                    borderRadius: RADIUS.lg,
-                    borderWidth: 1,
-                    borderColor: COLORS.border,
-                    backgroundColor: COLORS.surfaceMuted,
-                    paddingVertical: 16,
-                    paddingHorizontal: 16,
+                    marginTop: -10,
+                    paddingLeft: 62,
+                    fontSize: 11,
                     fontFamily: FONT.regular,
-                    color: COLORS.dark,
+                    color: COLORS.textTertiary,
+                    fontStyle: 'italic',
+                    opacity: voiceTitle.trim().length === 0 ? 1 : 0,
                   }}
-                />
+                >
+                  {COPY.profile.catchphraseEditHint}
+                </Text>
+
               </View>
 
               {/* Mood selector */}
