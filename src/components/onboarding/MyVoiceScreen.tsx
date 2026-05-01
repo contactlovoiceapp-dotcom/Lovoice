@@ -169,6 +169,7 @@ const MyVoiceScreen: React.FC<Props> = ({
     city.trim() !== '' &&
     gender !== '' &&
     interestedIn.length > 0;
+  const canSubmit = isOnboarding ? hasRecordedVoice : isFormValid;
 
   useEffect(() => {
     const showSub = Keyboard.addListener('keyboardWillShow', () => {
@@ -381,153 +382,157 @@ const MyVoiceScreen: React.FC<Props> = ({
                 </View>
               )}
 
-              <View style={{ gap: 16 }}>
-                <Text style={{ fontFamily: FONT.bold, fontSize: 16, color: COLORS.dark }}>
-                  {COPY.profile.infoLabel}
-                </Text>
-                <View>
-                  <Text style={{ fontFamily: FONT.medium, fontSize: 13, color: COLORS.textSecondary, marginBottom: 6, marginLeft: 4 }}>
-                    {COPY.profile.nameLabel}
-                  </Text>
-                  <TextInput
-                    value={name}
-                    onChangeText={setName}
-                    placeholder={COPY.profile.namePlaceholder}
-                    placeholderTextColor={COLORS.textTertiary}
-                    style={{
-                      borderRadius: RADIUS.md,
-                      borderWidth: 1,
-                      borderColor: COLORS.border,
-                      backgroundColor: COLORS.surfaceMuted,
-                      padding: 12,
-                      fontFamily: FONT.regular,
-                      letterSpacing: 0,
-                      color: COLORS.dark,
-                    }}
-                  />
-                </View>
-                <View>
-                  <Text style={{ fontFamily: FONT.medium, fontSize: 13, color: COLORS.textSecondary, marginBottom: 6, marginLeft: 4 }}>
-                    {COPY.gender.label}
-                  </Text>
-                  <Pressable
-                    accessibilityRole="button"
-                    onPress={() => setShowGenderPicker(true)}
-                    style={{
-                      borderRadius: RADIUS.md,
-                      borderWidth: 1,
-                      borderColor: COLORS.border,
-                      backgroundColor: COLORS.surfaceMuted,
-                      padding: 12,
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                    }}
-                  >
-                    <Text
-                      style={{
-                        fontFamily: FONT.regular,
-                        color: gender ? COLORS.dark : COLORS.textTertiary,
-                      }}
-                    >
-                      {gender || COPY.gender.placeholder}
+              {!isOnboarding && (
+                <>
+                  <View style={{ gap: 16 }}>
+                    <Text style={{ fontFamily: FONT.bold, fontSize: 16, color: COLORS.dark }}>
+                      {COPY.profile.infoLabel}
                     </Text>
-                    <ChevronDown size={18} color={COLORS.textTertiary} />
-                  </Pressable>
-                </View>
-                <View style={{ flexDirection: 'row', gap: 16 }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontFamily: FONT.medium, fontSize: 13, color: COLORS.textSecondary, marginBottom: 6, marginLeft: 4 }}>
-                      {COPY.profile.ageLabel}
-                    </Text>
-                    <TextInput
-                      value={age}
-                      onChangeText={setAge}
-                      placeholder={COPY.profile.agePlaceholder}
-                      placeholderTextColor={COLORS.textTertiary}
-                      keyboardType="number-pad"
-                      style={{
-                        borderRadius: RADIUS.md,
-                        borderWidth: 1,
-                        borderColor: COLORS.border,
-                        backgroundColor: COLORS.surfaceMuted,
-                        padding: 12,
-                        fontFamily: FONT.regular,
-                        letterSpacing: 0,
-                        color: COLORS.dark,
-                      }}
-                    />
-                  </View>
-                  <View style={{ flex: 2 }}>
-                    <Text style={{ fontFamily: FONT.medium, fontSize: 13, color: COLORS.textSecondary, marginBottom: 6, marginLeft: 4 }}>
-                      {COPY.profile.cityLabel}
-                    </Text>
-                    <TextInput
-                      value={city}
-                      onChangeText={setCity}
-                      placeholder={COPY.profile.cityPlaceholder}
-                      placeholderTextColor={COLORS.textTertiary}
-                      style={{
-                        borderRadius: RADIUS.md,
-                        borderWidth: 1,
-                        borderColor: COLORS.border,
-                        backgroundColor: COLORS.surfaceMuted,
-                        padding: 12,
-                        fontFamily: FONT.regular,
-                        letterSpacing: 0,
-                        color: COLORS.dark,
-                      }}
-                    />
-                  </View>
-                </View>
-              </View>
-
-              <View style={{ gap: 16 }}>
-                <Text style={{ fontFamily: FONT.bold, fontSize: 16, color: COLORS.dark }}>
-                  {COPY.profile.preferencesLabel}
-                </Text>
-                <View>
-                  <Text style={{ fontFamily: FONT.medium, fontSize: 13, color: COLORS.textSecondary, marginBottom: 6, marginLeft: 4 }}>
-                    {COPY.gender.interestedInLabel}
-                  </Text>
-                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-                    {INTEREST_OPTIONS.map((opt) => {
-                      const selected = interestedIn.includes(opt.value);
-                      return (
-                        <Pressable
-                          key={opt.value}
-                          accessibilityRole="button"
-                          accessibilityState={{ selected }}
-                          onPress={() => toggleInterestedIn(opt.value)}
+                    <View>
+                      <Text style={{ fontFamily: FONT.medium, fontSize: 13, color: COLORS.textSecondary, marginBottom: 6, marginLeft: 4 }}>
+                        {COPY.profile.nameLabel}
+                      </Text>
+                      <TextInput
+                        value={name}
+                        onChangeText={setName}
+                        placeholder={COPY.profile.namePlaceholder}
+                        placeholderTextColor={COLORS.textTertiary}
+                        style={{
+                          borderRadius: RADIUS.md,
+                          borderWidth: 1,
+                          borderColor: COLORS.border,
+                          backgroundColor: COLORS.surfaceMuted,
+                          padding: 12,
+                          fontFamily: FONT.regular,
+                          letterSpacing: 0,
+                          color: COLORS.dark,
+                        }}
+                      />
+                    </View>
+                    <View>
+                      <Text style={{ fontFamily: FONT.medium, fontSize: 13, color: COLORS.textSecondary, marginBottom: 6, marginLeft: 4 }}>
+                        {COPY.gender.label}
+                      </Text>
+                      <Pressable
+                        accessibilityRole="button"
+                        onPress={() => setShowGenderPicker(true)}
+                        style={{
+                          borderRadius: RADIUS.md,
+                          borderWidth: 1,
+                          borderColor: COLORS.border,
+                          backgroundColor: COLORS.surfaceMuted,
+                          padding: 12,
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                        }}
+                      >
+                        <Text
                           style={{
-                            borderRadius: RADIUS.full,
-                            borderWidth: 1,
-                            borderColor: selected ? COLORS.primary : COLORS.border,
-                            backgroundColor: selected ? COLORS.primaryMuted : COLORS.surfaceMuted,
-                            paddingHorizontal: 16,
-                            paddingVertical: 10,
+                            fontFamily: FONT.regular,
+                            color: gender ? COLORS.dark : COLORS.textTertiary,
                           }}
                         >
-                          <Text
-                            style={{
-                              fontFamily: selected ? FONT.semibold : FONT.medium,
-                              fontSize: 13,
-                              color: selected ? COLORS.primary : COLORS.textSecondary,
-                            }}
-                          >
-                            {opt.label}
-                          </Text>
-                        </Pressable>
-                      );
-                    })}
+                          {gender || COPY.gender.placeholder}
+                        </Text>
+                        <ChevronDown size={18} color={COLORS.textTertiary} />
+                      </Pressable>
+                    </View>
+                    <View style={{ flexDirection: 'row', gap: 16 }}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontFamily: FONT.medium, fontSize: 13, color: COLORS.textSecondary, marginBottom: 6, marginLeft: 4 }}>
+                          {COPY.profile.ageLabel}
+                        </Text>
+                        <TextInput
+                          value={age}
+                          onChangeText={setAge}
+                          placeholder={COPY.profile.agePlaceholder}
+                          placeholderTextColor={COLORS.textTertiary}
+                          keyboardType="number-pad"
+                          style={{
+                            borderRadius: RADIUS.md,
+                            borderWidth: 1,
+                            borderColor: COLORS.border,
+                            backgroundColor: COLORS.surfaceMuted,
+                            padding: 12,
+                            fontFamily: FONT.regular,
+                            letterSpacing: 0,
+                            color: COLORS.dark,
+                          }}
+                        />
+                      </View>
+                      <View style={{ flex: 2 }}>
+                        <Text style={{ fontFamily: FONT.medium, fontSize: 13, color: COLORS.textSecondary, marginBottom: 6, marginLeft: 4 }}>
+                          {COPY.profile.cityLabel}
+                        </Text>
+                        <TextInput
+                          value={city}
+                          onChangeText={setCity}
+                          placeholder={COPY.profile.cityPlaceholder}
+                          placeholderTextColor={COLORS.textTertiary}
+                          style={{
+                            borderRadius: RADIUS.md,
+                            borderWidth: 1,
+                            borderColor: COLORS.border,
+                            backgroundColor: COLORS.surfaceMuted,
+                            padding: 12,
+                            fontFamily: FONT.regular,
+                            letterSpacing: 0,
+                            color: COLORS.dark,
+                          }}
+                        />
+                      </View>
+                    </View>
                   </View>
-                  {interestedIn.length === 0 && (
-                    <Text style={{ marginTop: 8, marginLeft: 4, fontFamily: FONT.regular, fontSize: 12, color: COLORS.textTertiary }}>
-                      {COPY.gender.interestedInHint}
+
+                  <View style={{ gap: 16 }}>
+                    <Text style={{ fontFamily: FONT.bold, fontSize: 16, color: COLORS.dark }}>
+                      {COPY.profile.preferencesLabel}
                     </Text>
-                  )}
-                </View>
-              </View>
+                    <View>
+                      <Text style={{ fontFamily: FONT.medium, fontSize: 13, color: COLORS.textSecondary, marginBottom: 6, marginLeft: 4 }}>
+                        {COPY.gender.interestedInLabel}
+                      </Text>
+                      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+                        {INTEREST_OPTIONS.map((opt) => {
+                          const selected = interestedIn.includes(opt.value);
+                          return (
+                            <Pressable
+                              key={opt.value}
+                              accessibilityRole="button"
+                              accessibilityState={{ selected }}
+                              onPress={() => toggleInterestedIn(opt.value)}
+                              style={{
+                                borderRadius: RADIUS.full,
+                                borderWidth: 1,
+                                borderColor: selected ? COLORS.primary : COLORS.border,
+                                backgroundColor: selected ? COLORS.primaryMuted : COLORS.surfaceMuted,
+                                paddingHorizontal: 16,
+                                paddingVertical: 10,
+                              }}
+                            >
+                              <Text
+                                style={{
+                                  fontFamily: selected ? FONT.semibold : FONT.medium,
+                                  fontSize: 13,
+                                  color: selected ? COLORS.primary : COLORS.textSecondary,
+                                }}
+                              >
+                                {opt.label}
+                              </Text>
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                      {interestedIn.length === 0 && (
+                        <Text style={{ marginTop: 8, marginLeft: 4, fontFamily: FONT.regular, fontSize: 12, color: COLORS.textTertiary }}>
+                          {COPY.gender.interestedInHint}
+                        </Text>
+                      )}
+                    </View>
+                  </View>
+                </>
+              )}
 
               <View>
                 <Text style={{ fontFamily: FONT.bold, fontSize: 16, color: COLORS.dark, marginBottom: 16 }}>
@@ -675,7 +680,7 @@ const MyVoiceScreen: React.FC<Props> = ({
             >
               <Pressable
                 accessibilityRole="button"
-                disabled={!isFormValid}
+                disabled={!canSubmit}
                 onPress={onSend}
                 style={{
                   width: '100%',
@@ -683,7 +688,7 @@ const MyVoiceScreen: React.FC<Props> = ({
                   borderRadius: RADIUS.full,
                   overflow: 'hidden',
                   maxWidth: contentMaxWidth,
-                  opacity: isFormValid ? 1 : 0.2,
+                  opacity: canSubmit ? 1 : 0.2,
                   ...SHADOW.button,
                 }}
               >

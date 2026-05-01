@@ -231,6 +231,10 @@ Reactive moderation (block + report + manual takedown by the operator) is part o
   - `city.tsx`: deduplicates identical search results, clears the result list after selection, and highlights the confirmed city.
   - `AuthRedirector`: allows OTP/record to finish the signup path after profile creation, preventing a premature jump to Discover.
   - `record.tsx` and `useAuth`: refresh the authenticated profile before leaving the voice step, so "Passer" cannot fall back to Home with stale profile state.
+  - Restored `profile-setup.tsx` as the voice finalization step after recording: replay, voice title, mood, and 3 emojis before entering Discover.
+  - `MyVoiceScreen`: onboarding mode now hides the legacy profile fields already covered by the wizard and keeps only voice metadata controls.
+  - Main profile tab now includes the voice controls again (replay, title, mood, 3 emojis, re-record) alongside profile field editing.
+  - Main profile tab now matches onboarding gender options and city search behavior, including deduplicated city results.
   - `AuthRedirector`: `session && !profile` redirects to `/(auth)/home` (not the wizard, since auth comes after the wizard).
   - `index.tsx` (splash): `session && profile` → discover, otherwise → home.
   - `record.tsx`: routes to `/(main)/discover` after recording (unchanged from Bloc H).

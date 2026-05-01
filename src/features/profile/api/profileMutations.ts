@@ -24,6 +24,7 @@ export type UpsertProfileInput = {
   lookingFor: GenderValue[];
   city: string;
   coordinates?: ProfileCoordinates | null;
+  bioEmojis?: string[];
 };
 
 export const profileQueryKeys = {
@@ -83,6 +84,9 @@ export function buildProfileUpsertPayload(
     looking_for: input.lookingFor,
     city: input.city.trim(),
     country: countryOverride ?? getProfileCountryFromSession(session),
+    ...(input.bioEmojis
+      ? { bio_emojis: input.bioEmojis.map((emoji) => emoji.trim()).filter(Boolean).slice(0, 3) }
+      : {}),
     location: coordinatesToPostgisPoint(input.coordinates),
   };
 }

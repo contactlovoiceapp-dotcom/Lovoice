@@ -32,7 +32,14 @@ export default function AuthRedirector() {
 
     if (session && profile && !isInMainGroup) {
       // Signup finishes inside the auth stack: OTP creates the profile, then record gates the feed.
-      if (isInAuthGroup && (pathname.endsWith('/otp') || pathname.endsWith('/record'))) return;
+      if (
+        isInAuthGroup &&
+        (pathname.endsWith('/otp') ||
+          pathname.endsWith('/record') ||
+          pathname.endsWith('/profile-setup'))
+      ) {
+        return;
+      }
       router.replace('/(main)/discover');
     }
   }, [isLoading, pathname, profile, router, segments, session]);

@@ -1,22 +1,26 @@
-/* Profile tab — view and edit the authenticated user's profile fields. */
+/* Profile tab — view the authenticated user's identity and edit preferences, city, mood, and emojis. */
 
 import React, { useCallback, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   ScrollView,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { LogOut } from 'lucide-react-native';
+import { LogOut, Pause, Play, Plus, RefreshCw, X } from 'lucide-react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 
 import { COPY } from '../../src/copy';
-import { COLORS, CTA_GRADIENT, FONT, ONBOARDING_GRADIENT, RADIUS, SHADOW } from '../../src/theme';
+import { COLORS, CTA_GRADIENT, FONT, ONBOARDING_GRADIENT, RADIUS, SHADOW, THEME_GRADIENTS } from '../../src/theme';
+import { ColorTheme } from '../../src/types';
 import { useAuth } from '../../src/features/auth/hooks/useAuth';
 import { useFeedState } from '../../src/features/feed/hooks/useFeedState';
 import { searchCities, type CitySearchResult } from '../../src/features/profile/api/citySearch';
@@ -25,21 +29,99 @@ import {
   OnboardingTextInput,
   SelectableOption,
 } from '../../src/features/profile/components/ProfileOnboardingStep';
+import { isoBirthdateToFrench } from '../../src/features/profile/helpers/birthdateInput';
 import {
-  formatBirthdateInput,
-  frenchBirthdateToIso,
-  isoBirthdateToFrench,
-} from '../../src/features/profile/helpers/birthdateInput';
-import {
-  GENDER_VALUES,
-  validateAge,
-  validateDisplayName,
-  validateGender,
   validateLookingFor,
   type GenderValue,
 } from '../../src/features/profile/helpers/validation';
 
 type EditError = keyof typeof COPY.profile.editErrors;
+
+const PROFILE_GENDERS: GenderValue[] = ['male', 'female', 'other'];
+
+const MOOD_OPTIONS: {
+  id: ColorTheme;
+  label: string;
+  colors: readonly [string, string];
+  ctaBorderColor: string;
+}[] = [
+  {
+    id: ColorTheme.Sunset,
+    label: COPY.moods.sunset,
+    colors: [THEME_GRADIENTS.sunset.colors[0], THEME_GRADIENTS.sunset.colors[1]],
+    ctaBorderColor: THEME_GRADIENTS.sunset.ctaGradient[0],
+  },
+  {
+    id: ColorTheme.Chill,
+    label: COPY.moods.chill,
+    colors: [THEME_GRADIENTS.chill.colors[0], THEME_GRADIENTS.chill.colors[1]],
+    ctaBorderColor: THEME_GRADIENTS.chill.ctaGradient[0],
+  },
+  {
+    id: ColorTheme.Electric,
+    label: COPY.moods.electric,
+    colors: [THEME_GRADIENTS.electric.colors[0], THEME_GRADIENTS.electric.colors[1]],
+    ctaBorderColor: THEME_GRADIENTS.electric.ctaGradient[0],
+  },
+  {
+    id: ColorTheme.Midnight,
+    label: COPY.moods.midnight,
+    colors: [THEME_GRADIENTS.midnight.colors[0], THEME_GRADIENTS.midnight.colors[1]],
+    // Magenta CTA so the selection ring is visible against the dark grey circle.
+    ctaBorderColor: THEME_GRADIENTS.midnight.ctaGradient[0],
+  },
+];
+
+const SUGGESTED_EMOJIS = [
+  '😂', '🔥', '🎵', '🍕', '✈️', '🏄',
+  '💃', '🎸', '🐶', '🍜', '👻', '🌙',
+  '🎯', '💪', '🌊', '🦋', '🎭', '🍫',
+  '🤓', '⚡', '🌈', '🏆', '🎤', '🦁',
+  '🍓', '🎮', '🌺', '💎', '🚀', '🎪',
+];
+
+const GENDER_LABELS: Partial<Record<string, string>> = {
+  male: COPY.onboarding.gender.options.male,
+  female: COPY.onboarding.gender.options.female,
+  other: COPY.onboarding.gender.options.other,
+  nonbinary: COPY.onboarding.gender.options.nonbinary,
+};
+
+function normalizeProfileGender(value: string | null | undefined): GenderValue | null {
+  if (value === 'male' || value === 'female' || value === 'other') return value;
+  if (value === 'nonbinary') return 'other';
+  return null;
+}
+
+function normalizeProfileGenders(values: unknown): GenderValue[] {
+  if (!Array.isArray(values)) return [];
+
+  return Array.from(
+    new Set(
+      values
+        .map((value) => normalizeProfileGender(typeof value === 'string' ? value : null))
+        .filter((value): value is GenderValue => value !== null),
+    ),
+  );
+}
+
+function uniqueCityResults(results: CitySearchResult[]): CitySearchResult[] {
+  return results.filter(
+    (result, index, list) =>
+      index === list.findIndex((item) => item.city === result.city && item.displayName === result.displayName),
+  );
+}
+
+function calculateAge(isoBirthdate: string): number {
+  const today = new Date();
+  const birth = new Date(isoBirthdate);
+  let age = today.getFullYear() - birth.getFullYear();
+  const monthDiff = today.getMonth() - birth.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+    age--;
+  }
+  return age;
+}
 
 function SectionTitle({ label }: { label: string }) {
   return (
@@ -59,24 +141,26 @@ function SectionTitle({ label }: { label: string }) {
 }
 
 export default function ProfileRoute() {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const { signOut, profile } = useAuth();
   const { setHasRecordedVoice } = useFeedState();
   const upsertProfile = useUpsertProfile();
+  const [isVoicePlaying, setIsVoicePlaying] = useState(false);
+  const [voiceTitle, setVoiceTitle] = useState('');
+  const [mood, setMood] = useState<ColorTheme>(ColorTheme.Sunset);
+  const [bioEmojis, setBioEmojis] = useState<[string, string, string]>([
+    profile?.bio_emojis?.[0] ?? '',
+    profile?.bio_emojis?.[1] ?? '',
+    profile?.bio_emojis?.[2] ?? '',
+  ]);
 
-  // Form state — initialized once from profile; changes stay local until saved.
-  const [displayName, setDisplayName] = useState(profile?.display_name ?? '');
-  const [birthdate, setBirthdate] = useState(
-    profile?.birthdate ? isoBirthdateToFrench(profile.birthdate) : '',
-  );
-  const [gender, setGender] = useState<GenderValue | null>(
-    (profile?.gender as GenderValue | null) ?? null,
-  );
+  // lookingFor stays editable.
   const [lookingFor, setLookingFor] = useState<GenderValue[]>(
-    (profile?.looking_for as GenderValue[]) ?? [],
+    normalizeProfileGenders(profile?.looking_for),
   );
 
-  // City: we track the confirmed selection separately from the search query.
+  // City: track the confirmed selection separately from the search query.
   const [confirmedCity, setConfirmedCity] = useState(profile?.city ?? '');
   const [newCoordinates, setNewCoordinates] = useState<{
     latitude: number;
@@ -88,6 +172,10 @@ export default function ProfileRoute() {
   const [selectedResultId, setSelectedResultId] = useState<string | null>(null);
   const [isSearching, setIsSearching] = useState(false);
 
+  // Emoji picker — tracks which slot (0–2) is open; null means closed.
+  const [emojiPickerIndex, setEmojiPickerIndex] = useState<number | null>(null);
+  const [emojiManualInput, setEmojiManualInput] = useState('');
+
   const [error, setError] = useState<EditError | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
@@ -97,6 +185,33 @@ export default function ProfileRoute() {
     );
   };
 
+  const openEmojiPicker = (index: number) => {
+    setEmojiPickerIndex(index);
+    setEmojiManualInput('');
+  };
+
+  const selectEmoji = (emoji: string) => {
+    if (emojiPickerIndex === null) return;
+    const trimmed = emoji.trim().slice(0, 2);
+    if (!trimmed) return;
+    setBioEmojis((current) => {
+      const next: [string, string, string] = [...current];
+      next[emojiPickerIndex] = trimmed;
+      return next;
+    });
+    setSaveSuccess(false);
+    setEmojiPickerIndex(null);
+  };
+
+  const clearEmoji = (index: number) => {
+    setBioEmojis((current) => {
+      const next: [string, string, string] = [...current];
+      next[index] = '';
+      return next;
+    });
+    setSaveSuccess(false);
+  };
+
   const handleCitySearch = async () => {
     setIsSearching(true);
     setError(null);
@@ -104,7 +219,7 @@ export default function ProfileRoute() {
 
     try {
       const results = await searchCities(cityQuery);
-      setCityResults(results);
+      setCityResults(uniqueCityResults(results));
     } catch {
       setCityResults([]);
     } finally {
@@ -118,32 +233,11 @@ export default function ProfileRoute() {
     setNewCoordinates(result.coordinates);
     setCityChanged(true);
     setCityResults([]);
+    setCityQuery(result.city);
     setError(null);
   };
 
   const handleSave = async () => {
-    const nameResult = validateDisplayName(displayName);
-
-    if (!nameResult.valid) {
-      setError(nameResult.error === 'too_short' ? 'name_too_short' : 'name_too_long');
-      return;
-    }
-
-    const isoBirthdate = frenchBirthdateToIso(birthdate);
-    const ageResult = validateAge(isoBirthdate ?? birthdate);
-
-    if (!ageResult.valid) {
-      setError(ageResult.error === 'invalid_date' ? 'birthdate_invalid' : 'birthdate_underage');
-      return;
-    }
-
-    const genderResult = validateGender(gender ?? '');
-
-    if (!genderResult.valid) {
-      setError('gender_required');
-      return;
-    }
-
     const lookingForResult = validateLookingFor(lookingFor);
 
     if (!lookingForResult.valid) {
@@ -159,14 +253,18 @@ export default function ProfileRoute() {
 
     setError(null);
 
+    // Pass immutable fields as-is from the profile — only lookingFor, city, and bioEmojis are editable.
+    const profileGender = normalizeProfileGender(profile?.gender) ?? 'other';
+
     try {
       await upsertProfile.mutateAsync({
-        displayName,
-        birthdate: isoBirthdate!,
-        gender: gender!,
+        displayName: profile?.display_name ?? '',
+        birthdate: profile?.birthdate ?? '',
+        gender: profileGender,
         lookingFor,
         city: confirmedCity,
         coordinates: newCoordinates ?? undefined,
+        bioEmojis,
       });
       setSaveSuccess(true);
       setCityChanged(false);
@@ -185,9 +283,117 @@ export default function ProfileRoute() {
     }
   }, [signOut, setHasRecordedVoice]);
 
+  const age = profile?.birthdate ? calculateAge(profile.birthdate) : null;
+  const genderText = GENDER_LABELS[profile?.gender ?? ''] ?? '';
+  const infoLine = [
+    profile?.display_name,
+    age !== null ? `${age} ans` : null,
+    genderText,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+
+  const currentCtaGradient = THEME_GRADIENTS[mood].ctaGradient;
+
   return (
     <>
       <StatusBar style="dark" />
+
+      {/* Emoji picker modal */}
+      <Modal
+        visible={emojiPickerIndex !== null}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setEmojiPickerIndex(null)}
+      >
+        <Pressable
+          style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' }}
+          onPress={() => setEmojiPickerIndex(null)}
+        >
+          <Pressable
+            onPress={() => {
+              /* Prevent tap-through closing modal when tapping inside sheet. */
+            }}
+            style={{
+              backgroundColor: COLORS.surface,
+              borderTopLeftRadius: RADIUS.modal,
+              borderTopRightRadius: RADIUS.modal,
+              padding: 24,
+              paddingBottom: insets.bottom + 24,
+            }}
+          >
+            <Text
+              style={{
+                marginBottom: 20,
+                fontSize: 17,
+                fontFamily: FONT.bold,
+                color: COLORS.dark,
+                textAlign: 'center',
+              }}
+            >
+              {COPY.profile.emojiPickerTitle}
+            </Text>
+
+            {/* Emoji grid — 6 columns */}
+            <View
+              style={{
+                flexDirection: 'row',
+                flexWrap: 'wrap',
+                gap: 8,
+                justifyContent: 'center',
+                marginBottom: 20,
+              }}
+            >
+              {SUGGESTED_EMOJIS.map((emoji) => (
+                <Pressable
+                  key={emoji}
+                  accessibilityRole="button"
+                  onPress={() => selectEmoji(emoji)}
+                  style={{
+                    width: 48,
+                    height: 48,
+                    borderRadius: RADIUS.md,
+                    backgroundColor: COLORS.surfaceMuted,
+                    borderWidth: 1,
+                    borderColor: COLORS.border,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Text style={{ fontSize: 26 }}>{emoji}</Text>
+                </Pressable>
+              ))}
+            </View>
+
+            {/* Free-text fallback */}
+            <TextInput
+              value={emojiManualInput}
+              onChangeText={(text) => {
+                setEmojiManualInput(text);
+                if (text.trim().length > 0) {
+                  selectEmoji(text.trim());
+                }
+              }}
+              placeholder={COPY.profile.emojiPickerInputPlaceholder}
+              placeholderTextColor={COLORS.textTertiary}
+              maxLength={2}
+              style={{
+                borderRadius: RADIUS.input,
+                borderWidth: 1,
+                borderColor: COLORS.border,
+                backgroundColor: COLORS.surfaceMuted,
+                paddingVertical: 14,
+                paddingHorizontal: 16,
+                fontSize: 24,
+                textAlign: 'center',
+                fontFamily: FONT.regular,
+                color: COLORS.dark,
+              }}
+            />
+          </Pressable>
+        </Pressable>
+      </Modal>
+
       <LinearGradient
         colors={[...ONBOARDING_GRADIENT]}
         start={{ x: 0, y: 0 }}
@@ -245,66 +451,249 @@ export default function ProfileRoute() {
               </Pressable>
             </View>
 
-            {/* Personal information */}
-            <View style={{ marginBottom: 28, gap: 14 }}>
+            {/* Voice */}
+            <View style={{ marginBottom: 28, gap: 16 }}>
+              <SectionTitle label={COPY.profile.voiceCard} />
+
+              <View
+                style={{
+                  borderRadius: RADIUS.xl,
+                  borderWidth: 1,
+                  borderColor: COLORS.border,
+                  backgroundColor: COLORS.surfaceMuted,
+                  padding: 16,
+                  ...SHADOW.card,
+                }}
+              >
+                <View style={{ marginBottom: 14 }}>
+                  <Text style={{ fontFamily: FONT.bold, fontSize: 16, color: COLORS.dark }}>
+                    {COPY.profile.voiceCard}
+                  </Text>
+                  <Text style={{ fontFamily: FONT.regular, fontSize: 12, color: COLORS.textTertiary }}>
+                    {COPY.profile.voiceTimestamp}
+                  </Text>
+                  {/* Subtle redo link — navigates without clearing existing recording. */}
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={COPY.a11y.retakeVoice}
+                    onPress={() => router.push('/(auth)/record?source=profile')}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 4,
+                      marginTop: 6,
+                      alignSelf: 'flex-start',
+                    }}
+                  >
+                    <RefreshCw size={12} color={COLORS.textTertiary} />
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        fontFamily: FONT.medium,
+                        color: COLORS.textTertiary,
+                      }}
+                    >
+                      {COPY.profile.recordVoiceAgain}
+                    </Text>
+                  </Pressable>
+                </View>
+
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={isVoicePlaying ? COPY.a11y.pause : COPY.a11y.play}
+                    onPress={() => setIsVoicePlaying((playing) => !playing)}
+                    style={{ width: 48, height: 48, borderRadius: 24, overflow: 'hidden' }}
+                  >
+                    <LinearGradient
+                      colors={[...currentCtaGradient]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 1 }}
+                      style={{ width: 48, height: 48, alignItems: 'center', justifyContent: 'center' }}
+                    >
+                      {isVoicePlaying ? (
+                        <Pause size={18} color={COLORS.surface} fill={COLORS.surface} />
+                      ) : (
+                        <Play size={18} color={COLORS.surface} fill={COLORS.surface} style={{ marginLeft: 2 }} />
+                      )}
+                    </LinearGradient>
+                  </Pressable>
+
+                  <View style={{ flex: 1, gap: 3 }}>
+                    <Text style={{ fontFamily: FONT.semibold, color: COLORS.dark }}>
+                      {voiceTitle.trim() || COPY.profile.catchphraseHint}
+                    </Text>
+                    <Text style={{ fontFamily: FONT.regular, fontSize: 12, color: COLORS.textTertiary }}>
+                      {bioEmojis.filter(Boolean).join(' ') || COPY.profile.emojisLabel.trim()}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Voice title input */}
+              <View style={{ gap: 8 }}>
+                <Text style={{ fontFamily: FONT.medium, color: COLORS.textSecondary }}>
+                  {COPY.profile.catchphraseLabel}
+                </Text>
+                <TextInput
+                  value={voiceTitle}
+                  onChangeText={(text) => {
+                    setVoiceTitle(text.slice(0, 60));
+                    setSaveSuccess(false);
+                  }}
+                  placeholder={COPY.profile.catchphrasePlaceholder}
+                  placeholderTextColor={COLORS.textTertiary}
+                  maxLength={60}
+                  style={{
+                    borderRadius: RADIUS.lg,
+                    borderWidth: 1,
+                    borderColor: COLORS.border,
+                    backgroundColor: COLORS.surfaceMuted,
+                    paddingVertical: 16,
+                    paddingHorizontal: 16,
+                    fontFamily: FONT.regular,
+                    color: COLORS.dark,
+                  }}
+                />
+              </View>
+
+              {/* Mood selector */}
+              <View>
+                <Text style={{ marginBottom: 12, fontFamily: FONT.medium, color: COLORS.textSecondary }}>
+                  {COPY.profile.moodLabel}
+                </Text>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                  {MOOD_OPTIONS.map((option) => {
+                    const selected = mood === option.id;
+
+                    return (
+                      <View key={option.id} style={{ alignItems: 'center', gap: 8 }}>
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityState={{ selected }}
+                          onPress={() => {
+                            setMood(option.id);
+                            setSaveSuccess(false);
+                          }}
+                          style={{
+                            padding: 8,
+                            borderRadius: RADIUS.full,
+                            opacity: selected ? 1 : 0.45,
+                          }}
+                        >
+                          <LinearGradient
+                            colors={[...option.colors]}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 1 }}
+                            style={{
+                              width: 48,
+                              height: 48,
+                              borderRadius: RADIUS.full,
+                              borderWidth: selected ? 2.5 : 0,
+                              // Use the mood's own CTA color so midnight shows magenta, not pink.
+                              borderColor: option.ctaBorderColor,
+                            }}
+                          />
+                        </Pressable>
+                        <Text
+                          style={{
+                            fontFamily: selected ? FONT.semibold : FONT.medium,
+                            fontSize: 11,
+                            color: selected ? option.ctaBorderColor : COLORS.textTertiary,
+                          }}
+                        >
+                          {option.label}
+                        </Text>
+                      </View>
+                    );
+                  })}
+                </View>
+              </View>
+
+              {/* Emoji picker */}
+              <View>
+                <Text style={{ marginBottom: 12, fontFamily: FONT.medium, color: COLORS.textSecondary }}>
+                  {COPY.profile.emojisLabel}
+                </Text>
+                <View style={{ flexDirection: 'row', gap: 16 }}>
+                  {bioEmojis.map((emoji, index) => (
+                    <View key={index} style={{ position: 'relative' }}>
+                      <Pressable
+                        accessibilityRole="button"
+                        onPress={() => openEmojiPicker(index)}
+                        style={{
+                          width: 72,
+                          height: 72,
+                          borderRadius: RADIUS.full,
+                          borderWidth: 1,
+                          borderColor: COLORS.border,
+                          backgroundColor: COLORS.surface,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        {emoji ? (
+                          <Text style={{ fontSize: 32 }}>{emoji}</Text>
+                        ) : (
+                          <Plus size={20} color={COLORS.textTertiary} />
+                        )}
+                      </Pressable>
+                      {emoji ? (
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel={COPY.a11y.clearEmoji}
+                          onPress={() => clearEmoji(index)}
+                          style={{
+                            position: 'absolute',
+                            top: 0,
+                            right: 0,
+                            width: 22,
+                            height: 22,
+                            borderRadius: RADIUS.full,
+                            backgroundColor: COLORS.surfaceMuted,
+                            borderWidth: 1,
+                            borderColor: COLORS.border,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          <X size={11} color={COLORS.textTertiary} />
+                        </Pressable>
+                      ) : null}
+                    </View>
+                  ))}
+                </View>
+              </View>
+            </View>
+
+            {/* Read-only identity info */}
+            <View style={{ marginBottom: 28 }}>
               <SectionTitle label={COPY.profile.editSectionInfo} />
-
-              <View style={{ gap: 8 }}>
-                <Text style={{ fontFamily: FONT.medium, color: COLORS.textSecondary }}>
-                  {COPY.profile.editDisplayNameLabel}
+              <View
+                style={{
+                  borderRadius: RADIUS.input,
+                  borderWidth: 1,
+                  borderColor: COLORS.border,
+                  backgroundColor: COLORS.surfaceMuted,
+                  paddingVertical: 14,
+                  paddingHorizontal: 16,
+                }}
+              >
+                <Text style={{ fontFamily: FONT.semibold, fontSize: 15, color: COLORS.dark }}>
+                  {infoLine || '—'}
                 </Text>
-                <OnboardingTextInput
-                  value={displayName}
-                  onChangeText={(text) => {
-                    setDisplayName(text);
-                    setError(null);
-                    setSaveSuccess(false);
-                  }}
-                  placeholder={COPY.profile.namePlaceholder}
-                  autoCapitalize="words"
-                  textContentType="givenName"
-                />
-              </View>
-
-              <View style={{ gap: 8 }}>
-                <Text style={{ fontFamily: FONT.medium, color: COLORS.textSecondary }}>
-                  {COPY.profile.editBirthdateLabel}
-                </Text>
-                <OnboardingTextInput
-                  value={birthdate}
-                  onChangeText={(text) => {
-                    setBirthdate(formatBirthdateInput(text));
-                    setError(null);
-                    setSaveSuccess(false);
-                  }}
-                  placeholder={COPY.onboarding.birthdate.placeholder}
-                  keyboardType="number-pad"
-                  maxLength={14}
-                />
+                {profile?.birthdate ? (
+                  <Text style={{ marginTop: 4, fontFamily: FONT.regular, fontSize: 13, color: COLORS.textSecondary }}>
+                    {isoBirthdateToFrench(profile.birthdate)}
+                  </Text>
+                ) : null}
               </View>
             </View>
 
-            {/* Gender */}
-            <View style={{ marginBottom: 28, gap: 14 }}>
-              <SectionTitle label={COPY.profile.editGenderLabel} />
-              {GENDER_VALUES.map((value: GenderValue) => (
-                <SelectableOption
-                  key={value}
-                  label={COPY.onboarding.gender.options[value]}
-                  selected={gender === value}
-                  onPress={() => {
-                    setGender(value);
-                    setError(null);
-                    setSaveSuccess(false);
-                  }}
-                />
-              ))}
-            </View>
-
-            {/* Looking for */}
+            {/* Looking for — editable */}
             <View style={{ marginBottom: 28, gap: 14 }}>
               <SectionTitle label={COPY.profile.editSectionPreferences} />
-              {GENDER_VALUES.map((value: GenderValue) => (
+              {PROFILE_GENDERS.map((value) => (
                 <SelectableOption
                   key={value}
                   label={COPY.onboarding.lookingFor.options[value]}
@@ -322,7 +711,6 @@ export default function ProfileRoute() {
             <View style={{ marginBottom: 28, gap: 14 }}>
               <SectionTitle label={COPY.profile.editSectionCity} />
 
-              {/* Current confirmed city */}
               {confirmedCity ? (
                 <View
                   style={{
@@ -340,7 +728,6 @@ export default function ProfileRoute() {
                 </View>
               ) : null}
 
-              {/* Change-city toggle */}
               {!cityChanged ? (
                 <Pressable
                   accessibilityRole="button"
@@ -379,6 +766,7 @@ export default function ProfileRoute() {
                     onChangeText={(text) => {
                       setCityQuery(text);
                       setSelectedResultId(null);
+                      setNewCoordinates(null);
                     }}
                     placeholder={COPY.onboarding.city.placeholder}
                     autoCapitalize="words"

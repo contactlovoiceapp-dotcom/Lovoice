@@ -35,6 +35,8 @@ type RecordingState = 'idle' | 'recording' | 'tooShort' | 'recorded' | 'playingP
 interface Props {
   onNext: () => void;
   onSkip: () => void;
+  /** When provided, a cancel button is shown so the user can abort without losing existing data. */
+  onCancel?: () => void;
 }
 
 /** Decorative glow that pulses while recording — invisible if animation fails. */
@@ -156,7 +158,7 @@ function PingRing({
   );
 }
 
-const RecordVoiceScreen: React.FC<Props> = ({ onNext, onSkip }) => {
+const RecordVoiceScreen: React.FC<Props> = ({ onNext, onSkip, onCancel }) => {
   const [recordingState, setRecordingState] = useState<RecordingState>('idle');
   const [time, setTime] = useState(0);
   const [showInspiration, setShowInspiration] = useState(false);
@@ -238,6 +240,26 @@ const RecordVoiceScreen: React.FC<Props> = ({ onNext, onSkip }) => {
         <View style={{ flex: 1, flexDirection: 'column', justifyContent: 'space-between', paddingHorizontal: 24, paddingVertical: 32 }}>
           {/* Header */}
           <View style={{ width: '100%', alignSelf: 'center', paddingTop: 16, maxWidth: contentMaxWidth }}>
+            {onCancel ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={COPY.common.cancel}
+                onPress={onCancel}
+                style={{
+                  alignSelf: 'flex-start',
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 6,
+                  paddingVertical: 8,
+                  marginBottom: 8,
+                }}
+              >
+                <X size={18} color={COLORS.textTertiary} />
+                <Text style={{ fontFamily: FONT.medium, color: COLORS.textTertiary }}>
+                  {COPY.common.cancel}
+                </Text>
+              </Pressable>
+            ) : null}
             <Text style={{ marginBottom: 8, textAlign: 'center', fontSize: 28, fontFamily: FONT.bold, color: COLORS.dark }}>
               {COPY.record.title}
               <Text style={{ fontFamily: FONT.serifItalic, color: COLORS.primary }}>{COPY.record.titleAccent}</Text>

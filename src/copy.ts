@@ -22,6 +22,8 @@ export const COPY = {
     play: 'Lecture',
     pause: 'Mettre en pause',
     deleteVoice: 'Supprimer le vocal',
+    retakeVoice: 'Refaire mon vocal',
+    clearEmoji: 'Supprimer cet emoji',
     closeFilters: 'Fermer les filtres',
     applyFilters: 'Appliquer les filtres',
   },
@@ -166,6 +168,9 @@ export const COPY = {
     editCityChangePrompt: 'Changer de ville',
     editCityChangeHint: 'Recherche une nouvelle ville puis sélectionne-la dans les résultats.',
     editSaveSuccess: 'Profil mis à jour.',
+    recordVoiceAgain: 'Refaire mon vocal',
+    emojiPickerTitle: 'Choisis un emoji',
+    emojiPickerInputPlaceholder: 'Entre un emoji manuellement',
     editErrors: {
       name_too_short: 'Ton prénom doit contenir au moins 2 caractères.',
       name_too_long: 'Ton prénom ne peut pas dépasser 30 caractères.',

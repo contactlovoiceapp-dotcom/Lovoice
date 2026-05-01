@@ -1,18 +1,17 @@
-/* Voice recording route — standalone step where the user records their introduction voice. */
+/* Voice profile setup route — lets new users review and decorate their recorded voice. */
 
 import React from 'react';
 import { Alert } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 
+import MyVoiceScreen from '../../src/components/onboarding/MyVoiceScreen';
 import { COPY } from '../../src/copy';
-import RecordVoiceScreen from '../../src/components/onboarding/RecordVoiceScreen';
 import { useAuth } from '../../src/features/auth/hooks/useAuth';
 import { useFeedState } from '../../src/features/feed/hooks/useFeedState';
 
-export default function RecordRoute() {
+export default function ProfileSetupRoute() {
   const router = useRouter();
   const { refreshProfile } = useAuth();
-  const { source } = useLocalSearchParams<{ source?: string }>();
   const setHasRecordedVoice = useFeedState((state) => state.setHasRecordedVoice);
 
   const goToDiscover = async () => {
@@ -25,16 +24,18 @@ export default function RecordRoute() {
   };
 
   return (
-    <RecordVoiceScreen
-      onNext={() => {
+    <MyVoiceScreen
+      onBack={() => router.back()}
+      onSend={() => {
         setHasRecordedVoice(true);
-        router.push('/(auth)/profile-setup');
-      }}
-      onSkip={() => {
         void goToDiscover();
       }}
-      // Go back without touching hasRecordedVoice so the previous recording is preserved.
-      onCancel={source === 'profile' ? () => router.back() : undefined}
+      onDeleteVoice={() => {
+        setHasRecordedVoice(false);
+        router.replace('/(auth)/record');
+      }}
+      hasRecordedVoice
+      isOnboarding
     />
   );
 }
