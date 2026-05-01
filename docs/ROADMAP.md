@@ -208,6 +208,21 @@ Reactive moderation (block + report + manual takedown by the operator) is part o
 - Trying to set birthdate < 18 is blocked client and server side.
 - Required fields cannot be skipped.
 
+### Phase log
+
+- Completed in Bloc A-G:
+  - Removed the mocked `profile-setup` route and redirected recording completion to the real onboarding wizard.
+  - Added profile field validators and tests for display name, age, gender, and looking-for values.
+  - Added server-side profile validation trigger with stable `23514` messages.
+  - Added `useUpsertProfile()` with React Query invalidation, country derivation from the verified phone number, and PostGIS point formatting.
+  - Built the `app/(auth)/onboarding/` wizard with ephemeral Zustand state, terms acceptance, required field validation, explicit Nominatim city search, and final Supabase profile upsert.
+  - Replaced the main profile tab with an editable profile form that reuses the same validation and upsert path.
+  - Kept V1 location aligned with product decisions: no device GPS, no `expo-location`, no live autocomplete, and no country filtering from selected city.
+- Validation performed:
+  - `npx tsc --noEmit`
+  - `npm test -- --runInBand`
+  - Lints checked on edited Phase 3 files.
+
 ### Suggested commit
 
 `feat(profile): onboarding wizard with age and country gating`
