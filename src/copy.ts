@@ -90,6 +90,7 @@ export const COPY = {
     recordedStatus: 'Écoute rapide avant de continuer',
     previewPlayingStatus: 'Lecture de ta voix',
     previewHint: 'Tu peux réécouter, recommencer ou continuer.',
+    profileRefreshError: "Impossible de charger ton profil. Réessaie dans quelques instants.",
     minimumRemaining: (seconds: number) => `Encore ${seconds} sec minimum`,
     ctaRecord: 'Enregistre ta voix',
     ctaMinimumRemaining: (seconds: number) => `Encore ${seconds} sec`,

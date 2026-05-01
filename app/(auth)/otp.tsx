@@ -117,6 +117,8 @@ export default function OtpRoute() {
               setIsSubmitting(false);
               return;
             }
+
+            await refreshProfile();
           } catch {
             setErrorMessage(COPY.phone.profileSaveFailed);
             setIsSubmitting(false);
@@ -126,7 +128,6 @@ export default function OtpRoute() {
           useProfileOnboardingState.getState().reset();
           setIsSubmitting(false);
           router.replace('/(auth)/record');
-          void refreshProfile();
           return;
         }
       }

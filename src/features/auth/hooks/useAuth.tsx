@@ -89,7 +89,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const refreshProfile = useCallback(async () => {
-    await loadProfile(session);
+    let nextSession = session;
+
+    if (!nextSession) {
+      const supabase = getSupabaseClient();
+
+      if (!supabase) {
+        throw new Error('Supabase is not configured.');
+      }
+
+      const { data, error: sessionError } = await supabase.auth.getSession();
+
+      if (sessionError) {
+        throw new Error(sessionError.message);
+      }
+
+      nextSession = data.session;
+      setSession(nextSession);
+    }
+
+    await loadProfile(nextSession);
   }, [loadProfile, session]);
 
   const signOut = useCallback(async () => {

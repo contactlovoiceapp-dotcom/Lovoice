@@ -230,6 +230,7 @@ Reactive moderation (block + report + manual takedown by the operator) is part o
   - `otp.tsx`: uses the already validated OTP country when building the profile payload, avoiding session phone formatting issues.
   - `city.tsx`: deduplicates identical search results, clears the result list after selection, and highlights the confirmed city.
   - `AuthRedirector`: allows OTP/record to finish the signup path after profile creation, preventing a premature jump to Discover.
+  - `record.tsx` and `useAuth`: refresh the authenticated profile before leaving the voice step, so "Passer" cannot fall back to Home with stale profile state.
   - `AuthRedirector`: `session && !profile` redirects to `/(auth)/home` (not the wizard, since auth comes after the wizard).
   - `index.tsx` (splash): `session && profile` → discover, otherwise → home.
   - `record.tsx`: routes to `/(main)/discover` after recording (unchanged from Bloc H).
