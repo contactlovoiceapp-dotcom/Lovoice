@@ -278,7 +278,7 @@ export const COPY = {
 
     terms: {
       title: 'Bienvenue sur LOVoice',
-      subtitle: 'Avant de continuer, prends un moment pour lire et accepter nos conditions.',
+      subtitle: 'Avant de créer ton profil, on valide ensemble les règles du jeu : respect, authenticité et CGU.',
       checkboxLabel: "J'accepte les ",
       cguLink: "Conditions d'utilisation",
       andSeparator: ' et la ',

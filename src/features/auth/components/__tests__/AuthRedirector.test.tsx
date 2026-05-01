@@ -71,14 +71,24 @@ describe('AuthRedirector', () => {
     expect(mockReplace).toHaveBeenCalledWith('/(auth)/home');
   });
 
-  it('pushes authenticated users without profile to the signup wizard, even from auth home', () => {
+  it('pushes authenticated users without profile to terms acceptance, even from auth home', () => {
     setAuth({ session: { user: { id: 'u1' } } as never, profile: null });
     mockPathname = '/(auth)/home';
     mockSegments = ['(auth)'];
 
     render(<AuthRedirector />);
 
-    expect(mockReplace).toHaveBeenCalledWith('/(auth)/onboarding/name');
+    expect(mockReplace).toHaveBeenCalledWith('/(auth)/onboarding/terms');
+  });
+
+  it('does not redirect users without profile while on terms acceptance', () => {
+    setAuth({ session: { user: { id: 'u1' } } as never, profile: null });
+    mockPathname = '/(auth)/onboarding/terms';
+    mockSegments = ['(auth)', 'onboarding', 'terms'];
+
+    render(<AuthRedirector />);
+
+    expect(mockReplace).not.toHaveBeenCalled();
   });
 
   it('does not redirect users without profile while inside the wizard', () => {

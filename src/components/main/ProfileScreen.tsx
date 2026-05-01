@@ -4,7 +4,6 @@ import React, { useCallback, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
-  Linking,
   Modal,
   Platform,
   Pressable,
@@ -14,7 +13,7 @@ import {
   View,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Check, LogOut, Pause, Play, Plus, RefreshCw, X } from 'lucide-react-native';
+import { LogOut, Pause, Play, Plus, RefreshCw, X } from 'lucide-react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -35,9 +34,6 @@ import {
   validateLookingFor,
   type GenderValue,
 } from '@/features/profile/helpers/validation';
-
-const TERMS_URL = 'https://lovoice.app/conditions-utilisation';
-const PRIVACY_URL = 'https://lovoice.app/politique-confidentialite';
 
 type EditError = keyof typeof COPY.profile.editErrors;
 
@@ -183,7 +179,6 @@ export default function ProfileScreen({ isOnboarding = false, onOnboardingComple
 
   const [error, setError] = useState<EditError | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
-  const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   const toggleLookingFor = (value: GenderValue) => {
     setLookingFor((prev) =>
@@ -875,43 +870,10 @@ export default function ProfileScreen({ isOnboarding = false, onOnboardingComple
               </Text>
             ) : null}
 
-            {/* CGU checkbox — onboarding only */}
-            {isOnboarding && (
-              <Pressable
-                accessibilityRole="checkbox"
-                accessibilityState={{ checked: acceptedTerms }}
-                onPress={() => setAcceptedTerms((c) => !c)}
-                style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 16 }}
-              >
-                <View style={{
-                  marginTop: 1, width: 22, height: 22, flexShrink: 0,
-                  alignItems: 'center', justifyContent: 'center',
-                  borderRadius: 6, borderWidth: 2,
-                  borderColor: acceptedTerms ? COLORS.primary : COLORS.textTertiary,
-                  backgroundColor: acceptedTerms ? COLORS.primary : 'transparent',
-                }}>
-                  {acceptedTerms ? <Check size={14} color={COLORS.surface} strokeWidth={3} /> : null}
-                </View>
-                <Text style={{ flex: 1, fontFamily: FONT.regular, fontSize: 13, lineHeight: 19, color: COLORS.textSecondary }}>
-                  {COPY.onboarding.terms.checkboxLabel}
-                  <Text accessibilityRole="link" onPress={() => { void Linking.openURL(TERMS_URL); }}
-                    style={{ fontFamily: FONT.semibold, color: COLORS.dark, textDecorationLine: 'underline' }}>
-                    {COPY.onboarding.terms.cguLink}
-                  </Text>
-                  {COPY.onboarding.terms.andSeparator}
-                  <Text accessibilityRole="link" onPress={() => { void Linking.openURL(PRIVACY_URL); }}
-                    style={{ fontFamily: FONT.semibold, color: COLORS.dark, textDecorationLine: 'underline' }}>
-                    {COPY.onboarding.terms.privacyLink}
-                  </Text>
-                  .
-                </Text>
-              </Pressable>
-            )}
-
             {/* Save CTA */}
             <Pressable
               accessibilityRole="button"
-              disabled={upsertProfile.isPending || (isOnboarding && !acceptedTerms)}
+              disabled={upsertProfile.isPending}
               onPress={() => {
                 void handleSave();
               }}
@@ -919,7 +881,7 @@ export default function ProfileScreen({ isOnboarding = false, onOnboardingComple
                 width: '100%',
                 borderRadius: RADIUS.full,
                 overflow: 'hidden',
-                opacity: (upsertProfile.isPending || (isOnboarding && !acceptedTerms)) ? 0.5 : 1,
+                opacity: upsertProfile.isPending ? 0.5 : 1,
                 ...SHADOW.button,
               }}
             >

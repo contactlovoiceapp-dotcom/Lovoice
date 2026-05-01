@@ -93,18 +93,19 @@ describe('RecordRoute', () => {
       mockLocalSearchParams = { source: 'profile' };
     });
 
-    it('marks the voice as recorded and goes back to the profile', () => {
+    it('marks the voice as recorded and returns to the profile', () => {
       useFeedState.getState().setHasRecordedVoice(false);
       render(<RecordRoute />);
 
       mockRecordVoiceScreenProps?.onNext?.();
 
       expect(useFeedState.getState().hasRecordedVoice).toBe(true);
-      expect(mockBack).toHaveBeenCalledTimes(1);
+      expect(mockReplace).toHaveBeenCalledWith('/(main)/profile');
+      expect(mockBack).not.toHaveBeenCalled();
       expect(mockPush).not.toHaveBeenCalled();
     });
 
-    it('goes back without changing voice state when cancelled', () => {
+    it('returns to the profile without changing voice state when cancelled', () => {
       useFeedState.getState().setHasRecordedVoice(true);
       render(<RecordRoute />);
 
@@ -112,8 +113,8 @@ describe('RecordRoute', () => {
       mockRecordVoiceScreenProps?.onCancel?.();
 
       expect(useFeedState.getState().hasRecordedVoice).toBe(true);
-      expect(mockBack).toHaveBeenCalledTimes(1);
-      expect(mockReplace).not.toHaveBeenCalled();
+      expect(mockReplace).toHaveBeenCalledWith('/(main)/profile');
+      expect(mockBack).not.toHaveBeenCalled();
     });
 
     it('does not expose onSkip from the profile', () => {

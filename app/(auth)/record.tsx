@@ -1,8 +1,8 @@
 /* Voice recording route — standalone step where the user records their introduction voice.
  *
  * Two entry points:
- *   1. Onboarding (no `source` param) → after recording, push to profile-setup for CGU + mood.
- *   2. Profile re-record (`source=profile`) → after recording, go back to the profile tab.
+ *   1. Onboarding (no `source` param) → after recording, push to the shared profile setup.
+ *   2. Profile re-record (`source=profile`) → after recording or cancellation, return to profile.
  */
 
 import React from 'react';
@@ -34,7 +34,7 @@ export default function RecordRoute() {
     setHasRecordedVoice(true);
 
     if (fromProfile) {
-      router.back();
+      router.replace('/(main)/profile');
     } else {
       router.push('/(auth)/profile-setup');
     }
@@ -44,7 +44,7 @@ export default function RecordRoute() {
     <RecordVoiceScreen
       onNext={handleNext}
       onSkip={fromProfile ? undefined : () => { void goToDiscover(); }}
-      onCancel={fromProfile ? () => router.back() : undefined}
+      onCancel={fromProfile ? () => router.replace('/(main)/profile') : undefined}
     />
   );
 }

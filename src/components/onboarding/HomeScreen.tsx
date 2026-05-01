@@ -1,4 +1,4 @@
-/* Landing screen — merges welcome, values, community acceptance, and phone entry into one flow. */
+/* Landing screen — presents LOVoice and collects the phone number for OTP auth. */
 
 import React, { useMemo, useState } from 'react';
 import {
@@ -45,7 +45,6 @@ const HomeScreen: React.FC<Props> = ({ onSubmit, isSubmitting = false, errorMess
     () => formatPhoneAsE164(phone, selectedCountry.callingCode),
     [phone, selectedCountry.callingCode],
   );
-  // CGU acceptance is now collected at the very end of signup (profile-setup), not on landing.
   const canSubmit = formattedPhone !== null && !isSubmitting;
 
   const handleSubmit = () => {

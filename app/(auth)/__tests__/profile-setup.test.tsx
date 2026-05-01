@@ -1,4 +1,4 @@
-/* Voice profile setup route tests — guard the CGU gate before entering the feed. */
+/* Voice profile setup route tests — save the shared profile setup before entering the feed. */
 
 import React, { type ReactNode } from 'react';
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
@@ -12,6 +12,7 @@ import { useAuth } from '../../../src/features/auth/hooks/useAuth';
 const mockReplace = jest.fn();
 const mockRefreshProfile = jest.fn();
 const mockSignOut = jest.fn();
+const mockMutateAsync = jest.fn();
 
 jest.mock('expo-router', () => ({
   useRouter: () => ({
@@ -28,7 +29,7 @@ jest.mock('../../../src/features/auth/hooks/useAuth', () => ({
 
 jest.mock('../../../src/features/profile/api/profileMutations', () => ({
   useUpsertProfile: () => ({
-    mutateAsync: jest.fn().mockResolvedValue(undefined),
+    mutateAsync: mockMutateAsync,
     isPending: false,
   }),
 }));
@@ -47,6 +48,8 @@ describe('ProfileSetupRoute', () => {
     mockRefreshProfile.mockReset();
     mockRefreshProfile.mockResolvedValue(undefined);
     mockSignOut.mockReset();
+    mockMutateAsync.mockReset();
+    mockMutateAsync.mockResolvedValue(undefined);
     useFeedState.getState().setHasRecordedVoice(false);
     jest.mocked(useAuth).mockReturnValue({
       session: null,
@@ -73,11 +76,12 @@ describe('ProfileSetupRoute', () => {
     });
   });
 
-  it('keeps the save CTA disabled when CGU is not accepted', () => {
-    const { getByRole } = render(<ProfileSetupRoute />, { wrapper: Wrapper });
+  it('does not show CGU acceptance on profile setup', () => {
+    const { getByRole, queryByRole } = render(<ProfileSetupRoute />, { wrapper: Wrapper });
     const cta = getByRole('button', { name: COPY.profile.submitOnboarding });
 
-    expect(cta.props.accessibilityState?.disabled).toBe(true);
+    expect(cta.props.accessibilityState?.disabled).toBeFalsy();
+    expect(queryByRole('checkbox')).toBeNull();
   });
 
   it('does not show the sign-out button during onboarding', () => {
@@ -86,14 +90,10 @@ describe('ProfileSetupRoute', () => {
     expect(queryByLabelText(COPY.profile.signOutCta)).toBeNull();
   });
 
-  it('navigates to discover after accepting CGU and saving', async () => {
+  it('navigates to discover after saving the profile setup', async () => {
     const { getByRole } = render(<ProfileSetupRoute />, { wrapper: Wrapper });
 
-    const checkbox = getByRole('checkbox');
-    fireEvent.press(checkbox);
-
     const cta = getByRole('button', { name: COPY.profile.submitOnboarding });
-    expect(cta.props.accessibilityState?.disabled).toBe(false);
 
     await act(async () => {
       fireEvent.press(cta);
@@ -101,6 +101,7 @@ describe('ProfileSetupRoute', () => {
 
     expect(useFeedState.getState().hasRecordedVoice).toBe(true);
     await waitFor(() => {
+      expect(mockMutateAsync).toHaveBeenCalledTimes(1);
       expect(mockRefreshProfile).toHaveBeenCalledTimes(1);
       expect(mockReplace).toHaveBeenCalledWith('/(main)/discover');
     });
