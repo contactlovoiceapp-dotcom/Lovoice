@@ -114,6 +114,19 @@ describe('AuthRedirector', () => {
     expect(mockReplace).not.toHaveBeenCalled();
   });
 
+  it('does not redirect away from onboarding city when the profile was just created', () => {
+    setAuth({
+      session: { user: { id: 'u1' } } as never,
+      profile: { id: 'u1' } as never,
+    });
+    mockPathname = '/(auth)/onboarding/city';
+    mockSegments = ['(auth)', 'onboarding', 'city'];
+
+    render(<AuthRedirector />);
+
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
+
   it('pushes fully onboarded users away from auth home into the feed', () => {
     setAuth({
       session: { user: { id: 'u1' } } as never,

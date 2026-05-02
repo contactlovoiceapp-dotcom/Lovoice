@@ -42,12 +42,9 @@ export default function AuthRedirector() {
     }
 
     if (session && profile && !isInMainGroup) {
-      // The post-auth flow finishes inside the auth stack (record, profile-setup).
-      if (
-        isInAuthGroup &&
-        (pathname.endsWith('/record') ||
-          pathname.endsWith('/profile-setup'))
-      ) {
+      // Let the user finish the full signup flow (onboarding → record → profile-setup)
+      // before redirecting to the main feed.
+      if (isInAuthGroup && isOnSignupFlow(pathname)) {
         return;
       }
       router.replace('/(main)/discover');
