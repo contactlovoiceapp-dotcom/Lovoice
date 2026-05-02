@@ -107,9 +107,9 @@ function createWrapper(): React.ComponentType<{ children: ReactNode }> {
 }
 
 describe('coordinatesToPostgisPoint', () => {
-  it('formats coordinates as a PostGIS WKT point with longitude first', () => {
+  it('formats coordinates as a PostGIS EWKT point with SRID and longitude first', () => {
     expect(coordinatesToPostgisPoint({ latitude: 48.8566, longitude: 2.3522 })).toBe(
-      'POINT(2.3522 48.8566)',
+      'SRID=4326;POINT(2.3522 48.8566)',
     );
   });
 
@@ -140,6 +140,12 @@ describe('getProfileCountryFromSession', () => {
     expect(getProfileCountryFromSession(createSession(phone))).toBe(country);
   });
 
+  it('derives country even when Supabase strips the leading +', () => {
+    expect(getProfileCountryFromSession(createSession('33612345678'))).toBe('FR');
+    expect(getProfileCountryFromSession(createSession('32470123456'))).toBe('BE');
+    expect(getProfileCountryFromSession(createSession('41781234567'))).toBe('CH');
+  });
+
   it('throws when the session has no phone', () => {
     expect(() => getProfileCountryFromSession(createSessionWithoutPhone())).toThrow(
       'profile.phone_missing',
@@ -163,7 +169,7 @@ describe('buildProfileUpsertPayload', () => {
       looking_for: ['male', 'nonbinary'],
       city: 'Paris',
       country: 'FR',
-      location: 'POINT(2.3522 48.8566)',
+      location: 'SRID=4326;POINT(2.3522 48.8566)',
     });
   });
 
@@ -217,7 +223,7 @@ describe('useUpsertProfile', () => {
         looking_for: ['male', 'nonbinary'],
         city: 'Paris',
         country: 'FR',
-        location: 'POINT(2.3522 48.8566)',
+        location: 'SRID=4326;POINT(2.3522 48.8566)',
       },
       { onConflict: 'id' },
     );

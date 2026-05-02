@@ -54,8 +54,8 @@ export function coordinatesToPostgisPoint(
     throw new Error('profile.location_invalid');
   }
 
-  // PostGIS expects longitude first in WKT POINT values.
-  return `POINT(${coordinates.longitude} ${coordinates.latitude})`;
+  // EWKT format with explicit SRID so Supabase can cast the string to geography(Point, 4326).
+  return `SRID=4326;POINT(${coordinates.longitude} ${coordinates.latitude})`;
 }
 
 export function getProfileCountryFromSession(session: Session): ProfileInsert['country'] {
@@ -65,7 +65,9 @@ export function getProfileCountryFromSession(session: Session): ProfileInsert['c
     throw new Error('profile.phone_missing');
   }
 
-  const country = getCountryFromE164Phone(phone);
+  // Supabase Auth may strip the leading + from stored phone numbers.
+  const normalizedPhone = phone.startsWith('+') ? phone : `+${phone}`;
+  const country = getCountryFromE164Phone(normalizedPhone);
 
   if (!country) {
     throw new Error('profile.country_unsupported');
@@ -111,6 +113,7 @@ export function useUpsertProfile() {
       }
 
       const payload = buildProfileUpsertPayload(input, session, input.country);
+      console.log('[useUpsertProfile] Payload:', JSON.stringify(payload));
       const { data, error } = await supabase
         .from('profiles')
         .upsert(payload, { onConflict: 'id' })
@@ -118,6 +121,7 @@ export function useUpsertProfile() {
         .single();
 
       if (error) {
+        console.error('[useUpsertProfile] Supabase error:', JSON.stringify(error));
         throw new Error(error.message);
       }
 

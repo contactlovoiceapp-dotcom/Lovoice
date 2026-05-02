@@ -55,8 +55,6 @@ export default function OnboardingBirthdateRoute() {
         placeholder={COPY.onboarding.birthdate.placeholder}
         keyboardType="number-pad"
         maxLength={14}
-        returnKeyType="next"
-        onSubmitEditing={handleNext}
       />
     </ProfileOnboardingStep>
   );
