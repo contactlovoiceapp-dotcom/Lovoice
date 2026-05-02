@@ -179,6 +179,7 @@ export default function PhoneRoute() {
                 placeholder={selectedCountry.example}
                 placeholderTextColor={COLORS.textTertiary}
                 keyboardType="phone-pad"
+                keyboardAppearance="light"
                 textContentType="telephoneNumber"
                 autoComplete="tel"
                 autoFocus

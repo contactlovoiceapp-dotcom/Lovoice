@@ -163,6 +163,7 @@ export default function OtpRoute() {
                 placeholder={COPY.phone.codePlaceholder}
                 placeholderTextColor={COLORS.textTertiary}
                 keyboardType="number-pad"
+                keyboardAppearance="light"
                 textContentType="oneTimeCode"
                 autoComplete="sms-otp"
                 maxLength={OTP_LENGTH}
