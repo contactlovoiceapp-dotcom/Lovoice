@@ -15,6 +15,9 @@ const config: ExpoConfig = {
   icon: "./assets/icon.png",
   userInterfaceStyle: "light",
   newArchEnabled: true,
+  updates: {
+    url: "https://u.expo.dev/f85debe0-2c75-463d-8ef7-f29d03b51dbe",
+  },
   runtimeVersion: {
     policy: "appVersion",
   },
@@ -39,7 +42,7 @@ const config: ExpoConfig = {
     edgeToEdgeEnabled: true,
     package: "com.shrtcut.lovoice",
   },
-  plugins: ["expo-font", "expo-router", "expo-secure-store"],
+  plugins: ["expo-font", "expo-router", "expo-secure-store", "expo-updates"],
   extra: {
     supabaseUrl,
     supabasePublishableKey,
