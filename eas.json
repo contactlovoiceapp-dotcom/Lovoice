@@ -29,5 +29,13 @@
       "channel": "production",
       "autoIncrement": true
     }
+  },
+  "submit": {
+    "production": {
+      "ios": {}
+    },
+    "preview": {
+      "ios": {}
+    }
   }
 }

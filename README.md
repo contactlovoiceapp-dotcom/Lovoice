@@ -160,7 +160,7 @@ LOVOICE_EXPO/
 │   ├── functions/             ← Edge Functions
 │   └── seed.sql
 ├── assets/
-└── eas.json                   ← EAS Build profiles (introduced in Phase 1)
+└── eas.json                   ← EAS Build + Submit profiles
 ```
 
 The admin back-office lives in a **sibling repository** (suggested name `lovoice-admin/`), created in Phase 6.bis. It consumes the same Supabase project. Its target structure:
@@ -216,6 +216,20 @@ npx supabase start     # local Supabase stack (after Phase 1 setup)
 npx supabase db push   # apply migrations
 npx supabase functions serve <name>  # run Edge Function locally
 ```
+
+### App Store / TestFlight (EAS)
+
+`eas.json` defines **two** profile families with the same names (`production`, `preview`, …): **`build.*`** (native compile) and **`submit.*`** (upload to App Store Connect). `npm run submit:ios` uses `--profile production`, so a matching **`submit.production`** entry must exist.
+
+- **Marketing version** — set `version` in `app.config.ts` (e.g. `0.2.2`). This is `CFBundleShortVersionString` / what users see as the app version.
+- **iOS build number** — `eas.json` sets `cli.appVersionSource: "remote"` and the production build profile uses `autoIncrement: true`, so EAS stores and bumps the build number on the server. To reset or set it explicitly: `eas build:version:set --platform ios --profile production`.
+
+```bash
+npm run build:ios      # cloud build, store distribution, production channel
+npm run submit:ios     # submit latest production iOS build to App Store Connect → TestFlight
+```
+
+Optional: under `submit.production.ios`, add `appleId`, `ascAppId` (numeric App ID in App Store Connect → App Information), and `appleTeamId` so `eas submit` does not prompt every time. Never commit secrets; use EAS Secrets or local env if needed.
 
 ---
 
