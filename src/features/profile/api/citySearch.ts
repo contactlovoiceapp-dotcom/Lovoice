@@ -94,7 +94,7 @@ export async function searchCities(query: string, fetchImpl: FetchLike = fetch):
   const response = await fetchImpl(buildNominatimSearchUrl(query), {
     headers: {
       Accept: 'application/json',
-      'User-Agent': 'LOVoice/1.0 profile-onboarding',
+      'User-Agent': 'Lovoice/1.0 profile-onboarding',
     },
   });
 

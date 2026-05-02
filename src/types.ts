@@ -1,4 +1,4 @@
-/* Core type definitions for the LOVoice application */
+/* Core type definitions for the Lovoice application. */
 
 export enum ColorTheme {
   Sunset = 'sunset',

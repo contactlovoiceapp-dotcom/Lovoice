@@ -4,7 +4,7 @@
   Sources of truth: this README + docs/ARCHITECTURE.md + docs/ROADMAP.md.
 -->
 
-# LOVoice — Mobile App (React Native / Expo)
+# Lovoice — Mobile App (React Native / Expo)
 
 > **LLM, read this entire file before doing anything else.**
 > Then read `docs/ARCHITECTURE.md` and the relevant phase in `docs/ROADMAP.md`.
@@ -18,7 +18,7 @@ The product ships in **two deliverables**:
 
 ## 1. Product summary
 
-LOVoice is a **voice-first dating app** for French-speaking Europe (FR / BE / CH).
+Lovoice is a **voice-first dating app** for French-speaking Europe (FR / BE / CH).
 Each user records a short **voice** (max 5 minutes) that introduces them.
 Other users discover these voices through a **vertical TikTok-style feed**.
 

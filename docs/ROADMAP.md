@@ -1,23 +1,15 @@
 <!--
-  Phased development plan for LOVoice V1.
+  Phased development plan for Lovoice V1.
   Each phase is sized to fit in a single LLM context window.
   Sub-agents (explore / shell / generalPurpose) are allowed and encouraged.
   At the end of each phase: propose a Conventional Commit message; do not run git commands.
 -->
 
-# LOVoice — Development Roadmap
+# Lovoice — Development Roadmap
 
 Each phase below is **self-contained**: it has a clear scope, deliverables, acceptance criteria, and lists the only external services it depends on.
 
 Before starting any phase, **re-read `README.md` and `docs/ARCHITECTURE.md`**.
-
-Legend:
-
-- 🟢 = can be done with mocked data, no external account needed
-- 🟡 = needs Supabase project + keys
-- 🔴 = needs additional third-party (Twilio / AssemblyAI / Hive / Sentry / PostHog / EAS)
-- ⭐ = **committed in V1 MVP**
-- ✳️ = **optional / post-MVP** (to do later in V1 if time allows, or in a subsequent version)
 
 The V1 MVP commitment covers all features described in this roadmap **except**:
 
@@ -33,99 +25,11 @@ Reactive moderation (block + report + manual takedown by the operator) is part o
 
 **Goal**: clean the prototype, finish the visual UX with the client, and put the codebase in a state where every following phase can plug in cleanly.
 
-### Scope
-
-1. **Refactor `App.tsx`** (currently 512 lines, monolithic). Split into:
-   - `app/_layout.tsx` (root) using **`expo-router`**,
-   - `app/(auth)/` for splash + home + phone + record onboarding,
-   - `app/(main)/` tab navigator: `discover`, `likes`, `messages`, `profile`.
-2. **Remove dead/legacy code** still hinting at swipe/match (none should remain — verify and delete if found).
-3. **Rename "vibe" → "voice" everywhere** (see README §3.bis). Affected files at the time of writing:
-   - `src/components/onboarding/RecordVibeScreen.tsx` → `RecordVoiceScreen.tsx`
-   - `src/components/onboarding/MyVibeScreen.tsx` → `MyVoiceScreen.tsx`
-   - `src/components/main/LikesScreen.tsx`, `src/components/main/FiltersModal.tsx`, `src/components/ProfileCard.tsx`, `App.tsx`, `src/types.ts` (local symbols and FR strings).
-   - All FR UI strings: "Ta Vibe" → "Ta voix", "Vibe enregistrée" → "Voix enregistrée", "Découvrir plus de vibes" → "Découvrir plus de voix", `tab 'my-vibes'` → `tab 'my-voice'`, etc.
-4. **Restructure `src/` per target structure** in README §5: introduce `src/features/{feed,voices,chat,likes,auth,profile,push}` folders with empty `api/`, `hooks/`, `components/` subfolders.
-5. **Strict TS**: enable `"strict": true` in `tsconfig.json`, fix any resulting errors.
-6. **Install foundational deps**:
-   - `expo-router`,
-   - `@tanstack/react-query`,
-   - `zustand`,
-   - `expo-secure-store`,
-   - `expo-haptics`.
-7. **Replace `geminiService.ts`** mock with a typed in-memory `mockProfilesService.ts` (no API call, no key needed).
-8. **Walk-through with client**: produce a Loom or screenshots of the full nav flow, get sign-off.
-
-### Deliverables
-
-- Working app with expo-router and the 4 main tabs (discover, likes, messages, profile).
-- `tsconfig.json` strict.
-- Folder structure matches README §5.
-
-### Acceptance
-
-- App builds on iOS and Android without warnings related to deprecated APIs.
-- No `expo-av` references anywhere.
-- Client signs off on the screens.
-
-### Suggested commit
-
-`refactor(app): migrate to expo-router and finalize prototype UX`
-
 ---
 
 ## Phase 1 — Backend bootstrap (Supabase + EAS + envs) 🟢
 
 **Goal**: the cloud project exists, the mobile app is connected to it, and the deployment pipeline works.
-
-**Status:** Done  
-**Completed:** 2026-04-29  
-**Ref:** `phase-1-backend-bootstrap`
-
-### Scope
-
-1. Create **Supabase project in `eu-central-1`** (Frankfurt).
-2. Initialize local Supabase: `supabase init`, commit the `supabase/` folder.
-3. Create migration `0001_init.sql` with: extensions (`postgis`, `pgcrypto`), all tables from `ARCHITECTURE.md` §2, indexes, FKs.
-4. Create migration `0002_rls.sql` with all RLS policies from §3 + storage bucket policies.
-5. Create the two storage buckets `voices` and `messages` via SQL (`storage.buckets`).
-6. Generate TS types: `supabase gen types typescript --linked > src/types/database.ts`. Commit.
-7. Create `src/lib/supabase.ts` (client init with `expo-secure-store` for auth persistence + `react-native-url-polyfill`).
-8. Wrap the app in `QueryClientProvider`.
-9. Create `app.config.ts` reading env vars (`SUPABASE_URL`, `SUPABASE_ANON_KEY`).
-10. Set up **EAS**: `eas.json` with `development`, `preview`, `production` profiles. Push secrets via `eas secret:create`.
-11. Add a `scripts/check-env.ts` that fails the build if required env vars are missing.
-
-### Deliverables
-
-- Supabase project live, schema applied, RLS on every table.
-- Mobile app boots and successfully calls `supabase.from('prompts').select()` (returns empty).
-- EAS dev build runs on device.
-
-### Acceptance
-
-- `supabase db push` is idempotent.
-- `npx supabase test db` (basic) passes.
-- App reads env vars from EAS in a build, from `.env.local` in dev.
-
-### Phase log
-
-- Completed in Bloc A-F: local Supabase init/link, public env setup, initial schema, RLS policies, storage buckets, generated TypeScript types, typed Supabase client, `app.config.ts`, React Query provider, env check script, and EAS profiles.
-- Validation performed:
-  - Remote `supabase db push` applies cleanly and is idempotent.
-  - Local Supabase starts after CLI/cache cleanup and applies migrations + seed.
-  - RLS is enabled on all 12 public tables.
-  - Storage buckets `voices` and `messages` exist.
-  - Mobile app boots and runs the temporary `[Supabase smoke test]` against `prompts` without error.
-  - `npm run check-env`, `npx tsc --noEmit`, and `eas build:configure --platform all` pass.
-- Follow-ups:
-  - Push EAS project secrets manually using `docs/EAS_SECRETS.md` before the first remote EAS build.
-  - Remove the temporary `[Supabase smoke test]` in Phase 2 before adding auth-aware redirects.
-  - Run the first EAS development build on a real device when device-only auth/build validation starts.
-
-### Suggested commit
-
-`feat(infra): bootstrap supabase project, schema, rls and EAS pipeline`
 
 ---
 
@@ -133,134 +37,15 @@ Reactive moderation (block + report + manual takedown by the operator) is part o
 
 **Goal**: a user can sign in or sign up with their phone number, restricted to FR/BE/CH.
 
-### Cleanup before scope
-
-- Remove the temporary `[Supabase smoke test]` `useEffect` in `app/_layout.tsx` (added in Phase 1 Bloc E to validate the connection). The auth-aware redirect introduced by this phase replaces it.
-
-### Scope
-
-1. In Supabase Auth, enable **Phone provider with Twilio Verify**. Store Twilio Account SID + Auth Token + Verify Service SID in Supabase secrets.
-2. Build `app/(auth)/phone.tsx`: country picker locked to FR/BE/CH (E.164 input), call `supabase.auth.signInWithOtp({ phone })`.
-3. Build `app/(auth)/otp.tsx`: 6-digit code input, call `supabase.auth.verifyOtp`.
-4. Country gating: derive country from the verified phone E.164 prefix. Trigger after first successful OTP creates a row in `profiles` with `country` set; reject any other prefix client-side AND with a DB trigger on `profiles` insert.
-5. `useAuth()` hook + `AuthProvider` exposing `{ session, profile, signOut, isLoading }`.
-6. Auth-aware redirect at the root layout: unauthenticated → `(auth)`, authenticated without profile → onboarding, authenticated with profile → `(main)`.
-7. Persist session via `expo-secure-store` (custom `auth.storage`).
-
-### Deliverables
-
-- End-to-end phone signup works on a real device for one French number.
-- Belgian and Swiss numbers are accepted; any other country is blocked with a clear message.
-- Session persists across app restarts.
-
-### Acceptance
-
-- A user with a `+1` number cannot sign up.
-- Logout clears the session and redirects to `(auth)/home`.
-- Unit test on the country detection helper.
-
-### Phase log
-
-- Implemented in Bloc A-E:
-  - Removed the temporary Supabase smoke test from `app/_layout.tsx`.
-  - Added FR/BE/CH phone helpers and unit tests.
-  - Added a Phase 2 migration for explicit `profiles.country` gating and `insert_own_profile` RLS.
-  - Documented Twilio Verify + Supabase Phone provider setup in `docs/TWILIO_SETUP.md`.
-  - Added `AuthProvider`, `useAuth`, auth-aware redirects, real phone OTP request, 6-digit OTP verification, resend, and a profile logout flow.
-- Manual setup completed:
-  - Supabase migration applied.
-  - Twilio Verify configured in Supabase Phone Auth.
-  - French phone number OTP flow smoke-tested on device.
-- Scope note:
-  - The roadmap originally said Phase 2 creates a `profiles` row immediately after OTP with `country`. The current schema requires `display_name`, `birthdate`, `gender`, and `city`, so Phase 2 keeps the valid state "authenticated without profile"; full profile creation, including persisted `country`, remains Phase 3.
-- Validation performed:
-  - `npx tsc --noEmit`
-  - `npm test -- --runInBand`
-
-### Suggested commit
-
-`feat(auth): phone OTP authentication restricted to FR/BE/CH`
-
 ---
 
-## Phase 3 — Profile onboarding 🟡 ⭐
+## Phase 3 — Profile onboarding 🟡
 
 **Goal**: after auth, the user creates their profile (name, birthdate, gender, looking-for, city with coordinates).
 
-### Scope
-
-1. **Phone-first signup flow.** The landing home screen takes the phone number directly and triggers Supabase OTP. After OTP verification, `AuthRedirector` decides where to go: profile exists → `/(main)/discover`, no profile → signup wizard. There is no separate "Créer un compte / Se connecter" choice — the same entry flow handles both signup and login.
-2. Multi-step wizard under `app/(auth)/onboarding/`: `name`, `birthdate` (must be ≥ 18), `gender`, `looking-for`, `city` (city/village search that stores both display name and coordinates). The wizard runs **after** OTP verification on a fresh account.
-3. On the city step, `useUpsertProfile()` persists the wizard data into `profiles`, then the user is routed to `/(auth)/record` for voice recording, then to `/(auth)/profile-setup` for voice metadata + CGU acceptance.
-4. Validation server-side via a `before insert` trigger on `profiles`: age ≥ 18, country in (FR,BE,CH), name length 2–30.
-5. Edit profile screen reachable from `(main)/profile`.
-6. **CGU + Privacy Policy acceptance**: placed on the final `profile-setup` step (`MyVoiceScreen` in onboarding mode). The "Discover" CTA is disabled until the box is checked. CGU is **not** asked on the landing home anymore (it would gate the phone input which adds friction without legal benefit at that stage).
-7. No device geolocation in V1: do not install `expo-location`. City lookup uses an explicit Nominatim search action, not live autocomplete, so no geocoding API key is needed in this version.
-
-### Deliverables
-
-- Profile creation wizard fully working.
-- A profile row is created with all required fields.
-- `profiles.location` is populated from the selected city/village coordinates.
-- Edit profile updates the row.
-
-### Acceptance
-
-- Trying to set birthdate < 18 is blocked client and server side.
-- Required fields cannot be skipped.
-
-### Phase log
-
-- Completed in Bloc A-G:
-  - Removed the mocked `profile-setup` route and redirected recording completion to the real onboarding wizard.
-  - Added profile field validators and tests for display name, age, gender, and looking-for values.
-  - Added server-side profile validation trigger with stable `23514` messages.
-  - Added `useUpsertProfile()` with React Query invalidation, country derivation from the verified phone number, and PostGIS point formatting.
-  - Built the `app/(auth)/onboarding/` wizard with ephemeral Zustand state, required field validation, explicit Nominatim city search, and final Supabase profile upsert.
-  - Replaced the main profile tab with an editable profile form that reuses the same validation and upsert path.
-  - Kept V1 location aligned with product decisions: no device GPS, no `expo-location`, no live autocomplete, and no country filtering from selected city.
-- Navigation correction (Bloc H):
-  - Removed the separate `terms.tsx` wizard step — CGU acceptance is handled by `HomeScreen`.
-  - Reduced the wizard from 6 to 5 steps (name → birthdate → gender → looking-for → city).
-  - Restored validated gender labels to Homme / Femme / Autre (3 options) in the wizard.
-  - Removed `acceptedTerms` from the ephemeral onboarding Zustand store.
-- Navigation rework (Bloc I) — restored validated design: HomeScreen → wizard → phone → OTP → record → discover:
-  - `home.tsx`: "Créer un compte" now routes to `/(auth)/onboarding/name` (wizard first, auth after).
-  - `city.tsx`: no longer calls `upsertProfile` — validates city selection and routes to `/(auth)/phone?mode=signup`.
-  - `otp.tsx`: after OTP success in signup mode, reads Zustand store, calls profile upsert directly via Supabase, then routes to `/(auth)/record`. Login mode falls back to splash.
-  - `otp.tsx`: uses the already validated OTP country when building the profile payload, avoiding session phone formatting issues.
-  - `city.tsx`: deduplicates identical search results, clears the result list after selection, and highlights the confirmed city.
-  - `AuthRedirector`: allows OTP/record to finish the signup path after profile creation, preventing a premature jump to Discover.
-  - `record.tsx` and `useAuth`: refresh the authenticated profile before leaving the voice step, so "Passer" cannot fall back to Home with stale profile state.
-  - Restored `profile-setup.tsx` as the voice finalization step after recording: replay, voice title, mood, and 3 emojis before entering Discover.
-  - `MyVoiceScreen`: onboarding mode now hides the legacy profile fields already covered by the wizard and keeps only voice metadata controls.
-  - Main profile tab now includes the voice controls again (replay, title, mood, 3 emojis, re-record) alongside profile field editing.
-  - Main profile tab now matches onboarding gender options and city search behavior, including deduplicated city results.
-  - `AuthRedirector`: `session && !profile` redirects to `/(auth)/home` (not the wizard, since auth comes after the wizard).
-  - `index.tsx` (splash): `session && profile` → discover, otherwise → home.
-  - `record.tsx`: routes to `/(main)/discover` after recording (unchanged from Bloc H).
-  - Removed `incomplete_profile` copy entry (no longer used since city doesn't validate previous steps).
-- Validation performed:
-  - `npx tsc --noEmit`
-  - `npm test -- --runInBand`
-  - Lints checked on edited Phase 3 files.
-- Navigation simplification (Bloc J — **canonical V1 design, supersedes Blocs A-I in case of conflict**):
-  - **Home** is now phone-first: the user enters their phone number directly on the landing screen. No "Créer un compte" / "Se connecter" buttons (the same flow covers both), no CGU checkbox at this stage, and no second phone screen.
-  - **OTP** verifies the code and lets `AuthRedirector` decide where to go: existing profile → `/(main)/discover`, no profile → `/(auth)/onboarding/name` (signup wizard).
-  - **Wizard** (`name → birthdate → gender → looking-for → city`) is unchanged in steps; only the city step now persists the profile via `useUpsertProfile`, then routes to `/(auth)/record`.
-  - **Record** is the standalone voice recording step. The "Passer" shortcut is kept but the Discover feed stays gated by `useFeedState.hasRecordedVoice` until a real voice exists.
-  - **Profile setup** (`MyVoiceScreen` in onboarding mode) is the final step before Discover — title, mood, 3 emojis, and a **mandatory CGU acceptance checkbox** that must be ticked before the user can enter the feed.
-  - Removed the obsolete `app/(auth)/phone.tsx` route and `src/components/onboarding/PhoneScreen.tsx` (the phone entry now lives only on the landing home screen).
-  - `AuthRedirector` was strengthened to handle "session without profile" even while inside the `(auth)` group, so a newly authenticated user is always pushed to the wizard (and can never get stranded on Home with an active session).
-  - Splash (`app/index.tsx`) gained a third branch (`session && !profile`) that redirects to the wizard, in addition to the existing two branches.
-
-### Suggested commit
-
-`feat(profile): onboarding wizard with age and country gating`
-
 ---
 
-## Phase 4 — Voice recording + voice upload 🟡 ⭐
+## Phase 4 — Voice recording + voice upload
 
 **Goal**: user can record, re-record, listen back, and publish their voice.
 
@@ -287,13 +72,9 @@ Reactive moderation (block + report + manual takedown by the operator) is part o
 - Files are 32 kbps mono AAC, ~240 KB/min ±10%.
 - Upload works on flaky network (manual test: airplane mode mid-upload → retry).
 
-### Suggested commit
-
-`feat(voices): recording, signed upload pipeline, profile voice management`
-
 ---
 
-## Phase 5 — Discover feed (playback + autoplay + preload) 🟡 ⭐
+## Phase 5 — Discover feed (playback + autoplay + preload)
 
 **Goal**: the TikTok-style feed loads real voices from Supabase and plays them with zero perceived latency.
 
@@ -320,13 +101,9 @@ Reactive moderation (block + report + manual takedown by the operator) is part o
 - Scrolling 20 cards never throws an unhandled promise rejection.
 - Filters change updates the feed within 1 query.
 
-### Suggested commit
-
-`feat(feed): live discover feed with preloaded ring playback`
-
 ---
 
-## Phase 6 — Likes, blocks, reports (+ moderation backend) 🟡 ⭐
+## Phase 6 — Likes, blocks, reports (+ moderation backend)
 
 **Goal**: users can like a voice, block a user, report a voice or a user. Like events appear in the recipient's Likes screen (received tab). The server-side moderation primitives that the back-office (Phase 6.bis) will consume are in place.
 
@@ -362,13 +139,9 @@ Reactive moderation (block + report + manual takedown by the operator) is part o
 - Calling `moderate()` from a non-admin JWT is rejected with 401 and no row is touched.
 - Every successful admin Edge Function call appends one row to `audit_log`.
 
-### Suggested commit
-
-`feat(social): likes, blocks, reports and moderation backend primitives`
-
 ---
 
-## Phase 6.bis — Admin back-office (companion Next.js web app) 🟢 ⭐
+## Phase 6.bis — Admin back-office (companion Next.js web app)
 
 **Goal**: the operator (non-technical) can triage reports, take down content, and ban users from a clean web interface — no SQL, no Supabase Studio.
 
@@ -378,7 +151,6 @@ This phase produces a **separate Next.js repository** (suggested name `lovoice-a
 
 - Phase 6 merged (admin Edge Functions and RLS policies live).
 - A Vercel account (free) connected to the new `lovoice-admin` repo, EU region (`fra1`).
-- At least one admin email seeded in `admin_users` (the operator's email).
 
 ### Scope
 
@@ -387,9 +159,9 @@ This phase produces a **separate Next.js repository** (suggested name `lovoice-a
    - configure TypeScript strict mode (same level as the mobile app),
    - install: `@supabase/supabase-js`, `@supabase/ssr`, `@tanstack/react-query`, `lucide-react`, `date-fns`. Nothing else.
    - copy `src/types/database.ts` from the mobile repo into `src/types/database.ts`. Document in the README that the file must be regenerated together whenever a Supabase migration ships.
-2. **Supabase client** in `src/lib/supabase.ts` using `@supabase/ssr` for cookie-based session handling. Public anon key only — service role key is **never** added to env.
+2. **Supabase client** in `src/lib/supabase.ts` using `@supabase/ssr` for cookie-based session handling.
 3. **Auth**:
-   - `/login` page: email input → `signInWithOtp({ email, options: { emailRedirectTo: '<URL>/reports' } })`.
+   - `/login`
    - `app/(admin)/layout.tsx`: server component that reads the session, calls `is_admin()`, and redirects to `/login` with an error if false.
 4. **`/reports` page** (default route after login):
    - Server-side fetch of `pending_reports` view (a SQL view created in this phase that joins `reports` with `voices` / `messages` / `profiles`). Pagination 25/page.
@@ -407,13 +179,13 @@ This phase produces a **separate Next.js repository** (suggested name `lovoice-a
 ### Deliverables
 
 - `lovoice-admin` repo deployed on Vercel at a stable URL (`admin.lovoice.app` or similar).
-- Operator can log in with her email and complete the full moderation loop point-and-click.
+- Operator can log in and complete the full moderation loop point-and-click.
 - Every action she performs leaves a trace in `audit_log`.
 - Zero SQL written by the operator.
 
 ### Acceptance
 
-- Login by an email NOT in `admin_users` is rejected with a clear error and the user is signed out.
+- Login by account NOT in `admin_users` is rejected with a clear error and the user is signed out.
 - Calling any of the five admin Edge Functions from the browser DevTools console with a stolen non-admin JWT returns 401.
 - The service-role key does not appear in any built bundle (verified by grep on the `.next` build output).
 - Lighthouse score on `/reports` ≥ 90 (perf and a11y).
@@ -424,7 +196,7 @@ This phase produces a **separate Next.js repository** (suggested name `lovoice-a
 
 ---
 
-## Phase 7 — Messaging (text + voice, Realtime) 🟡 ⭐
+## Phase 7 — Messaging (text + voice, Realtime)
 
 **Goal**: full chat with text and voice messages, real-time updates, read receipts.
 
@@ -452,13 +224,9 @@ This phase produces a **separate Next.js repository** (suggested name `lovoice-a
 - Killing the app and reopening a conversation shows all history.
 - Recording indicator disappears within 2s of stop.
 
-### Suggested commit
-
-`feat(chat): realtime messaging with text and voice messages`
-
 ---
 
-## Phase 8 — Push notifications 🔴 (Expo Push) ⭐
+## Phase 8 — Push notifications (Expo Push)
 
 **Goal**: push notifications for likes and new messages, deep-linking to the relevant screen. There is no dedicated Notifications screen — likes appear in the Likes screen (received tab) and messages appear in the Messages screen.
 
@@ -482,13 +250,9 @@ This phase produces a **separate Next.js repository** (suggested name `lovoice-a
 - Android push works on a Pixel with Play Services.
 - Disabling push in OS settings is handled gracefully.
 
-### Suggested commit
-
-`feat(push): push delivery with deep links to likes and messages`
-
 ---
 
-## Phase 9 — Auto-moderation pipeline (transcription + safety) 🔴 (AssemblyAI + Hive) ✳️ optional / post-MVP
+## Phase 9 — Auto-moderation pipeline (transcription + safety) (AssemblyAI + Hive) optional / post-MVP
 
 **Status**: **NOT in the V1 MVP commitment.** Ship only if MVP time allows, otherwise schedule for V1.x. Until this phase ships, content safety is handled by reactive moderation (Phase 6 + `docs/ARCHITECTURE.md` §4.3.a).
 
@@ -508,7 +272,7 @@ This phase produces a **separate Next.js repository** (suggested name `lovoice-a
 5. Hive Audio + Hive Text integrations.
 6. OpenAI Moderation as cheap secondary check on transcript.
 7. Decision logic per ARCHITECTURE §4.3.b.
-8. On rejection: hide content, notify author with reason, allow appeal (a button creates a `manual_review` request — replaces the email-based appeal of the MVP).
+8. On rejection: hide content, notify author with reason, allow appeal (a button creates a `manual_review` request).
 9. **Back-office extension** (in the `lovoice-admin` repo): add a new `/manual-review` route that lists items with `status = 'manual_review'` and reuses the same row component and the same `moderate()` action as `/reports`. Add a transcript column on both routes (reads `voices.transcript` / `messages.transcript`). No new Edge Function needed.
 
 ### Deliverables
@@ -522,13 +286,9 @@ This phase produces a **separate Next.js repository** (suggested name `lovoice-a
 - No voice with `status != 'approved'` ever appears in `get_feed()`.
 - Moderation throughput keeps up with upload throughput at the projected volume (no growing backlog in `moderation_jobs`).
 
-### Suggested commit
-
-`feat(moderation): async transcription and safety pipeline for voices and messages`
-
 ---
 
-## Phase 10 — RGPD, security hardening, observability 🔴 (Sentry) ⭐
+## Phase 10 — RGPD, security hardening, observability (Sentry)
 
 **Goal**: app is store-ready and compliant.
 
@@ -552,13 +312,9 @@ This phase produces a **separate Next.js repository** (suggested name `lovoice-a
 - Test that after `delete_account`, no row referencing the user remains except anonymized message tombstones.
 - App passes Apple's 5.1.1(v) account-deletion requirement.
 
-### Suggested commit
-
-`feat(compliance): account deletion, data export, sentry and rate limiting`
-
 ---
 
-## Phase 10.bis — Product analytics 🔴 (PostHog) ✳️ optional / post-MVP
+## Phase 10.bis — Product analytics (PostHog) optional / post-MVP
 
 **Status**: **NOT in the V1 MVP commitment.** Ship in V1 if time allows, otherwise schedule later.
 
@@ -576,13 +332,9 @@ This phase produces a **separate Next.js repository** (suggested name `lovoice-a
 5. Validate end-to-end: events show up in PostHog within 1 minute on a real device.
 6. **Back-office extension** (in the `lovoice-admin` repo): add a `/stats` route that embeds the operator's chosen PostHog insights as iframes (PostHog supports public iframe sharing per insight). Read-only, no new Edge Function.
 
-### Suggested commit
-
-`feat(analytics): posthog integration with PII-safe event tracking`
-
 ---
 
-## Phase 11 — Production build + store submission 🔴 (EAS + App Store + Play Store) ⭐
+## Phase 11 — Production build + store submission (EAS + App Store + Play Store)
 
 **Goal**: app is in TestFlight and Google Play Internal Testing.
 
@@ -601,41 +353,4 @@ This phase produces a **separate Next.js repository** (suggested name `lovoice-a
 - Build available in Internal Testing on Play.
 - Crash-free rate > 99% on the smoke run.
 
-### Suggested commit
-
-`chore(release): v1.0.0 production build for TestFlight and Play Internal`
-
 ---
-
-## Estimated effort (single dev + LLM)
-
-| Phase                                                | Scope       | Estimate               |
-| ---------------------------------------------------- | ----------- | ---------------------- |
-| 0 — Foundation refactor                              | ⭐ MVP      | 2 days                 |
-| 1 — Backend bootstrap                                | ⭐ MVP      | 1.5 days               |
-| 2 — Phone auth                                       | ⭐ MVP      | 1 day                  |
-| 3 — Profile onboarding                               | ⭐ MVP      | 1.5 days               |
-| 4 — Voice recording + upload                         | ⭐ MVP      | 3 days                 |
-| 5 — Discover feed playback                           | ⭐ MVP      | 3 days                 |
-| 6 — Likes / blocks / reports + moderation backend    | ⭐ MVP      | 2 days                 |
-| 6.bis — Admin back-office (Next.js)                  | ⭐ MVP      | 2 days                 |
-| 7 — Messaging realtime                               | ⭐ MVP      | 4 days                 |
-| 8 — Push notifications                               | ⭐ MVP      | 1 day                  |
-| 10 — RGPD + Sentry + rate limiting                   | ⭐ MVP      | 2 days                 |
-| 11 — Store submission                                | ⭐ MVP      | 2 days                 |
-| **MVP subtotal (committed)**                         |             | **≈ 25 working days**  |
-| 9 — Auto-moderation pipeline (+ back-office tab)     | ✳️ optional | 2.5 days               |
-| 10.bis — PostHog analytics (+ back-office stats tab) | ✳️ optional | 1 day                  |
-| **Optional subtotal**                                |             | **≈ 3.5 working days** |
-
----
-
-## How to start a phase (LLM operating procedure)
-
-1. Read `README.md` and `docs/ARCHITECTURE.md` end-to-end.
-2. Open this file at the current phase. **Do not read other phases.**
-3. Confirm with the user that the previous phase is signed off.
-4. List the new external accounts/keys needed (cross-check with `docs/CLIENT_SETUP.md`).
-5. Use sub-agents (`explore`, `shell`) for repetitive tasks (codebase mapping, command runs).
-6. Implement scope strictly; flag any out-of-scope idea as "deferred to phase X".
-7. End with: a) test plan executed, b) suggested Conventional Commit message, c) updated note in `docs/ROADMAP.md` if scope drifted.

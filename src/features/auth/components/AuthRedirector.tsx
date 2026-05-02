@@ -37,7 +37,7 @@ export default function AuthRedirector() {
     // inside the auth group (e.g. just landed here from OTP verification on a fresh account).
     // The signup-flow paths are excluded so the user can complete name/birthdate/.../record/setup.
     if (session && !profile && !isOnSignupFlow(pathname)) {
-      router.replace('/(auth)/onboarding/terms');
+      router.replace('/(auth)/onboarding/name');
       return;
     }
 

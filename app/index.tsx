@@ -27,7 +27,7 @@ export default function SplashRoute() {
       // Resume from the very first wizard step (CGU) — the in-memory wizard state is
       // wiped on app restart, so jumping to a later step would skip required validations.
       if (session && !profile) {
-        router.replace('/(auth)/onboarding/terms');
+        router.replace('/(auth)/onboarding/name');
         return;
       }
 

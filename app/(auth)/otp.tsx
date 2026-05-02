@@ -78,7 +78,7 @@ export default function OtpRoute() {
     // Land on the first signup step. AuthRedirector will reroute returning users
     // (whose profile already exists) straight to the feed once the profile finishes loading,
     // avoiding a redundant splash flash on the way back through `/`.
-    router.replace('/(auth)/onboarding/terms');
+    router.replace('/(auth)/onboarding/name');
   };
 
   const handleResend = async () => {

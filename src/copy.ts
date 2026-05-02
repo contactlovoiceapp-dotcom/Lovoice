@@ -13,7 +13,7 @@ export const COPY = {
     save: 'Sauvegarder',
     later: 'Plus tard',
     optional: '(Facultatif)',
-    appName: 'LOVoice',
+    appName: 'Lovoice',
   },
 
   a11y: {
@@ -53,9 +53,9 @@ export const COPY = {
         desc: "Ici, pas de photo à perfectionner. Juste ta voix et ce qu'elle dit de toi.",
       },
     ] as const,
-    phoneHint: 'Entre ton numéro pour commencer.',
-    cta: "C'est parti !",
-    sending: 'Envoi du code...',
+    cguNotice: 'En me connectant, je m\'engage à respecter les valeurs de bienveillance de la communauté Lovoice et j\'accepte les ',
+    cguLink: 'Conditions Générales',
+    cta: 'Connexion',
   },
 
   phone: {
@@ -276,17 +276,6 @@ export const COPY = {
     // Shared step indicator — "1 / 5"
     step: (current: number, total: number) => `${current} / ${total}`,
 
-    terms: {
-      title: 'Bienvenue sur LOVoice',
-      subtitle: 'Avant de créer ton profil, on valide ensemble les règles du jeu : respect, authenticité et CGU.',
-      checkboxLabel: "J'accepte les ",
-      cguLink: "Conditions d'utilisation",
-      andSeparator: ' et la ',
-      privacyLink: 'Politique de confidentialité',
-      cta: "C'est parti !",
-      errorRequired: 'Tu dois accepter les conditions pour continuer.',
-    },
-
     name: {
       title: 'Comment tu t\'appelles ?',
       subtitle: "C'est le prénom qui apparaîtra sur ton profil.",
@@ -299,11 +288,11 @@ export const COPY = {
 
     birthdate: {
       title: 'Ta date de naissance',
-      subtitle: 'Tu dois avoir au moins 18 ans pour rejoindre LOVoice.',
+      subtitle: 'Tu dois avoir au moins 18 ans pour rejoindre Lovoice.',
       placeholder: 'JJ / MM / AAAA',
       errors: {
         invalid_date: 'Entre une date valide.',
-        underage: 'Tu dois avoir au moins 18 ans pour rejoindre LOVoice.',
+        underage: 'Tu dois avoir au moins 18 ans pour rejoindre Lovoice.',
       },
     },
 

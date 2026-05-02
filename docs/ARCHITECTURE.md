@@ -1,9 +1,9 @@
 <!--
-  Technical architecture, data model, security model, and audio pipeline for LOVoice.
+  Technical architecture, data model, security model, and audio pipeline for Lovoice.
   Read this BEFORE writing any backend or audio-related code.
 -->
 
-# LOVoice — Technical Architecture
+# Lovoice — Technical Architecture
 
 This document is the canonical reference for the system design.
 Read it together with `README.md` (constraints) and `docs/ROADMAP.md` (current phase scope).
@@ -49,24 +49,25 @@ Read it together with `README.md` (constraints) and `docs/ROADMAP.md` (current p
 All tables live in the default `public` schema unless noted. **All tables have RLS enabled.**
 
 ### 2.1 `profiles`
+
 One row per user. `id` is `auth.users.id` (one-to-one).
 
-| column | type | notes |
-|---|---|---|
-| `id` | `uuid` PK FK → `auth.users(id)` on delete cascade | |
-| `display_name` | `text` not null | |
-| `birthdate` | `date` not null | age computed in queries |
-| `gender` | `text` check in (`male`,`female`,`nonbinary`,`other`) | |
-| `looking_for` | `text[]` | filter target genders |
-| `city` | `text` | display only |
-| `location` | `geography(Point, 4326)` | for distance filter |
-| `country` | `text` check in (`FR`,`BE`,`CH`) | enforced at signup |
-| `bio_emojis` | `text[]` | up to 3 |
-| `created_at` | `timestamptz` default `now()` | |
-| `last_seen_at` | `timestamptz` | |
-| `push_token` | `text` | Expo push token |
-| `is_banned` | `boolean` default false | |
-| `deleted_at` | `timestamptz` | soft delete; hard purge via Edge Function |
+| column         | type                                                  | notes                                     |
+| -------------- | ----------------------------------------------------- | ----------------------------------------- |
+| `id`           | `uuid` PK FK → `auth.users(id)` on delete cascade     |                                           |
+| `display_name` | `text` not null                                       |                                           |
+| `birthdate`    | `date` not null                                       | age computed in queries                   |
+| `gender`       | `text` check in (`male`,`female`,`nonbinary`,`other`) |                                           |
+| `looking_for`  | `text[]`                                              | filter target genders                     |
+| `city`         | `text`                                                | display only                              |
+| `location`     | `geography(Point, 4326)`                              | for distance filter                       |
+| `country`      | `text` check in (`FR`,`BE`,`CH`)                      | enforced at signup                        |
+| `bio_emojis`   | `text[]`                                              | up to 3                                   |
+| `created_at`   | `timestamptz` default `now()`                         |                                           |
+| `last_seen_at` | `timestamptz`                                         |                                           |
+| `push_token`   | `text`                                                | Expo push token                           |
+| `is_banned`    | `boolean` default false                               |                                           |
+| `deleted_at`   | `timestamptz`                                         | soft delete; hard purge via Edge Function |
 
 Profile validation is enforced by a `BEFORE INSERT OR UPDATE` trigger. The mobile client should map SQLSTATE `23514` with these stable messages:
 
@@ -76,115 +77,123 @@ Profile validation is enforced by a `BEFORE INSERT OR UPDATE` trigger. The mobil
 - `profile.looking_for_invalid`
 
 ### 2.2 `voices`
+
 The voice introduction. A user can have multiple voices but only **one `is_active = true`** at a time.
 
-| column | type | notes |
-|---|---|---|
-| `id` | `uuid` PK | |
-| `user_id` | `uuid` FK → `profiles(id)` | |
-| `prompt_id` | `uuid` FK → `prompts(id)` | nullable (free-form voice) |
-| `storage_path` | `text` | `voices/{user_id}/{voice_id}.m4a` |
-| `duration_ms` | `integer` check (≤ 300_000) | |
-| `transcript` | `text` | nullable; filled by AssemblyAI when auto-transcription is enabled (optional, post-MVP) |
-| `theme` | `text` | UI color theme |
-| `status` | `text` default `'approved'` check in (`pending`,`approved`,`rejected`,`manual_review`) | V1 MVP defaults to `'approved'` (reactive moderation). When the auto-moderation pipeline ships, the default flips to `'pending'` — see §4.3. |
-| `moderation_reason` | `text` | filled by Hive |
-| `is_active` | `boolean` default false | partial unique index per user |
-| `created_at` | `timestamptz` default `now()` | |
+| column              | type                                                                                   | notes                                                                                                                                        |
+| ------------------- | -------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`                | `uuid` PK                                                                              |                                                                                                                                              |
+| `user_id`           | `uuid` FK → `profiles(id)`                                                             |                                                                                                                                              |
+| `prompt_id`         | `uuid` FK → `prompts(id)`                                                              | nullable (free-form voice)                                                                                                                   |
+| `storage_path`      | `text`                                                                                 | `voices/{user_id}/{voice_id}.m4a`                                                                                                            |
+| `duration_ms`       | `integer` check (≤ 300_000)                                                            |                                                                                                                                              |
+| `transcript`        | `text`                                                                                 | nullable; filled by AssemblyAI when auto-transcription is enabled (optional, post-MVP)                                                       |
+| `theme`             | `text`                                                                                 | UI color theme                                                                                                                               |
+| `status`            | `text` default `'approved'` check in (`pending`,`approved`,`rejected`,`manual_review`) | V1 MVP defaults to `'approved'` (reactive moderation). When the auto-moderation pipeline ships, the default flips to `'pending'` — see §4.3. |
+| `moderation_reason` | `text`                                                                                 | filled by Hive                                                                                                                               |
+| `is_active`         | `boolean` default false                                                                | partial unique index per user                                                                                                                |
+| `created_at`        | `timestamptz` default `now()`                                                          |                                                                                                                                              |
 
 ### 2.3 `prompts`
+
 Curated catalog of suggested topics ("Mon plus beau voyage…"). Read-only for clients.
 
 ### 2.4 `likes`
+
 A user likes a voice. Unique on `(liker_id, voice_id)`.
 
-| column | type | notes |
-|---|---|---|
-| `id` | `uuid` PK | |
-| `liker_id` | `uuid` FK → `profiles(id)` | |
-| `voice_id` | `uuid` FK → `voices(id)` | |
-| `created_at` | `timestamptz` default `now()` | |
+| column       | type                          | notes |
+| ------------ | ----------------------------- | ----- |
+| `id`         | `uuid` PK                     |       |
+| `liker_id`   | `uuid` FK → `profiles(id)`    |       |
+| `voice_id`   | `uuid` FK → `voices(id)`      |       |
+| `created_at` | `timestamptz` default `now()` |       |
 
 ### 2.5 `conversations`
+
 Created lazily on the first reply (text or voice) to a voice.
 
-| column | type | notes |
-|---|---|---|
-| `id` | `uuid` PK | |
-| `user_a` | `uuid` | always `least(user_a, user_b)` to enforce uniqueness |
-| `user_b` | `uuid` | |
-| `last_message_at` | `timestamptz` | |
-| `created_at` | `timestamptz` default `now()` | |
+| column            | type                          | notes                                                |
+| ----------------- | ----------------------------- | ---------------------------------------------------- |
+| `id`              | `uuid` PK                     |                                                      |
+| `user_a`          | `uuid`                        | always `least(user_a, user_b)` to enforce uniqueness |
+| `user_b`          | `uuid`                        |                                                      |
+| `last_message_at` | `timestamptz`                 |                                                      |
+| `created_at`      | `timestamptz` default `now()` |                                                      |
 
 Unique on `(user_a, user_b)`.
 
 ### 2.6 `messages`
 
-| column | type | notes |
-|---|---|---|
-| `id` | `uuid` PK | |
-| `conversation_id` | `uuid` FK | |
-| `sender_id` | `uuid` FK → `profiles(id)` | |
-| `kind` | `text` check in (`text`,`voice`) | |
-| `body_text` | `text` | nullable; required if kind=text |
-| `voice_path` | `text` | nullable; required if kind=voice |
-| `voice_duration_ms` | `integer` | |
-| `status` | `text` default `'approved'` | same enum as `voices`; default flips to `'pending'` once auto-moderation is enabled |
-| `created_at` | `timestamptz` default `now()` | |
-| `read_at` | `timestamptz` | |
+| column              | type                             | notes                                                                               |
+| ------------------- | -------------------------------- | ----------------------------------------------------------------------------------- |
+| `id`                | `uuid` PK                        |                                                                                     |
+| `conversation_id`   | `uuid` FK                        |                                                                                     |
+| `sender_id`         | `uuid` FK → `profiles(id)`       |                                                                                     |
+| `kind`              | `text` check in (`text`,`voice`) |                                                                                     |
+| `body_text`         | `text`                           | nullable; required if kind=text                                                     |
+| `voice_path`        | `text`                           | nullable; required if kind=voice                                                    |
+| `voice_duration_ms` | `integer`                        |                                                                                     |
+| `status`            | `text` default `'approved'`      | same enum as `voices`; default flips to `'pending'` once auto-moderation is enabled |
+| `created_at`        | `timestamptz` default `now()`    |                                                                                     |
+| `read_at`           | `timestamptz`                    |                                                                                     |
 
 ### 2.7 `notifications`
 
-| column | type | notes |
-|---|---|---|
-| `id` | `uuid` PK | |
-| `user_id` | `uuid` FK → `profiles(id)` | recipient |
-| `kind` | `text` check in (`like`,`message`,`system`) | |
-| `actor_id` | `uuid` FK → `profiles(id)` | nullable for system |
-| `payload` | `jsonb` | e.g. `{ voice_id, message_id }` |
-| `read_at` | `timestamptz` | |
-| `created_at` | `timestamptz` default `now()` | |
+| column       | type                                        | notes                           |
+| ------------ | ------------------------------------------- | ------------------------------- |
+| `id`         | `uuid` PK                                   |                                 |
+| `user_id`    | `uuid` FK → `profiles(id)`                  | recipient                       |
+| `kind`       | `text` check in (`like`,`message`,`system`) |                                 |
+| `actor_id`   | `uuid` FK → `profiles(id)`                  | nullable for system             |
+| `payload`    | `jsonb`                                     | e.g. `{ voice_id, message_id }` |
+| `read_at`    | `timestamptz`                               |                                 |
+| `created_at` | `timestamptz` default `now()`               |                                 |
 
 ### 2.8 `blocks` and `reports`
+
 Standard pair: `blocks(blocker_id, blocked_id)`, `reports(reporter_id, target_user_id, target_voice_id, target_message_id, reason, free_text, status, resolved_by, resolved_at, created_at)`.
 
 `reports.status` is `'pending' | 'dismissed' | 'actioned'` and is set by the back-office. `resolved_by` references `admin_users.id`.
 
 ### 2.9 `feed_seen`
+
 Tracks voices the user already saw, to avoid showing them again.
 
-| column | type | notes |
-|---|---|---|
-| `user_id` | `uuid` | |
-| `voice_id` | `uuid` | |
-| `seen_at` | `timestamptz` | |
-| PK | `(user_id, voice_id)` | |
+| column     | type                  | notes |
+| ---------- | --------------------- | ----- |
+| `user_id`  | `uuid`                |       |
+| `voice_id` | `uuid`                |       |
+| `seen_at`  | `timestamptz`         |       |
+| PK         | `(user_id, voice_id)` |       |
 
 ### 2.10 `admin_users`
+
 The single source of truth for back-office access. A row in this table is what makes a Supabase `auth.users` account "an admin"; nothing else does. Mobile-app users (phone OTP) and admin-app users (email magic link) live in the same `auth.users` table and are distinguished only by the presence of an `admin_users` row.
 
-| column | type | notes |
-|---|---|---|
-| `id` | `uuid` PK FK → `auth.users(id)` on delete cascade | |
-| `email` | `text` not null unique | |
-| `display_name` | `text` not null | shown in audit log |
-| `created_at` | `timestamptz` default `now()` | |
-| `last_seen_at` | `timestamptz` | |
+| column         | type                                              | notes              |
+| -------------- | ------------------------------------------------- | ------------------ |
+| `id`           | `uuid` PK FK → `auth.users(id)` on delete cascade |                    |
+| `email`        | `text` not null unique                            |                    |
+| `display_name` | `text` not null                                   | shown in audit log |
+| `created_at`   | `timestamptz` default `now()`                     |                    |
+| `last_seen_at` | `timestamptz`                                     |                    |
 
 RLS on this table: only service role can read it (the list of admins is sensitive). The `is_admin()` helper below is `security definer` so the back-office can probe its own status without reading the table directly.
 
 ### 2.11 `audit_log`
+
 Every back-office action and every account-deletion writes a row here. Used for compliance and debugging.
 
-| column | type | notes |
-|---|---|---|
-| `id` | `uuid` PK | |
-| `actor_id` | `uuid` | references `admin_users(id)` for admin actions, `profiles(id)` for user self-service deletion |
-| `action` | `text` | e.g. `voice.reject`, `user.ban`, `account.delete` |
-| `target_kind` | `text` | `voice`, `message`, `profile`, `report` |
-| `target_id` | `uuid` | |
-| `reason` | `text` | nullable |
-| `created_at` | `timestamptz` default `now()` | |
+| column        | type                          | notes                                                                                         |
+| ------------- | ----------------------------- | --------------------------------------------------------------------------------------------- |
+| `id`          | `uuid` PK                     |                                                                                               |
+| `actor_id`    | `uuid`                        | references `admin_users(id)` for admin actions, `profiles(id)` for user self-service deletion |
+| `action`      | `text`                        | e.g. `voice.reject`, `user.ban`, `account.delete`                                             |
+| `target_kind` | `text`                        | `voice`, `message`, `profile`, `report`                                                       |
+| `target_id`   | `uuid`                        |                                                                                               |
+| `reason`      | `text`                        | nullable                                                                                      |
+| `created_at`  | `timestamptz` default `now()` |                                                                                               |
 
 ---
 
@@ -359,21 +368,34 @@ When enabled, `commit_upload` switches the default row status to `'pending'` and
 ## 5. Realtime messaging
 
 ### 5.1 Subscriptions
+
 - For each open conversation: subscribe to Postgres Changes
   ```ts
-  supabase.channel(`conv:${conversationId}`)
-    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: `conversation_id=eq.${conversationId}` }, handler)
-    .on('broadcast', { event: 'typing' }, handler)
-    .on('broadcast', { event: 'recording' }, handler)
+  supabase
+    .channel(`conv:${conversationId}`)
+    .on(
+      "postgres_changes",
+      {
+        event: "INSERT",
+        schema: "public",
+        table: "messages",
+        filter: `conversation_id=eq.${conversationId}`,
+      },
+      handler,
+    )
+    .on("broadcast", { event: "typing" }, handler)
+    .on("broadcast", { event: "recording" }, handler)
     .subscribe();
   ```
 - For the inbox list: subscribe to `INSERT` on `notifications` filtered by `user_id`.
 
 ### 5.2 Optimistic UI
+
 - On send: insert the message in the local React Query cache with `status: 'sending'`. On server confirmation, replace.
 - Failed sends are kept locally and retried on reconnect (manual retry button after 3 failures).
 
 ### 5.3 Read receipts
+
 - When the user opens a conversation, mark all unread messages from the other user as read in a single `update`. Update is broadcast via Postgres Changes (the sender sees `read_at` populate).
 
 ---
@@ -426,6 +448,7 @@ Wrapped in a `security definer` function `get_feed(max_distance_km int)` callabl
 ## 9. Account deletion (RGPD)
 
 Edge Function `delete_account` (called by authenticated user):
+
 1. Soft-delete profile (`deleted_at = now()`).
 2. Hard-delete: voices rows + storage objects, messages rows + storage objects (only the user's own; counterpart's messages stay but `sender_id` is anonymized to a tombstone uuid).
 3. Hard-delete likes, notifications, push token, blocks, reports authored by the user.
@@ -443,7 +466,7 @@ V1 MVP — committed:
 
 Optional / post-MVP:
 
-- **PostHog (EU)**: track events `voice_recorded`, `voice_played` (with %_listened), `voice_liked`, `message_sent` (kind), `conversation_opened`, `signup_completed`. **No content, only counts.** Until PostHog is wired, product insight comes from Sentry plus ad-hoc Supabase SQL queries on `voices`, `likes`, `messages`, `notifications`.
+- **PostHog (EU)**: track events `voice_recorded`, `voice_played` (with %\_listened), `voice_liked`, `message_sent` (kind), `conversation_opened`, `signup_completed`. **No content, only counts.** Until PostHog is wired, product insight comes from Sentry plus ad-hoc Supabase SQL queries on `voices`, `likes`, `messages`, `notifications`.
 
 ---
 
@@ -477,30 +500,30 @@ The back-office is a separate Next.js project that gives the operator a point-an
 ### 13.1 Stack and hosting
 
 - **Next.js 14** App Router, TypeScript strict, Tailwind CSS.
-- **`@supabase/supabase-js`** with the **anon key only**. The Supabase JS client uses the admin's session JWT, and the row-level security policies grant elevated read access via `is_admin()` (see §3).
+- **`@supabase/supabase-js`** The Supabase JS client uses the admin's session JWT, and the row-level security policies grant elevated read access via `is_admin()` (see §3).
 - **Hosted on Vercel**, EU region (`fra1`), free tier.
 - **Repo**: separate from the mobile repo (suggested name `lovoice-admin`). The generated Supabase types (`database.ts`) are copied from the mobile repo and regenerated together whenever a migration ships.
 - **Deps cap**: same frugality rule as the mobile app. Allowed in V1: `next`, `react`, `tailwindcss`, `@supabase/supabase-js`, `@supabase/ssr`, `lucide-react` (icons), `date-fns`. Anything else needs justification.
 
 ### 13.2 Authentication
 
-- Supabase Auth, **email + magic link**. The email used must match a row in `admin_users`.
 - A middleware (`app/(admin)/layout.tsx`) calls `is_admin()` once on mount; if false, the user is signed out and redirected to `/login` with an error toast. This is a UX guard only — every Edge Function still re-checks `is_admin()` server-side.
 - Admins are provisioned by hand via a one-shot SQL migration `seed_admin_users.sql` (kept out of git — applied via `supabase db push` from the operator's machine, or by the developer on her behalf).
 
 ### 13.3 Pages (V1 MVP scope)
 
-| Route | Purpose |
-|---|---|
-| `/login` | Email input, sends a magic link via `supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: '/reports' } })`. |
-| `/reports` | Paginated table of `reports` where `status = 'pending'`, joined with the target voice/message and the reporter+author profiles. Each row shows: avatars, reason, free text, an inline `<audio>` player on a freshly-fetched signed URL, and the three action buttons (Ignorer / Retirer / Bannir). Confirmation modal on Retirer and Bannir. Auto-refresh every 30s via React Query. |
-| `/users/[id]` | Profile detail: display fields, current voice (with player), recent activity (last 10 messages, last 10 reports filed against them). Buttons: **Bannir** / **Lever le ban** / **Supprimer le compte** (the last calls the existing `delete_account` Edge Function). |
-| `/banned` | List of currently banned users, with the reason and an **Unban** button. |
-| `/audit` | Read-only paginated view of `audit_log` for the last 90 days, filterable by `actor_id`, `action`, `target_kind`. |
+| Route         | Purpose                                                                                                                                                                                                                                                                                                                                                                              |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `/login`      |
+| `/reports`    | Paginated table of `reports` where `status = 'pending'`, joined with the target voice/message and the reporter+author profiles. Each row shows: avatars, reason, free text, an inline `<audio>` player on a freshly-fetched signed URL, and the three action buttons (Ignorer / Retirer / Bannir). Confirmation modal on Retirer and Bannir. Auto-refresh every 30s via React Query. |
+| `/users/[id]` | Profile detail: display fields, current voice (with player), recent activity (last 10 messages, last 10 reports filed against them). Buttons: **Bannir** / **Lever le ban** / **Supprimer le compte** (the last calls the existing `delete_account` Edge Function).                                                                                                                  |
+| `/banned`     | List of currently banned users, with the reason and an **Unban** button.                                                                                                                                                                                                                                                                                                             |
+| `/audit`      | Read-only paginated view of `audit_log` for the last 90 days, filterable by `actor_id`, `action`, `target_kind`.                                                                                                                                                                                                                                                                     |
 
 ### 13.4 Edge Functions consumed
 
 The back-office never writes to tables directly. Every action goes through an Edge Function (Supabase Functions, Deno) that:
+
 1. Verifies the caller's JWT,
 2. Re-checks `is_admin()`,
 3. Performs the change,
@@ -509,13 +532,13 @@ The back-office never writes to tables directly. Every action goes through an Ed
 
 Functions used by the V1 back-office:
 
-| Function | Body | Purpose |
-|---|---|---|
-| `dismiss_report` | `{ report_id, reason? }` | Mark report as `dismissed`. |
-| `moderate` | `{ target_kind: 'voice' \| 'message', target_id, reason }` | Set target `status = 'rejected'`, store reason, notify author, mark related reports as `actioned`. Idempotent. |
-| `ban_user` | `{ user_id, reason }` | Set `is_banned = true`, revoke session via `auth.admin.signOut`. |
-| `unban_user` | `{ user_id }` | Set `is_banned = false`. |
-| `delete_account_admin` | `{ user_id, reason }` | Same purge logic as the user-initiated `delete_account` (§9), but invoked by an admin. |
+| Function               | Body                                                       | Purpose                                                                                                        |
+| ---------------------- | ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `dismiss_report`       | `{ report_id, reason? }`                                   | Mark report as `dismissed`.                                                                                    |
+| `moderate`             | `{ target_kind: 'voice' \| 'message', target_id, reason }` | Set target `status = 'rejected'`, store reason, notify author, mark related reports as `actioned`. Idempotent. |
+| `ban_user`             | `{ user_id, reason }`                                      | Set `is_banned = true`, revoke session via `auth.admin.signOut`.                                               |
+| `unban_user`           | `{ user_id }`                                              | Set `is_banned = false`.                                                                                       |
+| `delete_account_admin` | `{ user_id, reason }`                                      | Same purge logic as the user-initiated `delete_account` (§9), but invoked by an admin.                         |
 
 ### 13.5 Audio playback in the back-office
 
