@@ -62,22 +62,38 @@ export default function OtpRoute() {
     setIsSubmitting(true);
     setErrorMessage(null);
 
-    const { error } = await supabase.auth.verifyOtp({
+    const { data: otpData, error } = await supabase.auth.verifyOtp({
       phone,
       token: code,
       type: 'sms',
     });
 
-    setIsSubmitting(false);
-
     if (error) {
+      setIsSubmitting(false);
       setErrorMessage(error.message);
       return;
     }
 
-    // Land on the first signup step. AuthRedirector will reroute returning users
-    // (whose profile already exists) straight to the feed once the profile finishes loading,
-    // avoiding a redundant splash flash on the way back through `/`.
+    // Returning users already have a profile — send them straight to the feed.
+    const userId = otpData.user?.id;
+
+    if (userId) {
+      const { data: existingProfile } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', userId)
+        .maybeSingle();
+
+      setIsSubmitting(false);
+
+      if (existingProfile) {
+        router.replace('/(main)/discover');
+        return;
+      }
+    } else {
+      setIsSubmitting(false);
+    }
+
     router.replace('/(auth)/onboarding/name');
   };
 

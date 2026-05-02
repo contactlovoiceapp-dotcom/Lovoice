@@ -1,4 +1,9 @@
-/* AuthRedirector tests — guard the routing rules between session, profile, and route group. */
+/* AuthRedirector tests — exhaustive table-driven coverage of every auth×profile×route combination.
+ *
+ * These tests are the safety net against routing regressions. Every redirect rule in
+ * AuthRedirector must have an explicit test case here. If you add or change a rule,
+ * add a matching row to the table below.
+ */
 
 import React from 'react';
 import { render } from '@testing-library/react-native';
@@ -22,6 +27,9 @@ jest.mock('../../hooks/useAuth', () => ({
 
 type AuthState = ReturnType<typeof useAuth>;
 
+const SESSION = { user: { id: 'u1' } } as never;
+const PROFILE = { id: 'u1' } as never;
+
 function setAuth(state: Partial<AuthState>) {
   jest.mocked(useAuth).mockReturnValue({
     session: null,
@@ -34,109 +42,149 @@ function setAuth(state: Partial<AuthState>) {
   } as AuthState);
 }
 
+function renderWithRoute(pathname: string, segments: string[]) {
+  mockPathname = pathname;
+  mockSegments = segments;
+  render(<AuthRedirector />);
+}
+
 beforeEach(() => {
   mockReplace.mockClear();
-  mockPathname = '/(auth)/home';
-  mockSegments = ['(auth)'];
 });
 
-describe('AuthRedirector', () => {
+// ---------------------------------------------------------------------------
+// Guard: loading & splash
+// ---------------------------------------------------------------------------
+describe('guard states', () => {
   it('does nothing while auth state is still loading', () => {
     setAuth({ isLoading: true });
-    mockPathname = '/(main)/discover';
-    mockSegments = ['(main)'];
-
-    render(<AuthRedirector />);
-
+    renderWithRoute('/(main)/discover', ['(main)']);
     expect(mockReplace).not.toHaveBeenCalled();
   });
 
-  it('does nothing on the splash route (handled by index.tsx)', () => {
+  it('does nothing on the splash route (index.tsx handles it)', () => {
     setAuth({ session: null });
-    mockPathname = '/';
-    mockSegments = [];
+    renderWithRoute('/', []);
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
+});
 
-    render(<AuthRedirector />);
+// ---------------------------------------------------------------------------
+// Visitor: no session
+// ---------------------------------------------------------------------------
+describe('visitor (no session)', () => {
+  beforeEach(() => setAuth({ session: null }));
 
+  it('does not redirect when already in the auth group', () => {
+    renderWithRoute('/(auth)/home', ['(auth)']);
     expect(mockReplace).not.toHaveBeenCalled();
   });
 
-  it('pushes unauthenticated users in main group back to auth home', () => {
-    setAuth({ session: null });
-    mockPathname = '/(main)/discover';
-    mockSegments = ['(main)'];
+  it('does not redirect from auth phone screen', () => {
+    renderWithRoute('/(auth)/phone', ['(auth)']);
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
 
-    render(<AuthRedirector />);
-
+  it('redirects to auth home when on a main-group page', () => {
+    renderWithRoute('/(main)/discover', ['(main)']);
     expect(mockReplace).toHaveBeenCalledWith('/(auth)/home');
   });
 
-  it('pushes authenticated users without profile to onboarding name step', () => {
-    setAuth({ session: { user: { id: 'u1' } } as never, profile: null });
-    mockPathname = '/(auth)/home';
-    mockSegments = ['(auth)'];
+  it('redirects to auth home when on main profile page', () => {
+    renderWithRoute('/(main)/profile', ['(main)']);
+    expect(mockReplace).toHaveBeenCalledWith('/(auth)/home');
+  });
+});
 
-    render(<AuthRedirector />);
+// ---------------------------------------------------------------------------
+// New user: session exists, profile does NOT
+// ---------------------------------------------------------------------------
+describe('new user (session, no profile)', () => {
+  beforeEach(() => setAuth({ session: SESSION, profile: null }));
 
+  it('redirects from auth home to onboarding', () => {
+    renderWithRoute('/(auth)/home', ['(auth)']);
     expect(mockReplace).toHaveBeenCalledWith('/(auth)/onboarding/name');
   });
 
-  it('does not redirect users without profile while inside the wizard', () => {
-    setAuth({ session: { user: { id: 'u1' } } as never, profile: null });
-    mockPathname = '/(auth)/onboarding/birthdate';
-    mockSegments = ['(auth)', 'onboarding', 'birthdate'];
-
-    render(<AuthRedirector />);
-
-    expect(mockReplace).not.toHaveBeenCalled();
+  it('redirects from auth phone to onboarding', () => {
+    renderWithRoute('/(auth)/phone', ['(auth)']);
+    expect(mockReplace).toHaveBeenCalledWith('/(auth)/onboarding/name');
   });
 
-  it('does not redirect users without profile while on record or profile-setup', () => {
-    setAuth({ session: { user: { id: 'u1' } } as never, profile: null });
-    mockPathname = '/(auth)/record';
-    mockSegments = ['(auth)', 'record'];
-
-    render(<AuthRedirector />);
-
-    expect(mockReplace).not.toHaveBeenCalled();
+  it('redirects from auth OTP to onboarding', () => {
+    renderWithRoute('/(auth)/otp', ['(auth)']);
+    expect(mockReplace).toHaveBeenCalledWith('/(auth)/onboarding/name');
   });
 
-  it('keeps fully onboarded users on the post-auth voice steps without bouncing them away', () => {
-    setAuth({
-      session: { user: { id: 'u1' } } as never,
-      profile: { id: 'u1' } as never,
-    });
-    mockPathname = '/(auth)/profile-setup';
-    mockSegments = ['(auth)', 'profile-setup'];
+  const signupFlowPaths: [string, string[]][] = [
+    ['/(auth)/onboarding/name', ['(auth)', 'onboarding', 'name']],
+    ['/(auth)/onboarding/birthdate', ['(auth)', 'onboarding', 'birthdate']],
+    ['/(auth)/onboarding/gender', ['(auth)', 'onboarding', 'gender']],
+    ['/(auth)/onboarding/looking-for', ['(auth)', 'onboarding', 'looking-for']],
+    ['/(auth)/onboarding/city', ['(auth)', 'onboarding', 'city']],
+    ['/(auth)/record', ['(auth)', 'record']],
+    ['/(auth)/profile-setup', ['(auth)', 'profile-setup']],
+  ];
 
-    render(<AuthRedirector />);
+  it.each(signupFlowPaths)(
+    'does NOT redirect from signup flow path %s',
+    (pathname, segments) => {
+      renderWithRoute(pathname, segments);
+      expect(mockReplace).not.toHaveBeenCalled();
+    },
+  );
 
+  it('does NOT redirect when already in the main group (profile still loading after OTP)', () => {
+    renderWithRoute('/(main)/discover', ['(main)']);
     expect(mockReplace).not.toHaveBeenCalled();
   });
+});
 
-  it('does not redirect away from onboarding city when the profile was just created', () => {
-    setAuth({
-      session: { user: { id: 'u1' } } as never,
-      profile: { id: 'u1' } as never,
-    });
-    mockPathname = '/(auth)/onboarding/city';
-    mockSegments = ['(auth)', 'onboarding', 'city'];
+// ---------------------------------------------------------------------------
+// Returning user: session + profile
+// ---------------------------------------------------------------------------
+describe('returning user (session + profile)', () => {
+  beforeEach(() => setAuth({ session: SESSION, profile: PROFILE }));
 
-    render(<AuthRedirector />);
-
-    expect(mockReplace).not.toHaveBeenCalled();
-  });
-
-  it('pushes fully onboarded users away from auth home into the feed', () => {
-    setAuth({
-      session: { user: { id: 'u1' } } as never,
-      profile: { id: 'u1' } as never,
-    });
-    mockPathname = '/(auth)/home';
-    mockSegments = ['(auth)'];
-
-    render(<AuthRedirector />);
-
+  it('redirects from auth home to discover', () => {
+    renderWithRoute('/(auth)/home', ['(auth)']);
     expect(mockReplace).toHaveBeenCalledWith('/(main)/discover');
+  });
+
+  it('redirects from auth phone to discover', () => {
+    renderWithRoute('/(auth)/phone', ['(auth)']);
+    expect(mockReplace).toHaveBeenCalledWith('/(main)/discover');
+  });
+
+  it('redirects from auth OTP to discover', () => {
+    renderWithRoute('/(auth)/otp', ['(auth)']);
+    expect(mockReplace).toHaveBeenCalledWith('/(main)/discover');
+  });
+
+  // After profile creation in city.tsx, the user must reach record and profile-setup
+  // without AuthRedirector stealing them away to discover.
+  const postCreationPaths: [string, string[]][] = [
+    ['/(auth)/onboarding/city', ['(auth)', 'onboarding', 'city']],
+    ['/(auth)/record', ['(auth)', 'record']],
+    ['/(auth)/profile-setup', ['(auth)', 'profile-setup']],
+  ];
+
+  it.each(postCreationPaths)(
+    'does NOT redirect away from post-creation path %s',
+    (pathname, segments) => {
+      renderWithRoute(pathname, segments);
+      expect(mockReplace).not.toHaveBeenCalled();
+    },
+  );
+
+  it('does not redirect when already on the discover page', () => {
+    renderWithRoute('/(main)/discover', ['(main)']);
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it('does not redirect when on main profile page', () => {
+    renderWithRoute('/(main)/profile', ['(main)']);
+    expect(mockReplace).not.toHaveBeenCalled();
   });
 });

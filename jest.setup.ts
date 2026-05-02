@@ -41,6 +41,11 @@ jest.mock('expo-font', () => ({
   isLoaded: () => true,
 }));
 
+jest.mock('expo-linear-gradient', () => {
+  const { View } = require('react-native');
+  return { LinearGradient: View };
+});
+
 jest.mock('expo-router', () => ({
   useRouter: () => ({
     push: jest.fn(),

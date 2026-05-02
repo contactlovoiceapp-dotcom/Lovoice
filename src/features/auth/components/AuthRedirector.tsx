@@ -33,10 +33,10 @@ export default function AuthRedirector() {
       return;
     }
 
-    // Authenticated but no profile yet: push to CGU + values, even when the user is still
-    // inside the auth group (e.g. just landed here from OTP verification on a fresh account).
-    // The signup-flow paths are excluded so the user can complete name/birthdate/.../record/setup.
-    if (session && !profile && !isOnSignupFlow(pathname)) {
+    // Authenticated but no profile yet: push to the onboarding wizard.
+    // Only applies within the auth group — users already in the main group are likely
+    // waiting for the profile to finish loading after a fresh session and should not be bounced.
+    if (session && !profile && isInAuthGroup && !isOnSignupFlow(pathname)) {
       router.replace('/(auth)/onboarding/name');
       return;
     }
