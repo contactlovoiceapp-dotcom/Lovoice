@@ -210,12 +210,26 @@ npm install
 npm start              # Expo dev server
 npm run ios            # iOS simulator
 npm run android        # Android emulator
+npm run check-env      # verify local .env.local matches .env.example
+npm run sync-eas-env   # push .env.local values to EAS environments
 npm test               # Run test suite (Jest + React Testing Library)
 npm run test:watch     # Watch mode for development
 npx supabase start     # local Supabase stack (after Phase 1 setup)
 npx supabase db push   # apply migrations
 npx supabase functions serve <name>  # run Edge Function locally
 ```
+
+### Environment variables
+
+`.env.example` is the source of truth for required mobile environment variable names. `.env.local` contains local development values and is never committed. Whenever you add a new `EXPO_PUBLIC_*` variable:
+
+1. Add its name to `.env.example` with an empty value.
+2. Add the real local value to `.env.local`.
+3. Run `npm run check-env`.
+4. Run `npm run sync-eas-env` so EAS Cloud builds (TestFlight / production) receive the same value.
+5. Rebuild the app, because Expo public env values are embedded at build time.
+
+Only use `EXPO_PUBLIC_*` for values that are safe to ship in the client bundle. Supabase URL and publishable key are public by design; secrets belong in Supabase Edge Functions or EAS Secrets, not in the mobile app.
 
 ### App Store / TestFlight (EAS)
 
