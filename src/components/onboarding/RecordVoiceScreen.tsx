@@ -459,9 +459,18 @@ const RecordVoiceScreen: React.FC<Props> = ({ onNext, onSkip, onCancel }) => {
               <Pressable
                 accessibilityRole="button"
                 onPress={onSkip}
-                style={{ width: '100%', paddingVertical: 8 }}
+                style={({ pressed }) => ({
+                  width: '100%',
+                  borderRadius: RADIUS.cta,
+                  borderWidth: 1.5,
+                  borderColor: COLORS.darkMuted,
+                  backgroundColor: pressed ? COLORS.surfaceLight : 'transparent',
+                  paddingVertical: 14,
+                  opacity: pressed ? 0.75 : 1,
+                  transform: [{ scale: pressed ? 0.98 : 1 }],
+                })}
               >
-                <Text style={{ textAlign: 'center', fontSize: 14, fontFamily: FONT.medium, color: COLORS.textTertiary }}>
+                <Text style={{ textAlign: 'center', fontSize: 14, fontFamily: FONT.semibold, color: COLORS.textSecondary }}>
                   {COPY.record.skip}
                 </Text>
               </Pressable>

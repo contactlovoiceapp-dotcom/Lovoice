@@ -39,6 +39,28 @@ type SelectableOptionProps = {
   onPress: () => void;
 };
 
+function StepProgressBar({ current, total }: { current: number; total: number }) {
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+      {Array.from({ length: total }, (_, i) => {
+        const step = i + 1;
+        const isActive = step <= current;
+        return (
+          <View
+            key={step}
+            style={{
+              flex: 1,
+              height: 4,
+              borderRadius: 2,
+              backgroundColor: isActive ? COLORS.primary : COLORS.border,
+            }}
+          />
+        );
+      })}
+    </View>
+  );
+}
+
 export function ProfileOnboardingStep({
   currentStep,
   totalSteps,
@@ -64,6 +86,12 @@ export function ProfileOnboardingStep({
       end={{ x: 1, y: 1 }}
       style={{ flex: 1 }}
     >
+      {/* Decorative orbs — same visual language as HomeScreen */}
+      <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden' }}>
+        <View style={{ position: 'absolute', top: '-20%', left: '-30%', width: 600, height: 600, borderRadius: 300, backgroundColor: COLORS.secondary, opacity: 0.08 }} />
+        <View style={{ position: 'absolute', bottom: '-10%', right: '-20%', width: 500, height: 500, borderRadius: 250, backgroundColor: COLORS.secondary, opacity: 0.05 }} />
+      </View>
+
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <ScrollView
           keyboardShouldPersistTaps="handled"
@@ -75,39 +103,50 @@ export function ProfileOnboardingStep({
           }}
         >
           <View style={{ width: '100%', maxWidth, alignSelf: 'center', flex: 1 }}>
+            {/* Header row: back button + step label */}
             <View style={{ minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
               {onBack ? (
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={COPY.common.back}
                   onPress={onBack}
-                  style={{
+                  style={({ pressed }) => ({
                     width: 40,
                     height: 40,
                     alignItems: 'center',
                     justifyContent: 'center',
-                    borderRadius: RADIUS.lg,
-                    backgroundColor: COLORS.border,
-                  }}
+                    borderRadius: RADIUS.full,
+                    backgroundColor: COLORS.surface,
+                    borderWidth: 1,
+                    borderColor: COLORS.border,
+                    opacity: pressed ? 0.7 : 1,
+                    ...SHADOW.card,
+                  })}
                 >
-                  <ArrowLeft size={22} color={COLORS.textSecondary} />
+                  <ArrowLeft size={20} color={COLORS.dark} />
                 </Pressable>
               ) : (
                 <View style={{ width: 40, height: 40 }} />
               )}
 
-              <Text style={{ fontFamily: FONT.semibold, color: COLORS.textSecondary }}>
+              <Text style={{ fontFamily: FONT.semibold, fontSize: 13, color: COLORS.textTertiary }}>
                 {COPY.onboarding.step(currentStep, totalSteps)}
               </Text>
             </View>
 
-            <View style={{ flex: 1, justifyContent: 'center', paddingVertical: 32 }}>
+            {/* Progress bar */}
+            <View style={{ marginTop: 12 }}>
+              <StepProgressBar current={currentStep} total={totalSteps} />
+            </View>
+
+            {/* Content area */}
+            <View style={{ flex: 1, justifyContent: 'center', paddingVertical: 36 }}>
               <Text
                 style={{
-                  marginBottom: 12,
+                  marginBottom: 10,
                   textAlign: 'center',
-                  fontSize: 30,
-                  lineHeight: 36,
+                  fontSize: 32,
+                  lineHeight: 38,
                   fontFamily: FONT.extrabold,
                   color: COLORS.dark,
                 }}
@@ -116,7 +155,7 @@ export function ProfileOnboardingStep({
               </Text>
               <Text
                 style={{
-                  marginBottom: 28,
+                  marginBottom: 32,
                   textAlign: 'center',
                   fontSize: 15,
                   lineHeight: 22,
@@ -127,11 +166,11 @@ export function ProfileOnboardingStep({
                 {subtitle}
               </Text>
 
-              <View style={{ gap: 14 }}>{children}</View>
+              <View style={{ gap: 12 }}>{children}</View>
             </View>
 
             {errorMessage ? (
-              <Text style={{ marginBottom: 12, textAlign: 'center', fontFamily: FONT.medium, color: COLORS.primary }}>
+              <Text style={{ marginBottom: 14, textAlign: 'center', fontFamily: FONT.medium, fontSize: 14, color: COLORS.primary }}>
                 {errorMessage}
               </Text>
             ) : null}
@@ -140,13 +179,14 @@ export function ProfileOnboardingStep({
               accessibilityRole="button"
               disabled={!canSubmit}
               onPress={onNext}
-              style={{
+              style={({ pressed }) => ({
                 width: '100%',
-                borderRadius: RADIUS.full,
+                borderRadius: RADIUS.cta,
                 overflow: 'hidden',
-                opacity: canSubmit ? 1 : 0.3,
+                opacity: canSubmit ? (pressed ? 0.9 : 1) : 0.3,
+                transform: [{ scale: pressed && canSubmit ? 0.98 : 1 }],
                 ...SHADOW.button,
-              }}
+              })}
             >
               <LinearGradient colors={[...CTA_GRADIENT]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
                 <View
@@ -158,7 +198,7 @@ export function ProfileOnboardingStep({
                     paddingVertical: 16,
                   }}
                 >
-                  <Text style={{ fontFamily: FONT.bold, color: '#ffffff' }}>{ctaLabel}</Text>
+                  <Text style={{ fontFamily: FONT.bold, fontSize: 16, color: '#ffffff' }}>{ctaLabel}</Text>
                   <ArrowRight size={20} color="#ffffff" />
                 </View>
               </LinearGradient>
@@ -181,12 +221,15 @@ export function OnboardingTextInput(props: TextInputProps) {
           borderRadius: RADIUS.input,
           borderWidth: 1,
           borderColor: COLORS.border,
-          backgroundColor: COLORS.surfaceMuted,
+          backgroundColor: COLORS.surface,
           paddingVertical: 16,
-          paddingHorizontal: 16,
+          paddingHorizontal: 18,
           fontSize: 17,
           fontFamily: FONT.medium,
           color: COLORS.dark,
+          // Prevents iOS from applying extra letter-spacing with custom fonts
+          letterSpacing: 0,
+          ...SHADOW.card,
         },
         props.style,
       ]}
@@ -194,38 +237,106 @@ export function OnboardingTextInput(props: TextInputProps) {
   );
 }
 
+/** Single-select card — radio circle indicator. Used for gender. */
 export function SelectableOption({ label, selected, onPress }: SelectableOptionProps) {
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ selected }}
       onPress={onPress}
-      style={{
-        minHeight: 54,
+      style={({ pressed }) => ({
+        overflow: 'hidden',
+        minHeight: 64,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
         borderRadius: RADIUS.lg,
-        borderWidth: 1,
+        borderWidth: 1.5,
         borderColor: selected ? COLORS.primary : COLORS.border,
-        backgroundColor: selected ? COLORS.primaryMuted : COLORS.surfaceMuted,
-        paddingHorizontal: 16,
-      }}
+        backgroundColor: selected ? COLORS.primaryMuted : COLORS.surface,
+        paddingHorizontal: 20,
+        opacity: pressed ? 0.85 : 1,
+        transform: [{ scale: pressed ? 0.985 : 1 }],
+        ...SHADOW.card,
+      })}
     >
-      <Text style={{ flex: 1, fontFamily: FONT.semibold, color: COLORS.dark }}>{label}</Text>
+      <Text style={{ flex: 1, fontFamily: FONT.semibold, fontSize: 17, color: COLORS.dark }}>
+        {label}
+      </Text>
+      {/* Radio circle */}
       <View
         style={{
-          width: 24,
-          height: 24,
+          width: 22,
+          height: 22,
           alignItems: 'center',
           justifyContent: 'center',
-          borderRadius: 12,
+          borderRadius: 11,
           borderWidth: 2,
           borderColor: selected ? COLORS.primary : COLORS.textTertiary,
-          backgroundColor: selected ? COLORS.primary : 'transparent',
+          backgroundColor: 'transparent',
         }}
       >
-        {selected ? <Check size={14} color="#ffffff" strokeWidth={3} /> : null}
+        {selected ? (
+          <View
+            style={{
+              width: 10,
+              height: 10,
+              borderRadius: 5,
+              backgroundColor: COLORS.primary,
+            }}
+          />
+        ) : null}
+      </View>
+    </Pressable>
+  );
+}
+
+type MultiSelectOptionProps = {
+  label: string;
+  selected: boolean;
+  onPress: () => void;
+};
+
+/** Multi-select card — square checkbox indicator. Used for looking-for. */
+export function MultiSelectOption({ label, selected, onPress }: MultiSelectOptionProps) {
+  return (
+    <Pressable
+      accessibilityRole="checkbox"
+      accessibilityState={{ checked: selected }}
+      onPress={onPress}
+      style={({ pressed }) => ({
+        overflow: 'hidden',
+        minHeight: 64,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        borderRadius: RADIUS.lg,
+        borderWidth: 1.5,
+        borderColor: selected ? COLORS.secondary : COLORS.border,
+        backgroundColor: selected ? 'rgba(212,121,236,0.1)' : COLORS.surface,
+        paddingHorizontal: 20,
+        opacity: pressed ? 0.85 : 1,
+        transform: [{ scale: pressed ? 0.985 : 1 }],
+        ...SHADOW.card,
+      })}
+    >
+      <Text style={{ flex: 1, fontFamily: FONT.semibold, fontSize: 17, color: COLORS.dark }}>
+        {label}
+      </Text>
+      {/* Square checkbox */}
+      <View
+        style={{
+          width: 22,
+          height: 22,
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderRadius: 6,
+          borderWidth: 2,
+          borderColor: selected ? COLORS.secondary : COLORS.textTertiary,
+          backgroundColor: selected ? COLORS.secondary : 'transparent',
+        }}
+      >
+        {selected ? <Check size={13} color="#ffffff" strokeWidth={3} /> : null}
       </View>
     </Pressable>
   );

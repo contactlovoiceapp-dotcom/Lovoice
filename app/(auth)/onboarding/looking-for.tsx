@@ -5,8 +5,8 @@ import { useRouter } from 'expo-router';
 
 import { COPY } from '@/copy';
 import {
+  MultiSelectOption,
   ProfileOnboardingStep,
-  SelectableOption,
 } from '@/features/profile/components/ProfileOnboardingStep';
 import {
   validateLookingFor,
@@ -48,7 +48,7 @@ export default function OnboardingLookingForRoute() {
       onNext={handleNext}
     >
       {ONBOARDING_GENDERS.map((value) => (
-        <SelectableOption
+        <MultiSelectOption
           key={value}
           label={COPY.onboarding.lookingFor.options[value]}
           selected={lookingFor.includes(value)}

@@ -33,7 +33,8 @@ const config: ExpoConfig = {
   android: {
     adaptiveIcon: {
       foregroundImage: "./assets/adaptive-icon.png",
-      backgroundColor: "#f8f5ff",
+      // White background so the logo renders cleanly on any launcher shape
+      backgroundColor: "#ffffff",
     },
     edgeToEdgeEnabled: true,
     package: "com.shrtcut.lovoice",
