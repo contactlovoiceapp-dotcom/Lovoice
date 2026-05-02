@@ -1,7 +1,8 @@
-/* OTP route tests — verify post-OTP routing: returning users → discover, new users → onboarding.
+/* OTP route tests — verify that the OTP screen delegates navigation to AuthRedirector.
  *
- * These tests guard the critical sign-in vs sign-up branching that happens after OTP
- * verification. A regression here means existing users re-do the full onboarding.
+ * After successful verification, otp.tsx must NOT navigate. It stays in loading state
+ * and lets the auth state change propagate through useAuth → AuthRedirector.
+ * This is the key invariant that prevents the onboarding flash for returning users.
  */
 
 import React from 'react';
@@ -29,10 +30,6 @@ jest.mock('lucide-react-native', () => ({
 
 const mockVerifyOtp = jest.fn();
 const mockSignInWithOtp = jest.fn();
-const mockMaybeSingle = jest.fn();
-const mockEq = jest.fn(() => ({ maybeSingle: mockMaybeSingle }));
-const mockSelect = jest.fn(() => ({ eq: mockEq }));
-const mockFrom = jest.fn(() => ({ select: mockSelect }));
 
 jest.mock('../../../src/lib/supabase', () => ({
   getSupabaseClient: () => ({
@@ -40,7 +37,6 @@ jest.mock('../../../src/lib/supabase', () => ({
       verifyOtp: mockVerifyOtp,
       signInWithOtp: mockSignInWithOtp,
     },
-    from: mockFrom,
   }),
 }));
 
@@ -107,55 +103,46 @@ function enterCodeAndSubmit(code = '123456') {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe('OtpRoute — post-verification routing', () => {
+describe('OtpRoute — post-verification behaviour', () => {
   beforeEach(() => {
     mockReplace.mockClear();
     mockBack.mockClear();
     mockVerifyOtp.mockReset();
     mockSignInWithOtp.mockReset();
-    mockFrom.mockClear();
-    mockSelect.mockClear();
-    mockEq.mockClear();
-    mockMaybeSingle.mockReset();
   });
 
-  it('sends a RETURNING user (profile exists) to /(main)/discover', async () => {
+  it('does NOT navigate after successful verification (AuthRedirector handles it)', async () => {
     mockVerifyOtp.mockResolvedValue({
       data: { user: { id: 'user-42' }, session: {} },
       error: null,
     });
-    mockMaybeSingle.mockResolvedValue({ data: { id: 'user-42' }, error: null });
 
     render(<OtpRoute />);
     enterCodeAndSubmit();
 
+    // Give any pending promises time to resolve.
     await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith('/(main)/discover');
+      expect(mockVerifyOtp).toHaveBeenCalled();
     });
 
-    expect(mockFrom).toHaveBeenCalledWith('profiles');
-    expect(mockEq).toHaveBeenCalledWith('id', 'user-42');
-    expect(mockReplace).not.toHaveBeenCalledWith('/(auth)/onboarding/name');
+    expect(mockReplace).not.toHaveBeenCalled();
   });
 
-  it('sends a NEW user (no profile) to /(auth)/onboarding/name', async () => {
+  it('stays in loading state after successful verification', async () => {
     mockVerifyOtp.mockResolvedValue({
-      data: { user: { id: 'user-new' }, session: {} },
+      data: { user: { id: 'user-42' }, session: {} },
       error: null,
     });
-    mockMaybeSingle.mockResolvedValue({ data: null, error: null });
 
     render(<OtpRoute />);
     enterCodeAndSubmit();
 
     await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith('/(auth)/onboarding/name');
+      expect(screen.getByText('Vérification...')).toBeTruthy();
     });
-
-    expect(mockReplace).not.toHaveBeenCalledWith('/(main)/discover');
   });
 
-  it('shows an error and does NOT navigate when OTP verification fails', async () => {
+  it('shows an error and resets loading when OTP verification fails', async () => {
     mockVerifyOtp.mockResolvedValue({
       data: { user: null, session: null },
       error: { message: 'Invalid token' },
@@ -169,35 +156,6 @@ describe('OtpRoute — post-verification routing', () => {
     });
 
     expect(mockReplace).not.toHaveBeenCalled();
-    expect(mockFrom).not.toHaveBeenCalled();
-  });
-
-  it('still navigates to onboarding when verifyOtp returns no user id', async () => {
-    mockVerifyOtp.mockResolvedValue({
-      data: { user: null, session: {} },
-      error: null,
-    });
-
-    render(<OtpRoute />);
-    enterCodeAndSubmit();
-
-    await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith('/(auth)/onboarding/name');
-    });
-  });
-
-  it('navigates to onboarding when profile query errors (fail-open for new users)', async () => {
-    mockVerifyOtp.mockResolvedValue({
-      data: { user: { id: 'user-err' }, session: {} },
-      error: null,
-    });
-    mockMaybeSingle.mockResolvedValue({ data: null, error: { message: 'RLS' } });
-
-    render(<OtpRoute />);
-    enterCodeAndSubmit();
-
-    await waitFor(() => {
-      expect(mockReplace).toHaveBeenCalledWith('/(auth)/onboarding/name');
-    });
+    expect(screen.getByText('Vérifier')).toBeTruthy();
   });
 });

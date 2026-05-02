@@ -62,7 +62,7 @@ export default function OtpRoute() {
     setIsSubmitting(true);
     setErrorMessage(null);
 
-    const { data: otpData, error } = await supabase.auth.verifyOtp({
+    const { error } = await supabase.auth.verifyOtp({
       phone,
       token: code,
       type: 'sms',
@@ -74,27 +74,9 @@ export default function OtpRoute() {
       return;
     }
 
-    // Returning users already have a profile — send them straight to the feed.
-    const userId = otpData.user?.id;
-
-    if (userId) {
-      const { data: existingProfile } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('id', userId)
-        .maybeSingle();
-
-      setIsSubmitting(false);
-
-      if (existingProfile) {
-        router.replace('/(main)/discover');
-        return;
-      }
-    } else {
-      setIsSubmitting(false);
-    }
-
-    router.replace('/(auth)/onboarding/name');
+    // Success — stay in loading state. The auth state change propagates through
+    // useAuth → loadProfile → AuthRedirector, which navigates to the correct
+    // destination (discover for returning users, onboarding for new users).
   };
 
   const handleResend = async () => {

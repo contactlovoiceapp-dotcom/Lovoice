@@ -1,4 +1,10 @@
-/* Keeps users in the correct route group for their current auth/profile state. */
+/* Keeps users in the correct route group for their current auth/profile state.
+ *
+ * This is the SINGLE source of truth for auth-based navigation. Screens should
+ * never call router.replace() in response to auth state changes — they update
+ * state and let this component react. Screens only navigate for in-flow user
+ * actions (next onboarding step, skip recording, etc.).
+ */
 
 import { useEffect } from 'react';
 import { usePathname, useRouter, useSegments } from 'expo-router';
@@ -33,17 +39,12 @@ export default function AuthRedirector() {
       return;
     }
 
-    // Authenticated but no profile yet: push to the onboarding wizard.
-    // Only applies within the auth group — users already in the main group are likely
-    // waiting for the profile to finish loading after a fresh session and should not be bounced.
-    if (session && !profile && isInAuthGroup && !isOnSignupFlow(pathname)) {
+    if (session && !profile && !isOnSignupFlow(pathname)) {
       router.replace('/(auth)/onboarding/name');
       return;
     }
 
     if (session && profile && !isInMainGroup) {
-      // Let the user finish the full signup flow (onboarding → record → profile-setup)
-      // before redirecting to the main feed.
       if (isInAuthGroup && isOnSignupFlow(pathname)) {
         return;
       }

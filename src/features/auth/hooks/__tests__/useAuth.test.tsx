@@ -176,4 +176,87 @@ describe('AuthProvider', () => {
     expect(getLatestAuth().session?.user.id).toBe('user-b');
     expect(getLatestAuth().profile?.id).toBe('user-b');
   });
+
+  it('sets isLoading to true during onAuthStateChange profile fetch (prevents redirect flash)', async () => {
+    const session = createSession('user-login');
+    const profileRequest = createDeferred<{ data: Profile; error: null }>();
+    let authStateCallback:
+      | ((_event: string, nextSession: Session | null) => void)
+      | null = null;
+    let latestAuth: ReturnType<typeof useAuth> | null = null;
+    const getLatestAuth = () => {
+      if (!latestAuth) {
+        throw new Error('Auth state was not captured.');
+      }
+
+      return latestAuth;
+    };
+
+    jest.mocked(getSupabaseClient).mockReturnValue({
+      auth: {
+        getSession: jest.fn().mockResolvedValue({
+          data: { session: null },
+          error: null,
+        }),
+        onAuthStateChange: jest.fn((callback) => {
+          authStateCallback = callback;
+          return {
+            data: {
+              subscription: {
+                unsubscribe: jest.fn(),
+              },
+            },
+          };
+        }),
+        signOut: jest.fn(),
+      },
+      from: jest.fn(() => ({
+        select: jest.fn(() => ({
+          eq: jest.fn(() => ({
+            maybeSingle: jest.fn(() => profileRequest.promise),
+          })),
+        })),
+      })),
+    } as unknown as ReturnType<typeof getSupabaseClient>);
+
+    render(
+      <AuthProvider>
+        <AuthProbe
+          onChange={(value) => {
+            latestAuth = value;
+          }}
+        />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => {
+      expect(getLatestAuth().isLoading).toBe(false);
+    });
+
+    // Simulate OTP verification triggering an auth state change.
+    act(() => {
+      authStateCallback?.('SIGNED_IN', session);
+    });
+
+    // isLoading must be true while the profile is being fetched.
+    await waitFor(() => {
+      expect(getLatestAuth().isLoading).toBe(true);
+      expect(getLatestAuth().session?.user.id).toBe('user-login');
+      expect(getLatestAuth().profile).toBeNull();
+    });
+
+    // Resolve the profile fetch.
+    await act(async () => {
+      profileRequest.resolve({
+        data: createProfile('user-login'),
+        error: null,
+      });
+    });
+
+    // Now isLoading is false and the profile is available.
+    await waitFor(() => {
+      expect(getLatestAuth().isLoading).toBe(false);
+      expect(getLatestAuth().profile?.id).toBe('user-login');
+    });
+  });
 });

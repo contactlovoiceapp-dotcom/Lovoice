@@ -3,6 +3,9 @@
  * These tests are the safety net against routing regressions. Every redirect rule in
  * AuthRedirector must have an explicit test case here. If you add or change a rule,
  * add a matching row to the table below.
+ *
+ * KEY INVARIANT: AuthRedirector never redirects while isLoading is true. This prevents
+ * flashes caused by stale profile state during auth transitions (e.g. after OTP verification).
  */
 
 import React from 'react';
@@ -53,12 +56,18 @@ beforeEach(() => {
 });
 
 // ---------------------------------------------------------------------------
-// Guard: loading & splash
+// Guard: loading & splash — AuthRedirector must NEVER act while state is stale
 // ---------------------------------------------------------------------------
 describe('guard states', () => {
-  it('does nothing while auth state is still loading', () => {
+  it('does nothing while auth state is loading (initial boot)', () => {
     setAuth({ isLoading: true });
     renderWithRoute('/(main)/discover', ['(main)']);
+    expect(mockReplace).not.toHaveBeenCalled();
+  });
+
+  it('does nothing while auth state is loading (post-OTP profile fetch)', () => {
+    setAuth({ isLoading: true, session: SESSION, profile: null });
+    renderWithRoute('/(auth)/otp', ['(auth)']);
     expect(mockReplace).not.toHaveBeenCalled();
   });
 
@@ -117,6 +126,11 @@ describe('new user (session, no profile)', () => {
     expect(mockReplace).toHaveBeenCalledWith('/(auth)/onboarding/name');
   });
 
+  it('redirects from main group to onboarding (e.g. profile deleted server-side)', () => {
+    renderWithRoute('/(main)/discover', ['(main)']);
+    expect(mockReplace).toHaveBeenCalledWith('/(auth)/onboarding/name');
+  });
+
   const signupFlowPaths: [string, string[]][] = [
     ['/(auth)/onboarding/name', ['(auth)', 'onboarding', 'name']],
     ['/(auth)/onboarding/birthdate', ['(auth)', 'onboarding', 'birthdate']],
@@ -134,11 +148,6 @@ describe('new user (session, no profile)', () => {
       expect(mockReplace).not.toHaveBeenCalled();
     },
   );
-
-  it('does NOT redirect when already in the main group (profile still loading after OTP)', () => {
-    renderWithRoute('/(main)/discover', ['(main)']);
-    expect(mockReplace).not.toHaveBeenCalled();
-  });
 });
 
 // ---------------------------------------------------------------------------
