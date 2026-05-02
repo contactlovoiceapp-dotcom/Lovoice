@@ -1,4 +1,4 @@
-/* Jest configuration for the LOVoice React Native app. */
+/* Jest configuration for the Lovoice React Native app. */
 
 /** @type {import('jest').Config} */
 module.exports = {

@@ -108,7 +108,6 @@ export default function OnboardingCityRoute() {
       });
       router.push('/(auth)/record');
     } catch (saveError) {
-      console.error('[city.tsx] Profile save failed:', saveError);
       setError('save_failed');
     }
   };

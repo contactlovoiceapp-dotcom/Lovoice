@@ -24,8 +24,8 @@ export default function SplashRoute() {
       }
 
       // Session without a profile means OTP succeeded but signup never completed.
-      // Resume from the very first wizard step (CGU) — the in-memory wizard state is
-      // wiped on app restart, so jumping to a later step would skip required validations.
+      // Resume from the first wizard step — the in-memory wizard state is wiped on
+      // app restart, so jumping to a later step would skip required validations.
       if (session && !profile) {
         router.replace('/(auth)/onboarding/name');
         return;

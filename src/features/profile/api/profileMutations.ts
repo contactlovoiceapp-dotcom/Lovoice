@@ -113,7 +113,6 @@ export function useUpsertProfile() {
       }
 
       const payload = buildProfileUpsertPayload(input, session, input.country);
-      console.log('[useUpsertProfile] Payload:', JSON.stringify(payload));
       const { data, error } = await supabase
         .from('profiles')
         .upsert(payload, { onConflict: 'id' })
@@ -121,7 +120,6 @@ export function useUpsertProfile() {
         .single();
 
       if (error) {
-        console.error('[useUpsertProfile] Supabase error:', JSON.stringify(error));
         throw new Error(error.message);
       }
 

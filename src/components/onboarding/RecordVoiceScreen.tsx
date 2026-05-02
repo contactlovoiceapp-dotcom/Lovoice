@@ -2,7 +2,6 @@
 
 import React, { useEffect, useState } from 'react';
 import {
-  Platform,
   Pressable,
   Text,
   View,
