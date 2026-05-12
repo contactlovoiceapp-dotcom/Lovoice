@@ -72,6 +72,41 @@ Reactive moderation (block + report + manual takedown by the operator) is part o
 - Files are 32 kbps mono AAC, ~240 KB/min ±10%.
 - Upload works on flaky network (manual test: airplane mode mid-upload → retry).
 
+### Mobile smoke test (run on a real device before tagging)
+
+Cover these once on iOS and once on Android. Backend curl walkthrough lives at
+`supabase/functions/SMOKE_TEST.md` and stays separate.
+
+1. **First voice** — fresh sign-up → onboarding → record screen → mic permission
+   prompt accepted → record 12 s → live waveform animates → tap stop → preview
+   plays back from documentDirectory cache → "Continuer" → upload spinner →
+   profile-setup screen lands with the active voice already populated.
+2. **Min duration** — start recording, tap stop at < 10 s; the CTA should stay
+   "Encore N sec" and the mic stop should be a no-op until the threshold.
+3. **Auto-stop** — let the recorder run; at 5:00 it must stop on its own and
+   show the preview state. Timer must show `5:00 / 5:00` exactly.
+4. **Permission denied** — deny mic permission once, observe the Settings icon
+   on the mic button + the French permission-denied message in the hint card,
+   tap to deep-link to system settings, grant, return → next mic tap records.
+5. **Airplane mode mid-upload** — record 30 s, toggle airplane mode just
+   before tapping "Continuer", confirm the CTA flips to "Réessayer" and the
+   error status appears. Toggle airplane mode off, tap "Réessayer" → upload
+   succeeds and onNext fires.
+6. **Re-record from profile** — open profile tab, tap "Changer mon vocal",
+   record a new voice, "Continuer" → returns to profile with the newer
+   `created_at` displayed and the previous voice gone (`is_active` swap).
+7. **Profile edits** — change title and mood on the profile voice card, tap
+   "Sauvegarder ", reload the screen → values persist.
+8. **Multi-device** — sign in on a second device with the same account; the
+   active voice + title + theme must appear without any local "hasRecorded"
+   priming (proves the gate is fully derived from `useActiveVoice`).
+9. **Empty state** — sign up + skip recording on onboarding; profile must
+   show the "Aucun vocal pour l'instant" empty state with the record CTA.
+10. **Cleanup** — record + cancel via the X header (or system back gesture);
+    re-open the app and confirm no orphan files remain in
+    `documentDirectory/pending/` (use `xcrun simctl get_app_container` or
+    `adb shell run-as` to inspect).
+
 ---
 
 ## Phase 5 — Discover feed (playback + autoplay + preload)
