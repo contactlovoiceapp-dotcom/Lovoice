@@ -1,0 +1,14 @@
+---
+description: Use expo install for native dependencies to avoid SDK version mismatches
+alwaysApply: true
+---
+
+# Expo Dependencies
+
+When adding or upgrading a package that touches native code (expo-*, react-native-*, @react-native-community/*):
+
+1. Use `npx expo install <package>` — never `npm install`.
+2. Run `npx expo-doctor` to check for peer dependency mismatches.
+3. If a peer dep requires a higher version than what expo pinned, check the actual parent's peerDependencies and install the right version manually.
+
+That's it. No extra build/test sequence — the normal dev workflow catches the rest.

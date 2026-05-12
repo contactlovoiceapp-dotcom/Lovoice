@@ -155,6 +155,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      // Verify the session is still valid server-side: if the user was deleted
+      // (e.g. via the reset-dev-account script) but the JWT lingers in SecureStore,
+      // getUser() will fail. Force a sign-out so the app returns to the login screen
+      // instead of landing in a broken onboarding state.
+      if (data.session) {
+        const { error: userError } = await supabase.auth.getUser();
+        if (userError) {
+          await supabase.auth.signOut().catch(() => null);
+          if (!isMounted) return;
+          setSession(null);
+          setProfile(null);
+          setIsLoading(false);
+          return;
+        }
+      }
+
       setSession(data.session);
       await loadProfile(data.session);
 

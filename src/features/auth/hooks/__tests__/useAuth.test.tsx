@@ -108,6 +108,7 @@ describe('AuthProvider', () => {
           data: { session: initialSession },
           error: null,
         }),
+        getUser: jest.fn().mockResolvedValue({ data: { user: initialSession.user }, error: null }),
         onAuthStateChange: jest.fn((callback) => {
           authStateCallback = callback;
           return {
@@ -198,6 +199,7 @@ describe('AuthProvider', () => {
           data: { session: null },
           error: null,
         }),
+        getUser: jest.fn().mockResolvedValue({ data: { user: null }, error: null }),
         onAuthStateChange: jest.fn((callback) => {
           authStateCallback = callback;
           return {

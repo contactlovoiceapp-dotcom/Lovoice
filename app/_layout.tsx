@@ -1,8 +1,9 @@
 /* Root layout — loads custom fonts, provides safe-area context, and renders the router slot. */
 
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { View } from 'react-native';
 import { Slot } from 'expo-router';
+import * as SplashScreen from 'expo-splash-screen';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
@@ -27,6 +28,9 @@ import { COLORS } from '../src/theme';
 import AuthRedirector from '../src/features/auth/components/AuthRedirector';
 import { AuthProvider } from '../src/features/auth/hooks/useAuth';
 import '../global.css';
+
+// Keep the native splash visible until fonts are loaded and the first frame is painted.
+SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const [queryClient] = useState(
@@ -56,13 +60,19 @@ export default function RootLayout() {
     PlayfairDisplay_900Black,
   });
 
+  const onLayoutReady = useCallback(async () => {
+    if (fontsLoaded) {
+      await SplashScreen.hideAsync();
+    }
+  }, [fontsLoaded]);
+
   if (!fontsLoaded) return null;
 
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <SafeAreaProvider>
-          <View style={{ flex: 1, backgroundColor: COLORS.background }}>
+          <View style={{ flex: 1, backgroundColor: COLORS.background }} onLayout={onLayoutReady}>
             <AuthRedirector />
             <Slot />
           </View>
