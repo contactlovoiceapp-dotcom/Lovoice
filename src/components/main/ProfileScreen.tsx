@@ -485,7 +485,7 @@ export default function ProfileScreen({ isOnboarding = false, onOnboardingComple
                     <Pressable
                       accessibilityRole="button"
                       accessibilityLabel={COPY.a11y.retakeVoice}
-                      onPress={() => router.push('/(auth)/record?source=profile')}
+                      onPress={() => router.push('/(main)/profile/record')}
                       style={{
                         flexDirection: 'row',
                         alignItems: 'center',

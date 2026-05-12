@@ -2,7 +2,7 @@
 
 import React from 'react';
 
-import ProfileScreen from '../../src/components/main/ProfileScreen';
+import ProfileScreen from '../../../src/components/main/ProfileScreen';
 
 export default function ProfileRoute() {
   return <ProfileScreen />;

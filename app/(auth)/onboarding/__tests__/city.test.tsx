@@ -72,7 +72,7 @@ describe('OnboardingCityRoute', () => {
         city: 'Paris',
         coordinates: { latitude: 48.8566, longitude: 2.3522 },
       });
-      expect(mockPush).toHaveBeenCalledWith('/(auth)/record');
+      expect(mockPush).toHaveBeenCalledWith('/(auth)/onboarding/record');
     });
   });
 

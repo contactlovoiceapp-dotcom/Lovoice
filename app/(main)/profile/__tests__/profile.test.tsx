@@ -4,10 +4,10 @@ import React, { type ReactNode } from 'react';
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-import ProfileRoute from '../profile';
-import { useFeedState } from '../../../src/features/feed/hooks/useFeedState';
-import { useAuth } from '../../../src/features/auth/hooks/useAuth';
-import type { Database } from '../../../src/types/database';
+import ProfileRoute from '..';
+import { useFeedState } from '../../../../src/features/feed/hooks/useFeedState';
+import { useAuth } from '../../../../src/features/auth/hooks/useAuth';
+import type { Database } from '../../../../src/types/database';
 
 type ProfileRow = Database['public']['Tables']['profiles']['Row'];
 
@@ -23,18 +23,18 @@ jest.mock('expo-router', () => ({
   }),
 }));
 
-jest.mock('../../../src/features/auth/hooks/useAuth', () => ({
+jest.mock('../../../../src/features/auth/hooks/useAuth', () => ({
   useAuth: jest.fn(),
 }));
 
-jest.mock('../../../src/features/profile/api/profileMutations', () => ({
+jest.mock('../../../../src/features/profile/api/profileMutations', () => ({
   useUpsertProfile: () => ({
     mutateAsync: jest.fn().mockResolvedValue(undefined),
     isPending: false,
   }),
 }));
 
-jest.mock('../../../src/features/profile/api/citySearch', () => ({
+jest.mock('../../../../src/features/profile/api/citySearch', () => ({
   searchCities: jest.fn().mockResolvedValue([]),
 }));
 

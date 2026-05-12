@@ -128,7 +128,7 @@ export default function DiscoverScreen() {
           hasRecordedVoice={hasRecordedVoice}
           isLiked={likedIds.has(item.id)}
           onToggleLike={() => handleToggleLike(item.id)}
-          onRecordVoice={() => router.push('/(auth)/record')}
+          onRecordVoice={() => router.push('/(auth)/onboarding/record')}
         />
       </View>
     ),

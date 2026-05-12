@@ -106,7 +106,7 @@ export default function OnboardingCityRoute() {
         city,
         coordinates,
       });
-      router.push('/(auth)/record');
+      router.push('/(auth)/onboarding/record');
     } catch (saveError) {
       setError('save_failed');
     }

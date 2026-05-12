@@ -13,13 +13,13 @@ import { useAuth } from '../hooks/useAuth';
 
 // Auth-group routes that legitimately host a session without a complete profile yet.
 // Reaching any of them must NOT trigger a redirect to the wizard.
-const SIGNUP_FLOW_PATH_SUFFIXES = ['/onboarding', '/record', '/profile-setup'];
+const SIGNUP_FLOW_PATH_SUFFIXES = ['/onboarding', '/profile-setup'];
 
-// After profile creation (city step), the user proceeds through record → profile-setup
+// After profile creation (city step), the user proceeds through onboarding/record → profile-setup
 // before reaching (main). Only these specific paths must not redirect to discover.
 // Early wizard steps (name, birthdate, gender, looking-for) are intentionally excluded
 // so a returning user cannot accidentally land back on the wizard.
-const POST_CREATION_PATH_SUFFIXES = ['/onboarding/city', '/record', '/profile-setup'];
+const POST_CREATION_PATH_SUFFIXES = ['/onboarding/city', '/onboarding/record', '/profile-setup'];
 
 function isOnSignupFlow(pathname: string): boolean {
   return SIGNUP_FLOW_PATH_SUFFIXES.some((suffix) => pathname.includes(suffix));

@@ -137,7 +137,7 @@ describe('new user (session, no profile)', () => {
     ['/(auth)/onboarding/gender', ['(auth)', 'onboarding', 'gender']],
     ['/(auth)/onboarding/looking-for', ['(auth)', 'onboarding', 'looking-for']],
     ['/(auth)/onboarding/city', ['(auth)', 'onboarding', 'city']],
-    ['/(auth)/record', ['(auth)', 'record']],
+    ['/(auth)/onboarding/record', ['(auth)', 'onboarding', 'record']],
     ['/(auth)/profile-setup', ['(auth)', 'profile-setup']],
   ];
 
@@ -175,7 +175,7 @@ describe('returning user (session + profile)', () => {
   // without AuthRedirector stealing them away to discover.
   const postCreationPaths: [string, string[]][] = [
     ['/(auth)/onboarding/city', ['(auth)', 'onboarding', 'city']],
-    ['/(auth)/record', ['(auth)', 'record']],
+    ['/(auth)/onboarding/record', ['(auth)', 'onboarding', 'record']],
     ['/(auth)/profile-setup', ['(auth)', 'profile-setup']],
   ];
 
