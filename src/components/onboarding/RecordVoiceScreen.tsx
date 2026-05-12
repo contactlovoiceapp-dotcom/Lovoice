@@ -288,13 +288,12 @@ const RecordVoiceScreen: React.FC<Props> = ({ onNext, onSkip, onCancel }) => {
   } else if (isRecording) {
     continueLabel = recorder.canStop
       ? COPY.record.ctaStopRecording
-      : COPY.record.ctaMinimumRemaining(minimumRemaining);
+      : COPY.record.ctaCancel;
   } else {
     continueLabel = COPY.record.ctaRecord;
   }
 
-  const continueDisabled =
-    isUploading || (isRecording && !recorder.canStop) || permissionDenied;
+  const continueDisabled = isUploading || permissionDenied;
 
   const handleMicPress = useCallback(async () => {
     if (isUploading) return;
@@ -313,6 +312,9 @@ const RecordVoiceScreen: React.FC<Props> = ({ onNext, onSkip, onCancel }) => {
     if (isRecording) {
       if (recorder.canStop) {
         await recorder.stop();
+      } else {
+        // Under minimum duration: discard and go back to idle so the user can retry immediately.
+        await recorder.reset();
       }
       return;
     }
@@ -328,6 +330,8 @@ const RecordVoiceScreen: React.FC<Props> = ({ onNext, onSkip, onCancel }) => {
     if (isRecording) {
       if (recorder.canStop) {
         await recorder.stop();
+      } else {
+        await recorder.reset();
       }
       return;
     }

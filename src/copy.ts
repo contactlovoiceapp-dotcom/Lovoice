@@ -99,7 +99,7 @@ export const COPY = {
     ctaUploading: 'Envoi en cours…',
     ctaRetry: 'Réessayer',
     ctaOpenSettings: 'Ouvrir les réglages',
-    ctaMinimumRemaining: (seconds: number) => `Encore ${seconds} sec`,
+    ctaCancel: 'Annuler',
     ctaStopRecording: "Arrête l'enregistrement",
     needInspiration: "Besoin d'inspiration ?",
     skip: "Passer pour l'instant",
