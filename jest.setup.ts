@@ -119,6 +119,7 @@ const mockFile = {
   move: jest.fn(),
   delete: jest.fn(),
   text: jest.fn(() => Promise.resolve('')),
+  bytes: jest.fn(() => Promise.resolve(new Uint8Array(0))),
 };
 
 const mockDirectory = {

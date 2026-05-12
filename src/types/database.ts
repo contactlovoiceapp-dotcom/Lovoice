@@ -877,8 +877,26 @@ export type Database = {
       }
       geomfromewkt: { Args: { "": string }; Returns: unknown }
       gettransactionid: { Args: never; Returns: unknown }
+      commit_voice_upload: {
+        Args: {
+          p_storage_path: string
+          p_duration_ms: number
+          p_prompt_id: string | null
+          p_title: string | null
+          p_theme: string | null
+        }
+        Returns: Database["public"]["Tables"]["voices"]["Row"][]
+      }
       is_admin: { Args: never; Returns: boolean }
       longtransactionsenabled: { Args: never; Returns: boolean }
+      update_own_voice: {
+        Args: {
+          p_voice_id: string
+          p_title: string | null
+          p_theme: string | null
+        }
+        Returns: Database["public"]["Tables"]["voices"]["Row"][]
+      }
       populate_geometry_columns:
         | { Args: { tbl_oid: unknown; use_typmod?: boolean }; Returns: number }
         | { Args: { use_typmod?: boolean }; Returns: string }
