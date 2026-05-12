@@ -48,6 +48,7 @@ const config: ExpoConfig = {
     permissions: ["RECORD_AUDIO"],
   },
   plugins: [
+    "expo-asset",
     "expo-font",
     "expo-router",
     "expo-secure-store",
