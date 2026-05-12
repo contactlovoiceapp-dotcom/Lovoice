@@ -13,11 +13,11 @@ Before starting any phase, **re-read `README.md` and `docs/ARCHITECTURE.md`**.
 
 The V1 MVP commitment covers all features described in this roadmap **except**:
 
-- automatic voice transcription (AssemblyAI),
-- automatic moderation (Hive — see `docs/ARCHITECTURE.md` §4.3.b),
-- product analytics (PostHog).
+- automatic voice transcription (AssemblyAI) — **scheduled for ~Q3 2026, Phase 9**,
+- automatic moderation (Hive — see `docs/ARCHITECTURE.md` §4.3.b) — **scheduled for ~Q3 2026, Phase 9**,
+- product analytics (PostHog) — optional, scheduled in V1.x if needed (Phase 10.bis).
 
-Reactive moderation (block + report + manual takedown by the operator) is part of the MVP commitment and replaces auto-moderation until the optional phase ships. See `docs/ARCHITECTURE.md` §4.3.a.
+Reactive moderation (block + report + manual takedown by the operator) is part of the MVP commitment and is the steady-state moderation strategy until Phase 9 ships. See `docs/ARCHITECTURE.md` §4.3.a.
 
 ---
 
@@ -55,7 +55,7 @@ Reactive moderation (block + report + manual takedown by the operator) is part o
 2. Build `useVoiceRecorder` hook: start, stop, pause, resume, metering at 50 ms, hard cap at 300_000 ms.
 3. Build `useVoicePlayer` hook (single-instance variant for preview).
 4. `app/(auth)/onboarding/record.tsx` (and a reachable `app/(main)/profile/record.tsx`): live waveform, timer, prompt picker (`prompts` table seeded), record / stop / replay / re-record.
-5. Implement Edge Function `request_upload` and `commit_upload` per ARCHITECTURE §4.2. Sign client-side using the helper from `@supabase/storage-js`. **In V1 MVP, `commit_upload` inserts the row with `status = 'approved'` and does NOT enqueue a moderation job** (the auto-moderation pipeline is the optional Phase 9). The code path that would enqueue the job is gated by an env flag (`AUTO_MODERATION_ENABLED`) so Phase 9 is a flip, not a refactor.
+5. Implement Edge Function `request_upload` and `commit_upload` per ARCHITECTURE §4.2. Sign client-side using the helper from `@supabase/storage-js`. **In V1 MVP, `commit_upload` inserts the row with `status = 'approved'` and does NOT enqueue a moderation job** (the auto-moderation pipeline is Phase 9, scheduled for ~Q3 2026). A `// TODO(phase-9)` marker is left at the future enqueue site so Phase 9 is a localized addition, not a refactor.
 6. Client uploads via signed PUT directly to Storage.
 7. After commit, set `voices.is_active = true` for the latest, `false` for previous.
 8. Display the user's current voice on the profile screen with replay.
@@ -252,9 +252,9 @@ This phase produces a **separate Next.js repository** (suggested name `lovoice-a
 
 ---
 
-## Phase 9 — Auto-moderation pipeline (transcription + safety) (AssemblyAI + Hive) optional / post-MVP
+## Phase 9 — Auto-moderation pipeline (transcription + safety) (AssemblyAI + Hive) — scheduled ~Q3 2026
 
-**Status**: **NOT in the V1 MVP commitment.** Ship only if MVP time allows, otherwise schedule for V1.x. Until this phase ships, content safety is handled by reactive moderation (Phase 6 + `docs/ARCHITECTURE.md` §4.3.a).
+**Status**: **NOT in the V1 MVP commitment, but scheduled for ~Q3 2026 (≈3 months post-MVP).** Until this phase ships, content safety is handled by reactive moderation (Phase 6 + `docs/ARCHITECTURE.md` §4.3.a). The schema, Edge Functions and storage layout shipped in Phases 1–8 are designed so this phase is a localized addition, not a refactor.
 
 **Goal**: every uploaded voice and voice message is automatically transcribed and moderated before being visible.
 
@@ -266,7 +266,7 @@ This phase produces a **separate Next.js repository** (suggested name `lovoice-a
 ### Scope
 
 1. Flip `voices.status` and `messages.status` defaults from `'approved'` back to `'pending'` (one migration).
-2. Toggle the env flag `AUTO_MODERATION_ENABLED = true` so `commit_upload` enqueues moderation jobs (the code path was prepared in Phase 4).
+2. Wire the `// TODO(phase-9)` marker in `commit_upload` to enqueue a moderation job (introduce the `AUTO_MODERATION_ENABLED` Edge Function secret at the same time, default `true` for this phase).
 3. Create `moderation_jobs` table + Edge Function `process_moderation_jobs` scheduled every 30s (Supabase scheduled cron).
 4. AssemblyAI integration: submit, poll, store transcript on the parent row.
 5. Hive Audio + Hive Text integrations.

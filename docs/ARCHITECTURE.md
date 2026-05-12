@@ -40,7 +40,7 @@ Read it together with `README.md` (constraints) and `docs/ROADMAP.md` (current p
    └──────────────────┘
 ```
 
-> **V1 MVP scope:** only the services above the dashed line are wired in V1. AssemblyAI, Hive and PostHog are documented end-to-end below but are **optional** (see `README.md` §3 and `docs/ROADMAP.md`). The schema, Edge Functions and storage layout are designed so that enabling them later is a drop-in change with no migration.
+> **V1 MVP scope:** only the services above the dashed line are wired in V1. AssemblyAI and Hive (auto-moderation, Phase 9) are **scheduled for ~Q3 2026 (≈3 months post-MVP)**. PostHog (Phase 10.bis) remains optional. The schema, Edge Functions and storage layout are designed so that enabling them later is a drop-in change with no migration.
 
 ---
 
@@ -87,9 +87,9 @@ The voice introduction. A user can have multiple voices but only **one `is_activ
 | `prompt_id`         | `uuid` FK → `prompts(id)`                                                              | nullable (free-form voice)                                                                                                                   |
 | `storage_path`      | `text`                                                                                 | `voices/{user_id}/{voice_id}.m4a`                                                                                                            |
 | `duration_ms`       | `integer` check (≤ 300_000)                                                            |                                                                                                                                              |
-| `transcript`        | `text`                                                                                 | nullable; filled by AssemblyAI when auto-transcription is enabled (optional, post-MVP)                                                       |
+| `transcript`        | `text`                                                                                 | nullable; filled by AssemblyAI when Phase 9 ships (~Q3 2026)                                                                                  |
 | `theme`             | `text`                                                                                 | UI color theme                                                                                                                               |
-| `status`            | `text` default `'approved'` check in (`pending`,`approved`,`rejected`,`manual_review`) | V1 MVP defaults to `'approved'` (reactive moderation). When the auto-moderation pipeline ships, the default flips to `'pending'` — see §4.3. |
+| `status`            | `text` default `'approved'` check in (`pending`,`approved`,`rejected`,`manual_review`) | V1 MVP defaults to `'approved'` (reactive moderation). The `pending` and `manual_review` values are kept in the enum so Phase 9 (~Q3 2026) only flips the default and wires the queue — see §4.3.b. |
 | `moderation_reason` | `text`                                                                                 | filled by Hive                                                                                                                               |
 | `is_active`         | `boolean` default false                                                                | partial unique index per user                                                                                                                |
 | `created_at`        | `timestamptz` default `now()`                                                          |                                                                                                                                              |

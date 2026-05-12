@@ -523,6 +523,7 @@ export type Database = {
           status: string
           storage_path: string
           theme: string | null
+          title: string | null
           transcript: string | null
           user_id: string
         }
@@ -536,6 +537,7 @@ export type Database = {
           status?: string
           storage_path: string
           theme?: string | null
+          title?: string | null
           transcript?: string | null
           user_id: string
         }
@@ -549,6 +551,7 @@ export type Database = {
           status?: string
           storage_path?: string
           theme?: string | null
+          title?: string | null
           transcript?: string | null
           user_id?: string
         }
