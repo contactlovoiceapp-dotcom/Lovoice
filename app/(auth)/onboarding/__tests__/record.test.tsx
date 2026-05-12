@@ -4,7 +4,6 @@ import React from 'react';
 import { act, render, waitFor } from '@testing-library/react-native';
 
 import RecordRoute from '../record';
-import { useFeedState } from '../../../../src/features/feed/hooks/useFeedState';
 import type RecordVoiceScreen from '../../../../src/components/onboarding/RecordVoiceScreen';
 
 const mockReplace = jest.fn();
@@ -48,28 +47,24 @@ describe('RecordRoute', () => {
     mockRefreshProfile.mockReset();
     mockRefreshProfile.mockResolvedValue(undefined);
     mockRecordVoiceScreenProps = null;
-    useFeedState.getState().setHasRecordedVoice(false);
   });
 
-  it('marks the voice as recorded and opens voice profile setup', () => {
+  it('opens voice profile setup after a successful upload', () => {
     render(<RecordRoute />);
 
-    expect(useFeedState.getState().hasRecordedVoice).toBe(false);
     mockRecordVoiceScreenProps?.onNext?.();
 
-    expect(useFeedState.getState().hasRecordedVoice).toBe(true);
     expect(mockPush).toHaveBeenCalledWith('/(auth)/profile-setup');
     expect(mockBack).not.toHaveBeenCalled();
   });
 
-  it('keeps voices locked when the user skips recording', async () => {
+  it('refreshes the profile and lands on discover when the user skips', async () => {
     render(<RecordRoute />);
 
     await act(async () => {
       mockRecordVoiceScreenProps?.onSkip?.();
     });
 
-    expect(useFeedState.getState().hasRecordedVoice).toBe(false);
     await waitFor(() => {
       expect(mockRefreshProfile).toHaveBeenCalledTimes(1);
       expect(mockReplace).toHaveBeenCalledWith('/(main)/discover');

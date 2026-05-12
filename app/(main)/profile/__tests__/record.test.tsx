@@ -4,7 +4,6 @@ import React from 'react';
 import { render } from '@testing-library/react-native';
 
 import ProfileRecordRoute from '../record';
-import { useFeedState } from '../../../../src/features/feed/hooks/useFeedState';
 import type RecordVoiceScreen from '../../../../src/components/onboarding/RecordVoiceScreen';
 
 const mockReplace = jest.fn();
@@ -39,29 +38,24 @@ describe('ProfileRecordRoute', () => {
     mockPush.mockClear();
     mockBack.mockClear();
     mockRecordVoiceScreenProps = null;
-    useFeedState.getState().setHasRecordedVoice(false);
   });
 
-  it('marks the voice as recorded and returns to the profile', () => {
-    useFeedState.getState().setHasRecordedVoice(false);
+  it('returns to the profile after a successful upload', () => {
     render(<ProfileRecordRoute />);
 
     mockRecordVoiceScreenProps?.onNext?.();
 
-    expect(useFeedState.getState().hasRecordedVoice).toBe(true);
     expect(mockReplace).toHaveBeenCalledWith('/(main)/profile');
     expect(mockBack).not.toHaveBeenCalled();
     expect(mockPush).not.toHaveBeenCalled();
   });
 
-  it('returns to the profile without changing voice state when cancelled', () => {
-    useFeedState.getState().setHasRecordedVoice(true);
+  it('returns to the profile when the user cancels', () => {
     render(<ProfileRecordRoute />);
 
     expect(mockRecordVoiceScreenProps?.onCancel).toBeDefined();
     mockRecordVoiceScreenProps?.onCancel?.();
 
-    expect(useFeedState.getState().hasRecordedVoice).toBe(true);
     expect(mockReplace).toHaveBeenCalledWith('/(main)/profile');
     expect(mockBack).not.toHaveBeenCalled();
   });

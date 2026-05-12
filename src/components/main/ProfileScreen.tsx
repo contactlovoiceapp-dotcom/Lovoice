@@ -1,7 +1,8 @@
 /* Shared profile screen — renders the full profile editor for both the main tab and onboarding setup. */
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Modal,
@@ -13,7 +14,7 @@ import {
   View,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { LogOut, Pause, Play, Plus, RefreshCw, X } from 'lucide-react-native';
+import { LogOut, Mic, Pause, Play, Plus, RefreshCw, X } from 'lucide-react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -22,9 +23,13 @@ import { COPY } from '@/copy';
 import { COLORS, CTA_GRADIENT, FONT, ONBOARDING_GRADIENT, RADIUS, SHADOW, THEME_GRADIENTS } from '@/theme';
 import { ColorTheme } from '@/types';
 import { useAuth } from '@/features/auth/hooks/useAuth';
-import { useFeedState } from '@/features/feed/hooks/useFeedState';
 import { searchCities, type CitySearchResult } from '@/features/profile/api/citySearch';
 import { useUpsertProfile } from '@/features/profile/api/profileMutations';
+import { useActiveVoice, useVoiceSignedUrl } from '@/features/voices/api/voiceQueries';
+import { useUpdateVoice } from '@/features/voices/api/voiceMutations';
+import { useVoicePlayer } from '@/features/voices/hooks/useVoicePlayer';
+import type { VoiceTheme } from '@/features/voices/types';
+import { formatRelativeTime } from '@/lib/formatRelativeTime';
 import {
   OnboardingTextInput,
   SelectableOption,
@@ -104,6 +109,15 @@ function normalizeProfileGenders(values: unknown): GenderValue[] {
   );
 }
 
+const VALID_VOICE_THEMES: ReadonlySet<VoiceTheme> = new Set(['sunset', 'chill', 'electric', 'midnight']);
+
+function voiceThemeToColorTheme(theme: string | null | undefined): ColorTheme {
+  if (theme && VALID_VOICE_THEMES.has(theme as VoiceTheme)) {
+    return theme as ColorTheme;
+  }
+  return ColorTheme.Sunset;
+}
+
 function uniqueCityResults(results: CitySearchResult[]): CitySearchResult[] {
   return results.filter(
     (result, index, list) =>
@@ -148,16 +162,32 @@ export default function ProfileScreen({ isOnboarding = false, onOnboardingComple
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { signOut, profile } = useAuth();
-  const { setHasRecordedVoice } = useFeedState();
   const upsertProfile = useUpsertProfile();
-  const [isVoicePlaying, setIsVoicePlaying] = useState(false);
+  const updateVoice = useUpdateVoice();
+
+  const activeVoiceQuery = useActiveVoice(profile?.id ?? null);
+  const activeVoice = activeVoiceQuery.data ?? null;
+  const signedUrlQuery = useVoiceSignedUrl(activeVoice?.storage_path ?? null);
+  const signedUrl = signedUrlQuery.data ?? null;
+  const voicePlayer = useVoicePlayer({ uri: signedUrl });
+
   const [voiceTitle, setVoiceTitle] = useState('');
   const [mood, setMood] = useState<ColorTheme>(ColorTheme.Sunset);
+  const [voiceDirty, setVoiceDirty] = useState(false);
   const [bioEmojis, setBioEmojis] = useState<[string, string, string]>([
     profile?.bio_emojis?.[0] ?? '',
     profile?.bio_emojis?.[1] ?? '',
     profile?.bio_emojis?.[2] ?? '',
   ]);
+
+  // Sync local title/mood with the latest active voice each time it changes (login, refetch, new upload).
+  // Resets the dirty flag because the new server values supersede in-flight edits.
+  useEffect(() => {
+    if (!activeVoice) return;
+    setVoiceTitle(activeVoice.title ?? '');
+    setMood(voiceThemeToColorTheme(activeVoice.theme));
+    setVoiceDirty(false);
+  }, [activeVoice?.id, activeVoice?.title, activeVoice?.theme, activeVoice]);
 
   const [lookingFor, setLookingFor] = useState<GenderValue[]>(
     normalizeProfileGenders(profile?.looking_for),
@@ -266,6 +296,18 @@ export default function ProfileScreen({ isOnboarding = false, onOnboardingComple
         bioEmojis,
         country: profile?.country ?? undefined,
       });
+
+      // Persist voice metadata only when the user actually changed it; avoids needless writes
+      // and respects the catchphrase max length already enforced server-side by update_own_voice.
+      if (activeVoice && voiceDirty) {
+        await updateVoice.mutateAsync({
+          voiceId: activeVoice.id,
+          title: voiceTitle.trim() || null,
+          theme: mood as VoiceTheme,
+        });
+        setVoiceDirty(false);
+      }
+
       if (isOnboarding) {
         onOnboardingComplete?.();
       } else {
@@ -281,11 +323,10 @@ export default function ProfileScreen({ isOnboarding = false, onOnboardingComple
   const handleSignOut = useCallback(async () => {
     try {
       await signOut();
-      setHasRecordedVoice(false);
     } catch {
       Alert.alert(COPY.profile.signOutTitle, COPY.profile.signOutError);
     }
-  }, [signOut, setHasRecordedVoice]);
+  }, [signOut]);
 
   const age = profile?.birthdate ? calculateAge(profile.birthdate) : null;
   const genderText = GENDER_LABELS[profile?.gender ?? ''] ?? '';
@@ -464,158 +505,230 @@ export default function ProfileScreen({ isOnboarding = false, onOnboardingComple
             <View style={{ marginBottom: 28, gap: 16 }}>
               <SectionTitle label={COPY.profile.voiceCard} />
 
-              <View
-                style={{
-                  borderRadius: RADIUS.xl,
-                  borderWidth: 1,
-                  borderColor: COLORS.border,
-                  backgroundColor: COLORS.surfaceMuted,
-                  padding: 16,
-                  ...SHADOW.card,
-                }}
-              >
-                <View style={{ marginBottom: 14 }}>
-                  <Text style={{ fontFamily: FONT.bold, fontSize: 16, color: COLORS.dark }}>
-                    {COPY.profile.voiceCard}
-                  </Text>
-                  <Text style={{ fontFamily: FONT.regular, fontSize: 12, color: COLORS.textTertiary }}>
-                    {COPY.profile.voiceTimestamp}
-                  </Text>
-                  {!isOnboarding && (
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel={COPY.a11y.retakeVoice}
-                      onPress={() => router.push('/(main)/profile/record')}
-                      style={{
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: 4,
-                        marginTop: 6,
-                        alignSelf: 'flex-start',
-                      }}
-                    >
-                      <RefreshCw size={12} color={COLORS.textTertiary} />
-                      <Text
-                        style={{
-                          fontSize: 12,
-                          fontFamily: FONT.medium,
-                          color: COLORS.textTertiary,
-                        }}
-                      >
-                        {COPY.profile.recordVoiceAgain}
-                      </Text>
-                    </Pressable>
-                  )}
-                </View>
-
-                {/* Play button + inline title */}
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={isVoicePlaying ? COPY.a11y.pause : COPY.a11y.play}
-                    onPress={() => setIsVoicePlaying((playing) => !playing)}
-                    style={{ width: 48, height: 48, borderRadius: 24, overflow: 'hidden' }}
-                  >
-                    <LinearGradient
-                      colors={[...currentMoodColors]}
-                      start={{ x: 0, y: 0 }}
-                      end={{ x: 1, y: 1 }}
-                      style={{ width: 48, height: 48, alignItems: 'center', justifyContent: 'center' }}
-                    >
-                      {isVoicePlaying ? (
-                        <Pause size={18} color={COLORS.surface} fill={COLORS.surface} />
-                      ) : (
-                        <Play size={18} color={COLORS.surface} fill={COLORS.surface} style={{ marginLeft: 2 }} />
-                      )}
-                    </LinearGradient>
-                  </Pressable>
-
-                  <TextInput
-                    value={voiceTitle}
-                    onChangeText={(text) => {
-                      setVoiceTitle(text.slice(0, 60));
-                      setSaveSuccess(false);
-                    }}
-                    placeholder={COPY.profile.catchphraseHint}
-                    placeholderTextColor={COLORS.textTertiary}
-                    maxLength={60}
-                    style={{
-                      flex: 1,
-                      fontFamily: FONT.semibold,
-                      fontSize: 14,
-                      color: COLORS.dark,
-                      padding: 0,
-                    }}
-                  />
-                </View>
-
-                <Text
+              {!activeVoice && !activeVoiceQuery.isLoading ? (
+                <View
                   style={{
-                    marginTop: -10,
-                    paddingLeft: 62,
-                    fontSize: 11,
-                    fontFamily: FONT.regular,
-                    color: COLORS.textTertiary,
-                    fontStyle: 'italic',
-                    opacity: voiceTitle.trim().length === 0 ? 1 : 0,
+                    borderRadius: RADIUS.xl,
+                    borderWidth: 1,
+                    borderColor: COLORS.border,
+                    backgroundColor: COLORS.surfaceMuted,
+                    padding: 16,
+                    gap: 12,
+                    ...SHADOW.card,
                   }}
                 >
-                  {COPY.profile.catchphraseEditHint}
-                </Text>
-
-              </View>
-
-              {/* Mood selector */}
-              <View>
-                <Text style={{ marginBottom: 12, fontFamily: FONT.medium, color: COLORS.textSecondary }}>
-                  {COPY.profile.moodLabel}
-                </Text>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                  {MOOD_OPTIONS.map((option) => {
-                    const selected = mood === option.id;
-
-                    return (
-                      <View key={option.id} style={{ alignItems: 'center', gap: 8 }}>
-                        <Pressable
-                          accessibilityRole="button"
-                          accessibilityState={{ selected }}
-                          onPress={() => {
-                            setMood(option.id);
-                            setSaveSuccess(false);
-                          }}
-                          style={{
-                            padding: 8,
-                            borderRadius: RADIUS.full,
-                            opacity: selected ? 1 : 0.45,
-                          }}
-                        >
-                          <LinearGradient
-                            colors={[...option.colors]}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 1 }}
-                            style={{
-                              width: 48,
-                              height: 48,
-                              borderRadius: RADIUS.full,
-                              borderWidth: selected ? 2.5 : 0,
-                              borderColor: option.ctaBorderColor,
-                            }}
-                          />
-                        </Pressable>
+                  <Text style={{ fontFamily: FONT.bold, fontSize: 16, color: COLORS.dark }}>
+                    {COPY.profile.voiceMissingTitle}
+                  </Text>
+                  <Text style={{ fontFamily: FONT.regular, fontSize: 13, color: COLORS.textSecondary }}>
+                    {COPY.profile.voiceMissingHint}
+                  </Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => router.push('/(main)/profile/record')}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 8,
+                      marginTop: 4,
+                      borderRadius: RADIUS.full,
+                      paddingVertical: 12,
+                      backgroundColor: COLORS.primary,
+                    }}
+                  >
+                    <Mic size={16} color={COLORS.surface} />
+                    <Text style={{ fontFamily: FONT.bold, color: COLORS.surface }}>
+                      {COPY.profile.voiceMissingCta}
+                    </Text>
+                  </Pressable>
+                </View>
+              ) : (
+                <View
+                  style={{
+                    borderRadius: RADIUS.xl,
+                    borderWidth: 1,
+                    borderColor: COLORS.border,
+                    backgroundColor: COLORS.surfaceMuted,
+                    padding: 16,
+                    ...SHADOW.card,
+                  }}
+                >
+                  <View style={{ marginBottom: 14 }}>
+                    <Text style={{ fontFamily: FONT.bold, fontSize: 16, color: COLORS.dark }}>
+                      {COPY.profile.voiceCard}
+                    </Text>
+                    <Text style={{ fontFamily: FONT.regular, fontSize: 12, color: COLORS.textTertiary }}>
+                      {activeVoice ? formatRelativeTime(activeVoice.created_at) : ''}
+                    </Text>
+                    {!isOnboarding && (
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={COPY.a11y.retakeVoice}
+                        onPress={() => router.push('/(main)/profile/record')}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 4,
+                          marginTop: 6,
+                          alignSelf: 'flex-start',
+                        }}
+                      >
+                        <RefreshCw size={12} color={COLORS.textTertiary} />
                         <Text
                           style={{
-                            fontFamily: selected ? FONT.semibold : FONT.medium,
-                            fontSize: 11,
-                            color: selected ? option.ctaBorderColor : COLORS.textTertiary,
+                            fontSize: 12,
+                            fontFamily: FONT.medium,
+                            color: COLORS.textTertiary,
                           }}
                         >
-                          {option.label}
+                          {COPY.profile.recordVoiceAgain}
                         </Text>
-                      </View>
-                    );
-                  })}
+                      </Pressable>
+                    )}
+                  </View>
+
+                  {/* Play button + inline title */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={voicePlayer.isPlaying ? COPY.a11y.pause : COPY.a11y.play}
+                      disabled={!signedUrl}
+                      onPress={() => {
+                        if (!signedUrl) return;
+                        if (voicePlayer.isPlaying) {
+                          voicePlayer.pause();
+                        } else {
+                          void voicePlayer.play();
+                        }
+                      }}
+                      style={{
+                        width: 48,
+                        height: 48,
+                        borderRadius: 24,
+                        overflow: 'hidden',
+                        opacity: signedUrl ? 1 : 0.5,
+                      }}
+                    >
+                      <LinearGradient
+                        colors={[...currentMoodColors]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={{ width: 48, height: 48, alignItems: 'center', justifyContent: 'center' }}
+                      >
+                        {signedUrlQuery.isLoading ? (
+                          <ActivityIndicator color={COLORS.surface} size="small" />
+                        ) : voicePlayer.isPlaying ? (
+                          <Pause size={18} color={COLORS.surface} fill={COLORS.surface} />
+                        ) : (
+                          <Play size={18} color={COLORS.surface} fill={COLORS.surface} style={{ marginLeft: 2 }} />
+                        )}
+                      </LinearGradient>
+                    </Pressable>
+
+                    <TextInput
+                      value={voiceTitle}
+                      onChangeText={(text) => {
+                        setVoiceTitle(text.slice(0, 60));
+                        setVoiceDirty(true);
+                        setSaveSuccess(false);
+                      }}
+                      placeholder={COPY.profile.catchphraseHint}
+                      placeholderTextColor={COLORS.textTertiary}
+                      maxLength={60}
+                      style={{
+                        flex: 1,
+                        fontFamily: FONT.semibold,
+                        fontSize: 14,
+                        color: COLORS.dark,
+                        padding: 0,
+                      }}
+                    />
+                  </View>
+
+                  <Text
+                    style={{
+                      marginTop: -10,
+                      paddingLeft: 62,
+                      fontSize: 11,
+                      fontFamily: FONT.regular,
+                      color: COLORS.textTertiary,
+                      fontStyle: 'italic',
+                      opacity: voiceTitle.trim().length === 0 ? 1 : 0,
+                    }}
+                  >
+                    {COPY.profile.catchphraseEditHint}
+                  </Text>
+
+                  {signedUrlQuery.isError ? (
+                    <Text
+                      style={{
+                        marginTop: 12,
+                        fontSize: 12,
+                        fontFamily: FONT.medium,
+                        color: COLORS.primary,
+                      }}
+                    >
+                      {COPY.profile.voicePlayError}
+                    </Text>
+                  ) : null}
                 </View>
-              </View>
+              )}
+
+              {/* Mood selector — only meaningful when there's a voice to attach a theme to. */}
+              {activeVoice ? (
+                <View>
+                  <Text style={{ marginBottom: 12, fontFamily: FONT.medium, color: COLORS.textSecondary }}>
+                    {COPY.profile.moodLabel}
+                  </Text>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                    {MOOD_OPTIONS.map((option) => {
+                      const selected = mood === option.id;
+
+                      return (
+                        <View key={option.id} style={{ alignItems: 'center', gap: 8 }}>
+                          <Pressable
+                            accessibilityRole="button"
+                            accessibilityState={{ selected }}
+                            onPress={() => {
+                              setMood(option.id);
+                              setVoiceDirty(true);
+                              setSaveSuccess(false);
+                            }}
+                            style={{
+                              padding: 8,
+                              borderRadius: RADIUS.full,
+                              opacity: selected ? 1 : 0.45,
+                            }}
+                          >
+                            <LinearGradient
+                              colors={[...option.colors]}
+                              start={{ x: 0, y: 0 }}
+                              end={{ x: 1, y: 1 }}
+                              style={{
+                                width: 48,
+                                height: 48,
+                                borderRadius: RADIUS.full,
+                                borderWidth: selected ? 2.5 : 0,
+                                borderColor: option.ctaBorderColor,
+                              }}
+                            />
+                          </Pressable>
+                          <Text
+                            style={{
+                              fontFamily: selected ? FONT.semibold : FONT.medium,
+                              fontSize: 11,
+                              color: selected ? option.ctaBorderColor : COLORS.textTertiary,
+                            }}
+                          >
+                            {option.label}
+                          </Text>
+                        </View>
+                      );
+                    })}
+                  </View>
+                </View>
+              ) : null}
 
               {/* Emoji picker */}
               <View>
@@ -873,7 +986,7 @@ export default function ProfileScreen({ isOnboarding = false, onOnboardingComple
             {/* Save CTA */}
             <Pressable
               accessibilityRole="button"
-              disabled={upsertProfile.isPending}
+              disabled={upsertProfile.isPending || updateVoice.isPending}
               onPress={() => {
                 void handleSave();
               }}
@@ -881,7 +994,7 @@ export default function ProfileScreen({ isOnboarding = false, onOnboardingComple
                 width: '100%',
                 borderRadius: RADIUS.full,
                 overflow: 'hidden',
-                opacity: upsertProfile.isPending ? 0.5 : 1,
+                opacity: upsertProfile.isPending || updateVoice.isPending ? 0.5 : 1,
                 ...SHADOW.button,
               }}
             >
@@ -898,7 +1011,7 @@ export default function ProfileScreen({ isOnboarding = false, onOnboardingComple
                   }}
                 >
                   <Text style={{ fontFamily: FONT.bold, color: '#ffffff' }}>
-                    {upsertProfile.isPending
+                    {upsertProfile.isPending || updateVoice.isPending
                       ? COPY.profile.editSaving
                       : isOnboarding
                         ? COPY.profile.submitOnboarding

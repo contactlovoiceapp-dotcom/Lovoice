@@ -6,7 +6,6 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import ProfileSetupRoute from '../profile-setup';
 import { COPY } from '../../../src/copy';
-import { useFeedState } from '../../../src/features/feed/hooks/useFeedState';
 import { useAuth } from '../../../src/features/auth/hooks/useAuth';
 
 const mockReplace = jest.fn();
@@ -38,6 +37,27 @@ jest.mock('../../../src/features/profile/api/citySearch', () => ({
   searchCities: jest.fn().mockResolvedValue([]),
 }));
 
+jest.mock('../../../src/features/voices/api/voiceQueries', () => ({
+  useActiveVoice: () => ({ data: null, isLoading: false, isFetching: false, isError: false }),
+  useVoiceSignedUrl: () => ({ data: null, isLoading: false, isError: false }),
+}));
+
+jest.mock('../../../src/features/voices/api/voiceMutations', () => ({
+  useUpdateVoice: () => ({ mutateAsync: jest.fn().mockResolvedValue(undefined), isPending: false }),
+}));
+
+jest.mock('../../../src/features/voices/hooks/useVoicePlayer', () => ({
+  useVoicePlayer: () => ({
+    isPlaying: false,
+    durationMs: 0,
+    positionMs: 0,
+    play: jest.fn(),
+    pause: jest.fn(),
+    seek: jest.fn(),
+    unload: jest.fn(),
+  }),
+}));
+
 function Wrapper({ children }: { children: ReactNode }) {
   return <SafeAreaProvider>{children}</SafeAreaProvider>;
 }
@@ -50,7 +70,6 @@ describe('ProfileSetupRoute', () => {
     mockSignOut.mockReset();
     mockMutateAsync.mockReset();
     mockMutateAsync.mockResolvedValue(undefined);
-    useFeedState.getState().setHasRecordedVoice(false);
     jest.mocked(useAuth).mockReturnValue({
       session: null,
       profile: {
@@ -99,7 +118,6 @@ describe('ProfileSetupRoute', () => {
       fireEvent.press(cta);
     });
 
-    expect(useFeedState.getState().hasRecordedVoice).toBe(true);
     await waitFor(() => {
       expect(mockMutateAsync).toHaveBeenCalledTimes(1);
       expect(mockRefreshProfile).toHaveBeenCalledTimes(1);

@@ -20,6 +20,8 @@ import { ColorTheme } from '../../src/types';
 import { COLORS, CTA_GRADIENT, FONT, RADIUS, THEME_GRADIENTS, isHexLight } from '../../src/theme';
 import { COPY } from '../../src/copy';
 import { useFeedState } from '../../src/features/feed/hooks/useFeedState';
+import { useAuth } from '../../src/features/auth/hooks/useAuth';
+import { useActiveVoice } from '../../src/features/voices/api/voiceQueries';
 
 import ProfileCard from '../../src/components/ProfileCard';
 import DiscoverHeader from '../../src/components/DiscoverHeader';
@@ -28,6 +30,10 @@ import FiltersModal from '../../src/components/main/FiltersModal';
 export default function DiscoverScreen() {
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const router = useRouter();
+  const { profile } = useAuth();
+  const activeVoiceQuery = useActiveVoice(profile?.id ?? null);
+  // Derive the voice gate from the canonical server state — avoids stale local flags between devices.
+  const hasRecordedVoice = !!activeVoiceQuery.data;
 
   const {
     profiles,
@@ -35,7 +41,6 @@ export default function DiscoverScreen() {
     autoplay,
     activeProfileIndex,
     isGenerating,
-    hasRecordedVoice,
     setActiveProfileIndex,
     setAutoplay,
     toggleLike,

@@ -7,12 +7,10 @@ import { useRouter } from 'expo-router';
 import { COPY } from '../../../src/copy';
 import RecordVoiceScreen from '../../../src/components/onboarding/RecordVoiceScreen';
 import { useAuth } from '../../../src/features/auth/hooks/useAuth';
-import { useFeedState } from '../../../src/features/feed/hooks/useFeedState';
 
 export default function RecordRoute() {
   const router = useRouter();
   const { refreshProfile } = useAuth();
-  const setHasRecordedVoice = useFeedState((state) => state.setHasRecordedVoice);
 
   const goToDiscover = async () => {
     try {
@@ -23,14 +21,9 @@ export default function RecordRoute() {
     }
   };
 
-  const handleNext = () => {
-    setHasRecordedVoice(true);
-    router.push('/(auth)/profile-setup');
-  };
-
   return (
     <RecordVoiceScreen
-      onNext={handleNext}
+      onNext={() => router.push('/(auth)/profile-setup')}
       onSkip={() => {
         void goToDiscover();
       }}

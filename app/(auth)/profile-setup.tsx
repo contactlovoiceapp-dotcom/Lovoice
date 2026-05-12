@@ -7,15 +7,12 @@ import { useRouter } from 'expo-router';
 import ProfileScreen from '../../src/components/main/ProfileScreen';
 import { COPY } from '../../src/copy';
 import { useAuth } from '../../src/features/auth/hooks/useAuth';
-import { useFeedState } from '../../src/features/feed/hooks/useFeedState';
 
 export default function ProfileSetupRoute() {
   const router = useRouter();
   const { refreshProfile } = useAuth();
-  const setHasRecordedVoice = useFeedState((state) => state.setHasRecordedVoice);
 
   const handleOnboardingComplete = async () => {
-    setHasRecordedVoice(true);
     try {
       await refreshProfile();
       router.replace('/(main)/discover');

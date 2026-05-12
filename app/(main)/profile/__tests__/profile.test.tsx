@@ -5,7 +5,6 @@ import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import ProfileRoute from '..';
-import { useFeedState } from '../../../../src/features/feed/hooks/useFeedState';
 import { useAuth } from '../../../../src/features/auth/hooks/useAuth';
 import type { Database } from '../../../../src/types/database';
 
@@ -36,6 +35,27 @@ jest.mock('../../../../src/features/profile/api/profileMutations', () => ({
 
 jest.mock('../../../../src/features/profile/api/citySearch', () => ({
   searchCities: jest.fn().mockResolvedValue([]),
+}));
+
+jest.mock('../../../../src/features/voices/api/voiceQueries', () => ({
+  useActiveVoice: () => ({ data: null, isLoading: false, isFetching: false, isError: false }),
+  useVoiceSignedUrl: () => ({ data: null, isLoading: false, isError: false }),
+}));
+
+jest.mock('../../../../src/features/voices/api/voiceMutations', () => ({
+  useUpdateVoice: () => ({ mutateAsync: jest.fn().mockResolvedValue(undefined), isPending: false }),
+}));
+
+jest.mock('../../../../src/features/voices/hooks/useVoicePlayer', () => ({
+  useVoicePlayer: () => ({
+    isPlaying: false,
+    durationMs: 0,
+    positionMs: 0,
+    play: jest.fn(),
+    pause: jest.fn(),
+    seek: jest.fn(),
+    unload: jest.fn(),
+  }),
 }));
 
 function Wrapper({ children }: { children: ReactNode }) {
@@ -77,9 +97,7 @@ describe('ProfileRoute', () => {
     });
   });
 
-  it('signs out, clears voice gate, and returns to auth home', async () => {
-    useFeedState.getState().setHasRecordedVoice(true);
-
+  it('signs out and returns to auth home', async () => {
     const { getByRole } = render(<ProfileRoute />, { wrapper: Wrapper });
     const signOutButton = getByRole('button', { name: 'Se déconnecter' });
 
@@ -89,7 +107,6 @@ describe('ProfileRoute', () => {
 
     await waitFor(() => {
       expect(mockSignOut).toHaveBeenCalledTimes(1);
-      expect(useFeedState.getState().hasRecordedVoice).toBe(false);
     });
   });
 

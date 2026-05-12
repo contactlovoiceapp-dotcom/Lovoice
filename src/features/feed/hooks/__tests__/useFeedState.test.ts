@@ -1,4 +1,4 @@
-/* Feed store tests — protect persisted local state used by the simulated onboarding flow. */
+/* Feed store tests — protect the persistence boundary so transient feed data never leaks to disk. */
 
 import * as SecureStore from 'expo-secure-store';
 
@@ -6,19 +6,22 @@ import { useFeedState } from '../useFeedState';
 
 describe('useFeedState', () => {
   beforeEach(() => {
-    useFeedState.getState().setHasRecordedVoice(false);
     jest.clearAllMocks();
   });
 
-  it('persists the recorded voice flag without serializing transient feed data', () => {
-    useFeedState.getState().setHasRecordedVoice(true);
+  it('exposes feed gestures and never persists transient feed data', async () => {
+    // Triggering any setter forces zustand to flush the persisted slice through SecureStore.
+    useFeedState.getState().setAutoplay(true);
 
     const setItemAsync = jest.mocked(SecureStore.setItemAsync);
-    expect(setItemAsync).toHaveBeenCalledWith(
-      'lovoice-feed-state',
-      expect.stringContaining('"hasRecordedVoice":true'),
-    );
-    expect(setItemAsync.mock.calls[0][1]).not.toContain('profiles');
-    expect(setItemAsync.mock.calls[0][1]).not.toContain('likedIds');
+
+    // Wait one microtask so the persist middleware can flush asynchronously.
+    await Promise.resolve();
+
+    expect(setItemAsync).toHaveBeenCalled();
+    const lastSerialized = setItemAsync.mock.calls.at(-1)?.[1] ?? '';
+    expect(lastSerialized).not.toContain('profiles');
+    expect(lastSerialized).not.toContain('likedIds');
+    expect(lastSerialized).not.toContain('hasRecordedVoice');
   });
 });

@@ -87,11 +87,9 @@ interface FeedState {
   autoplay: boolean;
   activeProfileIndex: number;
   isGenerating: boolean;
-  hasRecordedVoice: boolean;
 
   setActiveProfileIndex: (index: number) => void;
   setAutoplay: (value: boolean) => void;
-  setHasRecordedVoice: (value: boolean) => void;
 
   toggleLike: (id: string) => void;
   togglePlay: (id: string) => void;
@@ -110,11 +108,9 @@ export const useFeedState = create<FeedState>()(
       autoplay: false,
       activeProfileIndex: 0,
       isGenerating: false,
-      hasRecordedVoice: false,
 
       setActiveProfileIndex: (index) => set({ activeProfileIndex: index }),
       setAutoplay: (value) => set({ autoplay: value }),
-      setHasRecordedVoice: (value) => set({ hasRecordedVoice: value }),
 
       toggleLike: (id) =>
         set((state) => {
@@ -183,7 +179,9 @@ export const useFeedState = create<FeedState>()(
     {
       name: 'lovoice-feed-state',
       storage: createJSONStorage(() => secureStoreStorage),
-      partialize: (state) => ({ hasRecordedVoice: state.hasRecordedVoice }),
+      // Nothing to persist today; the voice gate is derived from the server-side active voice query.
+      // Keeping the persist wrapper so future fields (filters, etc.) can opt in without restructuring.
+      partialize: () => ({}),
     },
   ),
 );
