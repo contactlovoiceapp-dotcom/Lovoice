@@ -104,7 +104,7 @@ describe('useVoicePlayer — seek()', () => {
 });
 
 describe('useVoicePlayer — unload()', () => {
-  it('pauses and replaces the source with null', async () => {
+  it('pauses without calling replace (expo-audio 0.5 rejects null sources)', async () => {
     const { result } = renderHook(() =>
       useVoicePlayer({ uri: 'file:///document/pending/voice.m4a' }),
     );
@@ -113,12 +113,14 @@ describe('useVoicePlayer — unload()', () => {
       await result.current.play();
     });
 
+    mocks.player.replace.mockClear();
+
     act(() => {
       result.current.unload();
     });
 
     expect(mocks.player.pause).toHaveBeenCalled();
-    expect(mocks.player.replace).toHaveBeenCalledWith(null);
+    expect(mocks.player.replace).not.toHaveBeenCalled();
   });
 
   it('resets the session flag so the next play() reconfigures the session', async () => {

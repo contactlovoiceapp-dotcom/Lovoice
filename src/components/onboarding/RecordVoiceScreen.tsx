@@ -344,8 +344,12 @@ const RecordVoiceScreen: React.FC<Props> = ({ onNext, onSkip, onCancel }) => {
         durationMs: recorder.result.durationMs,
       });
       onNext();
-    } catch {
-      // Error surfaces via uploadVoice.error and the retry CTA.
+    } catch (err) {
+      // The user-facing surface is uploadVoice.error + the retry CTA; this dev-only log
+      // exposes the underlying message during smoke tests so we can diagnose pipeline failures.
+      if (__DEV__) {
+        console.error('[upload_voice] failed', err);
+      }
     }
   }, [isRecording, isStopped, isUploading, onNext, permissionDenied, player, recorder, uploadVoice]);
 

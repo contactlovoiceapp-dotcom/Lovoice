@@ -98,10 +98,16 @@ export function useVoiceRecorder(): VoiceRecorderHook {
   }, [recorderState.durationMillis, state]);
 
   // Restore playback session when the hook unmounts (component leaves without publishing).
+  // The recorder.isRecording getter and stop() can both throw NativeSharedObjectNotFoundException
+  // when expo-audio has already released the underlying native recorder; we treat those as no-ops.
   useEffect(() => {
     return () => {
-      if (recorder.isRecording) {
-        recorder.stop().catch(() => null);
+      try {
+        if (recorder.isRecording) {
+          recorder.stop().catch(() => null);
+        }
+      } catch {
+        // Native recorder already released — nothing to stop.
       }
       configureAudioSessionForPlayback().catch(() => null);
     };
@@ -177,8 +183,12 @@ export function useVoiceRecorder(): VoiceRecorderHook {
 
   const reset = useCallback(async () => {
     try {
-      if (recorder.isRecording) {
-        await recorder.stop();
+      try {
+        if (recorder.isRecording) {
+          await recorder.stop();
+        }
+      } catch {
+        // Native recorder may already be released; safe to skip.
       }
       // Delete the pending file if it was not consumed by an upload.
       if (result?.uri) {

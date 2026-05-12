@@ -1,7 +1,9 @@
 /* Mutations for uploading a new voice (3-step pipeline) and editing the active voice's title/theme. */
 
 import { useMutation, useQueryClient, type UseMutationResult } from '@tanstack/react-query';
+import { FunctionsHttpError } from '@supabase/supabase-js';
 import { File } from 'expo-file-system';
+import * as LegacyFileSystem from 'expo-file-system/legacy';
 
 import { getSupabaseClient } from '@/lib/supabase';
 import { useAuth } from '@/features/auth/hooks/useAuth';
@@ -13,6 +15,21 @@ import type {
 } from '../types';
 import { voiceQueryKeys } from './voiceQueries';
 
+// Edge Functions return { error: '<code>' } JSON bodies. supabase-js wraps them in a generic
+// FunctionsHttpError, so we read the body to surface the precise code instead of "non-2xx".
+async function extractFunctionErrorCode(err: unknown): Promise<string> {
+  if (err instanceof FunctionsHttpError) {
+    try {
+      const body = (await err.context.json()) as { error?: string } | null;
+      if (body?.error) return body.error;
+    } catch {
+      // Body wasn't JSON or already consumed — fall through.
+    }
+  }
+  if (err instanceof Error) return err.message;
+  return 'unknown';
+}
+
 const PUT_RETRY_COUNT = 3;
 const PUT_RETRY_BACKOFF_MS = [0, 1000, 3000] as const;
 
@@ -20,12 +37,13 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// Reads the recorded m4a file into memory and PUTs it to Storage with bounded retries.
+// Streams the recorded m4a file directly to the signed Storage URL with bounded retries.
+// We deliberately use FileSystem.uploadAsync instead of fetch() with Uint8Array: React Native's
+// fetch on Hermes mis-serialises binary bodies, which makes Storage accept the PUT (200) but
+// store empty bytes — commit_upload then fails with `object_not_found`. uploadAsync delegates
+// to native NSURLSession / OkHttp, which streams the file as raw binary correctly.
 // The signed URL is short-lived and cannot be reused after success, so retries reuse the same URL.
 async function putAudioWithRetry(localUri: string, signedUrl: string): Promise<void> {
-  const file = new File(localUri);
-  const bytes = await file.bytes();
-
   let lastError: Error | null = null;
 
   for (let attempt = 0; attempt < PUT_RETRY_COUNT; attempt += 1) {
@@ -34,19 +52,24 @@ async function putAudioWithRetry(localUri: string, signedUrl: string): Promise<v
     }
 
     try {
-      const response = await fetch(signedUrl, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'audio/mp4',
-        },
-        body: bytes,
+      const result = await LegacyFileSystem.uploadAsync(signedUrl, localUri, {
+        httpMethod: 'PUT',
+        uploadType: LegacyFileSystem.FileSystemUploadType.BINARY_CONTENT,
+        headers: { 'Content-Type': 'audio/mp4' },
       });
 
-      if (response.ok) {
+      if (__DEV__) {
+        console.log('[upload_voice] PUT result', {
+          status: result.status,
+          body: typeof result.body === 'string' ? result.body.slice(0, 300) : result.body,
+        });
+      }
+
+      if (result.status >= 200 && result.status < 300) {
         return;
       }
 
-      lastError = new Error(`voice.put_failed:${response.status}`);
+      lastError = new Error(`voice.put_failed:${result.status}`);
     } catch (err) {
       lastError = err instanceof Error ? err : new Error('voice.put_failed:network');
     }
@@ -92,7 +115,24 @@ export function useUploadVoice(): UseMutationResult<VoiceRow, Error, UploadVoice
       );
 
       if (requestError || !requestData) {
-        throw new Error(`voice.request_upload_failed:${requestError?.message ?? 'unknown'}`);
+        const code = await extractFunctionErrorCode(requestError);
+        throw new Error(`voice.request_upload_failed:${code}`);
+      }
+
+      if (__DEV__) {
+        try {
+          const localFile = new File(input.uri);
+          console.log('[upload_voice] request_upload OK', {
+            objectPath: requestData.objectPath,
+            signedUrlHost: new URL(requestData.signedUrl).host,
+            signedUrlPath: new URL(requestData.signedUrl).pathname,
+            localUri: input.uri,
+            localExists: localFile.exists,
+            localSize: localFile.size ?? null,
+          });
+        } catch (logErr) {
+          console.log('[upload_voice] request_upload OK (could not stat local)', logErr);
+        }
       }
 
       await putAudioWithRetry(input.uri, requestData.signedUrl);
@@ -112,7 +152,8 @@ export function useUploadVoice(): UseMutationResult<VoiceRow, Error, UploadVoice
       );
 
       if (commitError || !commitData?.voice) {
-        throw new Error(`voice.commit_upload_failed:${commitError?.message ?? 'unknown'}`);
+        const code = await extractFunctionErrorCode(commitError);
+        throw new Error(`voice.commit_upload_failed:${code}`);
       }
 
       safeDelete(input.uri);

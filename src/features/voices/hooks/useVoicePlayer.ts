@@ -38,6 +38,8 @@ export function useVoicePlayer({ uri }: { uri: string | null }): VoicePlayerHook
   // When the URI changes after the initial mount, pause the current track and swap the source.
   // pause() and replace() can throw NativeSharedObjectNotFoundException when expo-audio is in
   // the middle of recycling the player for a source change — both are recoverable.
+  // We only call replace() with a non-null URI: expo-audio 0.5 rejects `null` (ArgumentCastException),
+  // so when the consumer hands us null we simply pause and let the next non-null replace happen later.
   useEffect(() => {
     if (isFirstRenderRef.current) {
       isFirstRenderRef.current = false;
@@ -45,7 +47,9 @@ export function useVoicePlayer({ uri }: { uri: string | null }): VoicePlayerHook
     }
     try {
       player.pause();
-      player.replace(uri ?? null);
+      if (uri) {
+        player.replace(uri);
+      }
     } catch {
       // Player wrapper outlived its native counterpart; expo-audio handles the source swap.
     }
@@ -95,12 +99,12 @@ export function useVoicePlayer({ uri }: { uri: string | null }): VoicePlayerHook
   );
 
   const unload = useCallback(() => {
+    // expo-audio 0.5 doesn't accept null in replace(), so we just pause to release the audio
+    // session. The next replace() with a real URI will reuse the same native player.
     try {
       player.pause();
-      // Replacing with null clears the source and releases audio focus.
-      player.replace(null);
     } catch {
-      // Native player already gone — expo-audio has cleared the source for us.
+      // Native player already gone — nothing to do.
     }
     sessionConfiguredRef.current = false;
   }, [player]);
