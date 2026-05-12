@@ -72,7 +72,9 @@ export function useVoiceRecorder(): VoiceRecorderHook {
   // Mirror native duration and metering into React state while actively recording.
   useEffect(() => {
     if (state !== 'recording' && state !== 'paused') return;
-    setDurationMs(recorderState.durationMillis);
+    // Clamp so the displayed timer never overshoots the 5:00 hard cap during the brief
+    // window between the auto-stop trigger and the actual recorder.stop() resolving.
+    setDurationMs(Math.min(recorderState.durationMillis, MAX_VOICE_DURATION_MS));
 
     if (recorderState.metering !== undefined && state === 'recording') {
       setMeteringDb((prev) => {
@@ -170,7 +172,11 @@ export function useVoiceRecorder(): VoiceRecorderHook {
       srcFile.move(destFile);
 
       const finalUri = destFile.uri;
-      const finalDuration = recorderState.durationMillis || durationMs;
+      // Clamp to the hard cap: the metering poll fires every METERING_INTERVAL_MS and the
+      // native stop() takes a few extra ms, so durationMillis can land at e.g. 300_050 when
+      // the auto-stop triggers. The server enforces a strict <= MAX so we mirror it here.
+      const rawDuration = recorderState.durationMillis || durationMs;
+      const finalDuration = Math.min(rawDuration, MAX_VOICE_DURATION_MS);
 
       setResult({ uri: finalUri, durationMs: finalDuration });
       setState('stopped');
