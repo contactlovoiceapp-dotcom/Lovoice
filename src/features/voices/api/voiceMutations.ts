@@ -58,13 +58,6 @@ async function putAudioWithRetry(localUri: string, signedUrl: string): Promise<v
         headers: { 'Content-Type': 'audio/mp4' },
       });
 
-      if (__DEV__) {
-        console.log('[upload_voice] PUT result', {
-          status: result.status,
-          body: typeof result.body === 'string' ? result.body.slice(0, 300) : result.body,
-        });
-      }
-
       if (result.status >= 200 && result.status < 300) {
         return;
       }
@@ -117,22 +110,6 @@ export function useUploadVoice(): UseMutationResult<VoiceRow, Error, UploadVoice
       if (requestError || !requestData) {
         const code = await extractFunctionErrorCode(requestError);
         throw new Error(`voice.request_upload_failed:${code}`);
-      }
-
-      if (__DEV__) {
-        try {
-          const localFile = new File(input.uri);
-          console.log('[upload_voice] request_upload OK', {
-            objectPath: requestData.objectPath,
-            signedUrlHost: new URL(requestData.signedUrl).host,
-            signedUrlPath: new URL(requestData.signedUrl).pathname,
-            localUri: input.uri,
-            localExists: localFile.exists,
-            localSize: localFile.size ?? null,
-          });
-        } catch (logErr) {
-          console.log('[upload_voice] request_upload OK (could not stat local)', logErr);
-        }
       }
 
       await putAudioWithRetry(input.uri, requestData.signedUrl);
