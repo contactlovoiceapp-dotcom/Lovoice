@@ -48,7 +48,7 @@ Voice is the core medium. Recording and playback **must feel instant and reliabl
 ### Mobile (this repo)
 - **Expo SDK 54**, React Native 0.81, **TypeScript strict**.
 - **NativeWind 4** (Tailwind classes) for styling.
-- **`expo-router`** for navigation (to be introduced in Phase 0 — currently `App.tsx` is a manual switch, must be migrated).
+- **`expo-router`** for navigation.
 - **`expo-audio`** for recording and playback (NOT `expo-av`, which is deprecated since SDK 54).
 - **`expo-secure-store`** for tokens.
 - **`expo-notifications`** for push.
@@ -102,7 +102,7 @@ The product term used in **every UI string (in French)** and in **every code ide
 | The Discover feed | **"Découvrir"** | `feed` / `discover` |
 | The Likes screen | **"Likes"** | `likes` |
 
-**The word "vibe" is forbidden.** It was used in the prototype and must be removed everywhere it still appears (`App.tsx`, `RecordVibeScreen.tsx`, `MyVibeScreen.tsx`, `ProfileCard.tsx`, `FiltersModal.tsx`, `LikesScreen.tsx`, `src/types.ts`). This rename is part of Phase 0.
+**The word "vibe" is forbidden.** It was used in the prototype and has been fully removed as part of Phase 0.
 
 If you ever need to refer to the user's voice introduction, the only acceptable terms are:
 - French UI: **"ta voix"**, **"sa voix"**, **"ma voix"**, **"voix enregistrée"**, **"enregistrer ta voix"**
@@ -137,9 +137,8 @@ LOVOICE_EXPO/
 ├── README.md                  ← you are here
 ├── docs/
 │   ├── ARCHITECTURE.md        ← system design, data model, RLS, audio pipeline
-│   ├── ROADMAP.md             ← phased dev plan (read the relevant phase)
-│   └── CLIENT_SETUP.md        ← accounts/keys checklist for the client
-├── app/                       ← expo-router routes (introduced in Phase 0)
+│   └── ROADMAP.md             ← phased dev plan (read the relevant phase)
+├── app/                       ← expo-router routes
 │   ├── (auth)/                ← onboarding stack
 │   ├── (main)/                ← tab navigator (discover, likes, messages, profile)
 │   └── _layout.tsx
@@ -182,7 +181,7 @@ lovoice-admin/
 └── next.config.ts
 ```
 
-The current `App.tsx` and `src/components/onboarding/*` are **prototype code with mocked data**. They will be progressively refactored or deleted as phases progress. Treat them as visual reference, not as architecture.
+The `src/components/onboarding/*` are **prototype components**. They will be progressively refactored or deleted as phases progress. Treat them as visual reference, not as architecture.
 
 ---
 
@@ -258,4 +257,3 @@ Optional: under `submit.production.ios`, add `appleId`, `ascAppId` (numeric App 
 | How does audio upload work? | `docs/ARCHITECTURE.md` |
 | How does the admin back-office work? | `docs/ARCHITECTURE.md` §13 |
 | What am I supposed to build right now? | `docs/ROADMAP.md` (current phase) |
-| What does the client need to provide? | `docs/CLIENT_SETUP.md` |
