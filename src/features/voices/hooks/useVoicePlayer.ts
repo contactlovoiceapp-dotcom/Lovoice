@@ -36,13 +36,19 @@ export function useVoicePlayer({ uri }: { uri: string | null }): VoicePlayerHook
   const status = useAudioPlayerStatus(player);
 
   // When the URI changes after the initial mount, pause the current track and swap the source.
+  // pause() and replace() can throw NativeSharedObjectNotFoundException when expo-audio is in
+  // the middle of recycling the player for a source change — both are recoverable.
   useEffect(() => {
     if (isFirstRenderRef.current) {
       isFirstRenderRef.current = false;
       return;
     }
-    player.pause();
-    player.replace(uri ?? null);
+    try {
+      player.pause();
+      player.replace(uri ?? null);
+    } catch {
+      // Player wrapper outlived its native counterpart; expo-audio handles the source swap.
+    }
     sessionConfiguredRef.current = false;
   }, [uri]); // player reference is stable for the hook's lifetime
 
@@ -52,11 +58,21 @@ export function useVoicePlayer({ uri }: { uri: string | null }): VoicePlayerHook
   // No manual resume is needed here — OS handles it when interruptionMode is 'mixWithOthers'.
 
   // Release audio resources when the component unmounts.
+  // We swallow errors because expo-audio recreates the native player whenever the source
+  // changes; calling pause() on a wrapper whose native counterpart has already been released
+  // throws NativeSharedObjectNotFoundException, which is harmless in cleanup.
   useEffect(() => {
     return () => {
-      player.pause();
+      try {
+        player.pause();
+      } catch {
+        // Native object already released by expo-audio — nothing to do.
+      }
     };
-  }, [player]);
+    // The player ref is intentionally omitted: this effect must run cleanup only on unmount,
+    // not whenever expo-audio recycles the underlying player on source change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const play = useCallback(async () => {
     if (!sessionConfiguredRef.current) {
@@ -79,9 +95,13 @@ export function useVoicePlayer({ uri }: { uri: string | null }): VoicePlayerHook
   );
 
   const unload = useCallback(() => {
-    player.pause();
-    // Replacing with null clears the source and releases audio focus.
-    player.replace(null);
+    try {
+      player.pause();
+      // Replacing with null clears the source and releases audio focus.
+      player.replace(null);
+    } catch {
+      // Native player already gone — expo-audio has cleared the source for us.
+    }
     sessionConfiguredRef.current = false;
   }, [player]);
 
