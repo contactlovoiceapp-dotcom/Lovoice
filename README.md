@@ -206,9 +206,9 @@ When starting any task:
 
 ```bash
 npm install
-npm start              # Expo dev server
-npm run ios            # iOS simulator
-npm run android        # Android emulator
+npx expo start         # Start Metro dev server (use this to develop day-to-day)
+npx expo run:ios       # Compile and install the dev build on iOS simulator (required after erasing simulator or first install)
+npx expo run:android   # Compile and install the dev build on Android emulator
 npm run check-env      # verify local .env.local matches .env.example
 npm run sync-eas-env   # push .env.local values to EAS environments
 npm test               # Run test suite (Jest + React Testing Library)
@@ -217,6 +217,17 @@ npx supabase start     # local Supabase stack (after Phase 1 setup)
 npx supabase db push   # apply migrations
 npx supabase functions serve <name>  # run Edge Function locally
 ```
+
+> **Dev build vs Expo Go:** this project uses `expo-dev-client`. You **cannot** use the standard Expo Go app.
+> The dev build (`npx expo run:ios`) must be installed once on the target device/simulator.
+> After that, `npx expo start` + pressing `i` is enough for day-to-day development — no recompile needed.
+> Rerun `npx expo run:ios` only when native dependencies change or after erasing the simulator.
+
+> **Resetting a dev account for signup re-testing:**
+> ```bash
+> npx tsx scripts/reset-dev-account.ts +33XXXXXXXXX
+> ```
+> Requires `SUPABASE_SECRET_KEY` (legacy `service_role` JWT from Supabase Dashboard → Settings → API → Legacy keys) in `.env.local`. Never committed.
 
 ### Environment variables
 

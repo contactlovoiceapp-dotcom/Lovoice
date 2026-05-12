@@ -64,7 +64,7 @@ export default function PhoneRoute() {
     setIsSubmitting(false);
 
     if (error) {
-      setErrorMessage(error.message);
+      setErrorMessage(COPY.phone.authUnavailable);
       return;
     }
 
