@@ -34,6 +34,9 @@ yarn-error.*
 .env*
 !.env.example
 
+# dev-only scripts — contain or assume secrets, never commit
+scripts/reset-dev-account.ts
+
 # Google Play API (EAS Submit) — never commit
 google-play-service-account.json
 
