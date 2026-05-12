@@ -187,6 +187,23 @@ describe('returning user (session + profile)', () => {
     },
   );
 
+  // Early wizard steps must redirect a returning user to discover — they have no
+  // business re-entering the onboarding wizard once their profile exists.
+  const earlyOnboardingPaths: [string, string[]][] = [
+    ['/(auth)/onboarding/name', ['(auth)', 'onboarding', 'name']],
+    ['/(auth)/onboarding/birthdate', ['(auth)', 'onboarding', 'birthdate']],
+    ['/(auth)/onboarding/gender', ['(auth)', 'onboarding', 'gender']],
+    ['/(auth)/onboarding/looking-for', ['(auth)', 'onboarding', 'looking-for']],
+  ];
+
+  it.each(earlyOnboardingPaths)(
+    'redirects away from early wizard step %s to discover',
+    (pathname, segments) => {
+      renderWithRoute(pathname, segments);
+      expect(mockReplace).toHaveBeenCalledWith('/(main)/discover');
+    },
+  );
+
   it('does not redirect when already on the discover page', () => {
     renderWithRoute('/(main)/discover', ['(main)']);
     expect(mockReplace).not.toHaveBeenCalled();

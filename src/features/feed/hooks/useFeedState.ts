@@ -5,7 +5,7 @@ import { create } from 'zustand';
 import { createJSONStorage, persist, type StateStorage } from 'zustand/middleware';
 import type { Profile } from '../../../types';
 import { ColorTheme } from '../../../types';
-import { generateNewProfile } from '../../../services/mockProfilesService';
+import { generateNewProfile } from './mockProfilesService';
 
 const secureStoreStorage: StateStorage = {
   getItem: (name) => SecureStore.getItemAsync(name),

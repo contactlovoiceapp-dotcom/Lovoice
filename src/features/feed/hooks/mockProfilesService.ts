@@ -1,7 +1,7 @@
-/* In-memory mock profile generator — replaces the Gemini API call used in the prototype.
-   Returns random profiles from a static pool for development and demo purposes. */
+/* Temporary mock feed data — replaced by real DB query in Phase 5.
+   Generates random profiles from a static pool for development. */
 
-import { Profile, ColorTheme } from '../types';
+import { Profile, ColorTheme } from '../../../types';
 
 const MOCK_POOL: Profile[] = [
   {

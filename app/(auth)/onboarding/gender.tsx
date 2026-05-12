@@ -17,7 +17,7 @@ import { useProfileOnboardingState } from '@/features/profile/hooks/useProfileOn
 
 const TOTAL_STEPS = 5;
 
-const ONBOARDING_GENDERS: GenderValue[] = ['male', 'female', 'other'];
+const ONBOARDING_GENDERS: GenderValue[] = ['male', 'female', 'nonbinary', 'other'];
 
 export default function OnboardingGenderRoute() {
   const router = useRouter();

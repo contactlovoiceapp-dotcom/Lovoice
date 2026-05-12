@@ -15,8 +15,18 @@ import { useAuth } from '../hooks/useAuth';
 // Reaching any of them must NOT trigger a redirect to the wizard.
 const SIGNUP_FLOW_PATH_SUFFIXES = ['/onboarding', '/record', '/profile-setup'];
 
+// After profile creation (city step), the user proceeds through record → profile-setup
+// before reaching (main). Only these specific paths must not redirect to discover.
+// Early wizard steps (name, birthdate, gender, looking-for) are intentionally excluded
+// so a returning user cannot accidentally land back on the wizard.
+const POST_CREATION_PATH_SUFFIXES = ['/onboarding/city', '/record', '/profile-setup'];
+
 function isOnSignupFlow(pathname: string): boolean {
   return SIGNUP_FLOW_PATH_SUFFIXES.some((suffix) => pathname.includes(suffix));
+}
+
+function isOnPostCreationFlow(pathname: string): boolean {
+  return POST_CREATION_PATH_SUFFIXES.some((suffix) => pathname.includes(suffix));
 }
 
 export default function AuthRedirector() {
@@ -45,7 +55,7 @@ export default function AuthRedirector() {
     }
 
     if (session && profile && !isInMainGroup) {
-      if (isInAuthGroup && isOnSignupFlow(pathname)) {
+      if (isInAuthGroup && isOnPostCreationFlow(pathname)) {
         return;
       }
       router.replace('/(main)/discover');
