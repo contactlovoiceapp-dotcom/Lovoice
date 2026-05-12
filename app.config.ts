@@ -31,6 +31,9 @@ const config: ExpoConfig = {
     bundleIdentifier: "com.shrtcut.lovoice",
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
+      // Defensive explicit declaration; expo-audio plugin also sets this
+      NSMicrophoneUsageDescription:
+        "Lovoice utilise ton micro pour enregistrer ta voix.",
     },
   },
   android: {
@@ -41,8 +44,22 @@ const config: ExpoConfig = {
     },
     edgeToEdgeEnabled: true,
     package: "com.shrtcut.lovoice",
+    // Defensive explicit declaration; expo-audio plugin also adds RECORD_AUDIO
+    permissions: ["RECORD_AUDIO"],
   },
-  plugins: ["expo-font", "expo-router", "expo-secure-store", "expo-updates"],
+  plugins: [
+    "expo-font",
+    "expo-router",
+    "expo-secure-store",
+    "expo-updates",
+    [
+      "expo-audio",
+      {
+        microphonePermission:
+          "Lovoice utilise ton micro pour enregistrer ta voix.",
+      },
+    ],
+  ],
   extra: {
     supabaseUrl,
     supabasePublishableKey,

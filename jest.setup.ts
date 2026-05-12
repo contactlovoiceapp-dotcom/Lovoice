@@ -2,6 +2,159 @@
 
 import '@testing-library/react-native/build/matchers/extend-expect';
 
+// ---------------------------------------------------------------------------
+// expo-audio
+// ---------------------------------------------------------------------------
+
+const mockRecorder = {
+  id: 'mock-recorder',
+  currentTime: 0,
+  isRecording: false,
+  uri: null as string | null,
+  record: jest.fn(),
+  pause: jest.fn(),
+  stop: jest.fn(() => {
+    mockRecorder.uri = 'file:///tmp/mock-recording.m4a';
+    return Promise.resolve();
+  }),
+  prepareToRecordAsync: jest.fn(() => Promise.resolve()),
+  getStatus: jest.fn(() => ({ canRecord: true, isRecording: false, durationMillis: 0 })),
+  getAvailableInputs: jest.fn(() => []),
+  getCurrentInput: jest.fn(() => Promise.resolve({ name: 'Built-in Mic', type: 'mic', uid: '0' })),
+  setInput: jest.fn(),
+  addListener: jest.fn(() => ({ remove: jest.fn() })),
+};
+
+const mockRecorderState = {
+  canRecord: true,
+  isRecording: false,
+  durationMillis: 0,
+  mediaServicesDidReset: false,
+  metering: -50,
+};
+
+const mockPlayer = {
+  id: 'mock-player',
+  currentTime: 0,
+  duration: 0,
+  playing: false,
+  muted: false,
+  loop: false,
+  isLoaded: true,
+  volume: 1,
+  play: jest.fn(),
+  pause: jest.fn(),
+  seekTo: jest.fn(() => Promise.resolve()),
+  replace: jest.fn(),
+  remove: jest.fn(),
+  setVolume: jest.fn(),
+  setMuted: jest.fn(),
+  setLoop: jest.fn(),
+  setPlaybackRate: jest.fn(),
+  addListener: jest.fn(() => ({ remove: jest.fn() })),
+  setActiveForLockScreen: jest.fn(),
+  updateLockScreenMetadata: jest.fn(),
+  clearLockScreenControls: jest.fn(),
+  setAudioSamplingEnabled: jest.fn(),
+};
+
+const mockPlayerStatus = {
+  id: 'mock-player',
+  currentTime: 0,
+  duration: 0,
+  playing: false,
+  mute: false,
+  loop: false,
+  isLoaded: true,
+  isBuffering: false,
+  didJustFinish: false,
+  playbackState: 'paused',
+  timeControlStatus: 'paused',
+  reasonForWaitingToPlay: '',
+  playbackRate: 1,
+  shouldCorrectPitch: true,
+};
+
+jest.mock('expo-audio', () => ({
+  useAudioRecorder: jest.fn(() => mockRecorder),
+  useAudioRecorderState: jest.fn(() => mockRecorderState),
+  useAudioPlayer: jest.fn(() => mockPlayer),
+  useAudioPlayerStatus: jest.fn(() => mockPlayerStatus),
+  setAudioModeAsync: jest.fn(() => Promise.resolve()),
+  requestRecordingPermissionsAsync: jest.fn(() =>
+    Promise.resolve({ granted: true, status: 'granted', expires: 'never', canAskAgain: true }),
+  ),
+  getRecordingPermissionsAsync: jest.fn(() =>
+    Promise.resolve({ granted: true, status: 'granted', expires: 'never', canAskAgain: true }),
+  ),
+  IOSOutputFormat: {
+    MPEG4AAC: 'aac ',
+    LINEARPCM: 'lpcm',
+  },
+  AudioQuality: {
+    MIN: 0,
+    LOW: 32,
+    MEDIUM: 64,
+    HIGH: 96,
+    MAX: 127,
+  },
+}));
+
+// Expose mock objects for per-test override.
+(global as Record<string, unknown>).__expoAudioMocks = {
+  recorder: mockRecorder,
+  recorderState: mockRecorderState,
+  player: mockPlayer,
+  playerStatus: mockPlayerStatus,
+};
+
+// ---------------------------------------------------------------------------
+// expo-file-system
+// ---------------------------------------------------------------------------
+
+const mockFile = {
+  uri: 'file:///document/pending/mock-uuid.m4a',
+  exists: true,
+  copy: jest.fn(),
+  move: jest.fn(),
+  delete: jest.fn(),
+  text: jest.fn(() => Promise.resolve('')),
+};
+
+const mockDirectory = {
+  uri: 'file:///document/pending/',
+  exists: true,
+  create: jest.fn(),
+  delete: jest.fn(),
+  list: jest.fn(() => []),
+};
+
+jest.mock('expo-file-system', () => ({
+  File: jest.fn().mockImplementation((base: unknown, name?: string) => ({
+    ...mockFile,
+    uri:
+      typeof base === 'string'
+        ? base
+        : `file:///document/${name ?? 'mock-file.m4a'}`,
+  })),
+  Directory: jest.fn().mockImplementation(() => mockDirectory),
+  Paths: {
+    document: { uri: 'file:///document/' },
+    cache: { uri: 'file:///cache/' },
+    bundle: { uri: 'file:///bundle/' },
+  },
+}));
+
+// ---------------------------------------------------------------------------
+// expo-crypto
+// ---------------------------------------------------------------------------
+
+jest.mock('expo-crypto', () => ({
+  randomUUID: jest.fn(() => 'mock-uuid-1234-5678'),
+  digestStringAsync: jest.fn(() => Promise.resolve('mock-hash')),
+  CryptoDigestAlgorithm: { SHA256: 'SHA256' },
+}));
+
 jest.mock('react-native-safe-area-context', () => {
   const { View } = require('react-native');
   const insets = { top: 0, bottom: 0, left: 0, right: 0 };
