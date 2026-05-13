@@ -62,6 +62,13 @@
     "typescript": "~5.9.2"
   },
   "private": true,
+  "expo": {
+    "install": {
+      "exclude": [
+        "react-native-worklets"
+      ]
+    }
+  },
   "overrides": {
     "react": "19.1.0",
     "react-dom": "19.1.0"
