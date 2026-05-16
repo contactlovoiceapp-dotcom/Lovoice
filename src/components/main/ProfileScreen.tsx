@@ -533,6 +533,7 @@ export default function ProfileScreen({ isOnboarding = false, onOnboardingComple
                     padding: 16,
                     gap: 12,
                     ...SHADOW.card,
+                    ...(Platform.OS === 'android' ? { elevation: 0 } : undefined),
                   }}
                 >
                   <Text style={{ fontFamily: FONT.bold, fontSize: 16, color: COLORS.dark }}>
@@ -570,13 +571,14 @@ export default function ProfileScreen({ isOnboarding = false, onOnboardingComple
                     backgroundColor: COLORS.surfaceMuted,
                     padding: 16,
                     ...SHADOW.card,
+                    ...(Platform.OS === 'android' ? { elevation: 0 } : undefined),
                   }}
                 >
                   <View style={{ marginBottom: 14 }}>
                     <Text style={{ fontFamily: FONT.bold, fontSize: 16, color: COLORS.dark }}>
                       {COPY.profile.voiceCard}
                     </Text>
-                    <Text style={{ fontFamily: FONT.regular, fontSize: 12, color: COLORS.textTertiary }}>
+                    <Text style={{ fontFamily: FONT.regular, fontSize: 12, color: COLORS.textSecondary }}>
                       {activeVoice ? formatRelativeTime(activeVoice.created_at) : ''}
                     </Text>
                     {!isOnboarding && (
@@ -592,12 +594,12 @@ export default function ProfileScreen({ isOnboarding = false, onOnboardingComple
                           alignSelf: 'flex-start',
                         }}
                       >
-                        <RefreshCw size={12} color={COLORS.textTertiary} />
+                        <RefreshCw size={12} color={COLORS.textSecondary} />
                         <Text
                           style={{
                             fontSize: 12,
                             fontFamily: FONT.medium,
-                            color: COLORS.textTertiary,
+                            color: COLORS.textSecondary,
                           }}
                         >
                           {COPY.profile.recordVoiceAgain}
@@ -644,41 +646,55 @@ export default function ProfileScreen({ isOnboarding = false, onOnboardingComple
                       </LinearGradient>
                     </Pressable>
 
-                    <TextInput
-                      value={voiceTitle}
-                      disableFullscreenUI
-                      importantForAutofill="no"
-                      underlineColorAndroid="transparent"
-                      selectionColor={COLORS.primary}
-                      cursorColor={COLORS.primary}
-                      onChangeText={(text) => {
-                        setVoiceTitle(text.slice(0, 60));
-                        setVoiceDirty(true);
-                        setSaveSuccess(false);
-                      }}
-                      placeholder={COPY.profile.catchphraseHint}
-                      placeholderTextColor={COLORS.textTertiary}
-                      maxLength={60}
+                    {/* Android: never put flex:1 on TextInput inside ScrollView — it expands vertically and draws the default white edit background. */}
+                    <View
                       style={{
                         flex: 1,
-                        fontFamily: FONT.semibold,
-                        fontSize: 14,
-                        lineHeight: 18,
-                        height: 22,
-                        color: COLORS.dark,
-                        padding: 0,
-                        paddingVertical: 0,
-                        margin: 0,
+                        minWidth: 0,
+                        justifyContent: 'center',
                         backgroundColor: 'transparent',
-                        includeFontPadding: false,
-                        textAlignVertical: 'center',
                       }}
-                    />
+                    >
+                      <TextInput
+                        value={voiceTitle}
+                        multiline={false}
+                        numberOfLines={1}
+                        disableFullscreenUI
+                        importantForAutofill="no"
+                        underlineColorAndroid="transparent"
+                        selectionColor={COLORS.primary}
+                        cursorColor={COLORS.primary}
+                        onChangeText={(text) => {
+                          setVoiceTitle(text.slice(0, 60));
+                          setVoiceDirty(true);
+                          setSaveSuccess(false);
+                        }}
+                        placeholder={COPY.profile.catchphraseHint}
+                        placeholderTextColor={COLORS.textTertiary}
+                        maxLength={60}
+                        style={{
+                          width: '100%',
+                          minHeight: Platform.OS === 'android' ? 40 : undefined,
+                          maxHeight: 44,
+                          fontFamily: FONT.semibold,
+                          fontSize: 14,
+                          lineHeight: Platform.OS === 'android' ? 20 : 18,
+                          color: COLORS.dark,
+                          padding: 0,
+                          paddingVertical: 0,
+                          margin: 0,
+                          borderWidth: 0,
+                          backgroundColor: 'transparent',
+                          includeFontPadding: false,
+                          textAlignVertical: 'center',
+                        }}
+                      />
+                    </View>
                   </View>
 
                   <Text
                     style={{
-                      marginTop: -10,
+                      marginTop: 4,
                       paddingLeft: 62,
                       fontSize: 11,
                       fontFamily: FONT.regular,
