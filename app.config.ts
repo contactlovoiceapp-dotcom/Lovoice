@@ -22,7 +22,7 @@ const config: ExpoConfig = {
     policy: "appVersion",
   },
   splash: {
-    image: "./assets/icon.png",
+    image: "./assets/splash-logo.png",
     resizeMode: "contain",
     backgroundColor: "#f8f5ff",
   },
@@ -38,7 +38,7 @@ const config: ExpoConfig = {
   },
   android: {
     splash: {
-      image: "./assets/icon.png",
+      image: "./assets/splash-logo.png",
       resizeMode: "contain",
       backgroundColor: "#f8f5ff",
     },
@@ -60,8 +60,8 @@ const config: ExpoConfig = {
     [
       "expo-splash-screen",
       {
-        image: "./assets/icon.png",
-        imageWidth: 220,
+        image: "./assets/splash-logo.png",
+        imageWidth: 180,
         resizeMode: "contain",
         backgroundColor: "#f8f5ff",
       },

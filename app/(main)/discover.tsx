@@ -22,6 +22,7 @@ import { COPY } from '../../src/copy';
 import { useFeedState } from '../../src/features/feed/hooks/useFeedState';
 import { useAuth } from '../../src/features/auth/hooks/useAuth';
 import { useActiveVoice } from '../../src/features/voices/api/voiceQueries';
+import { useHideSplash } from '../../src/lib/useHideSplash';
 
 import ProfileCard from '../../src/components/ProfileCard';
 import DiscoverHeader from '../../src/components/DiscoverHeader';
@@ -32,8 +33,8 @@ export default function DiscoverScreen() {
   const router = useRouter();
   const { profile } = useAuth();
   const activeVoiceQuery = useActiveVoice(profile?.id ?? null);
-  // Derive the voice gate from the canonical server state — avoids stale local flags between devices.
   const hasRecordedVoice = !!activeVoiceQuery.data;
+  const onSplashReady = useHideSplash();
 
   const {
     profiles,
@@ -141,7 +142,7 @@ export default function DiscoverScreen() {
   );
 
   return (
-    <View style={{ flex: 1, backgroundColor: COLORS.background }}>
+    <View style={{ flex: 1, backgroundColor: COLORS.background }} onLayout={onSplashReady}>
       <StatusBar style={statusBarStyle} />
 
       <DiscoverHeader

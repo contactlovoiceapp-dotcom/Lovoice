@@ -28,10 +28,6 @@ export const COPY = {
     applyFilters: 'Appliquer les filtres',
   },
 
-  splash: {
-    tagline: 'Bienvenue',
-  },
-
   home: {
     headline: 'Trouve ta ',
     headlineAccent: 'Voix',

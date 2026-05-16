@@ -1,6 +1,8 @@
-/* Root layout — loads custom fonts, provides safe-area context, and renders the router slot. */
+/* Root layout — loads fonts, wires providers, and delegates splash hiding to screens.
+   No React splash overlay is used. The native splash screen stays visible until the
+   destination screen explicitly calls hideAsync() upon mounting. */
 
-import React, { useCallback, useState } from 'react';
+import React, { useState } from 'react';
 import { View } from 'react-native';
 import { Slot } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
@@ -29,7 +31,7 @@ import AuthRedirector from '../src/features/auth/components/AuthRedirector';
 import { AuthProvider } from '../src/features/auth/hooks/useAuth';
 import '../global.css';
 
-// Keep the native splash visible until fonts are loaded and the first frame is painted.
+// Keep native splash visible indefinitely
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
@@ -45,6 +47,7 @@ export default function RootLayout() {
         },
       }),
   );
+
   const [fontsLoaded] = useFonts({
     Outfit_300Light,
     Outfit_400Regular,
@@ -60,19 +63,13 @@ export default function RootLayout() {
     PlayfairDisplay_900Black,
   });
 
-  const onLayoutReady = useCallback(async () => {
-    if (fontsLoaded) {
-      await SplashScreen.hideAsync();
-    }
-  }, [fontsLoaded]);
-
   if (!fontsLoaded) return null;
 
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <SafeAreaProvider>
-          <View style={{ flex: 1, backgroundColor: COLORS.background }} onLayout={onLayoutReady}>
+          <View style={{ flex: 1, backgroundColor: COLORS.background }}>
             <AuthRedirector />
             <Slot />
           </View>

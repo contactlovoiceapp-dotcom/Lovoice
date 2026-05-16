@@ -1,41 +1,31 @@
-/* App entry route — shows the brand splash then redirects based on auth + profile state. */
+/* App entry route — navigates to the correct screen once auth state is known.
+   Renders nothing: the native splash stays visible until the destination
+   screen calls useHideSplash, so this route is never visible to the user. */
 
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'expo-router';
 
-import SplashScreen from '../src/components/onboarding/SplashScreen';
 import { useAuth } from '../src/features/auth/hooks/useAuth';
 
-const SPLASH_DURATION_MS = 2800;
-
-export default function SplashRoute() {
+export default function IndexRoute() {
   const router = useRouter();
   const { session, profile, isLoading } = useAuth();
 
   useEffect(() => {
-    if (isLoading) {
-      return undefined;
+    if (isLoading) return;
+
+    if (session && profile) {
+      router.replace('/(main)/discover');
+      return;
     }
 
-    const timer = setTimeout(() => {
-      if (session && profile) {
-        router.replace('/(main)/discover');
-        return;
-      }
+    if (session && !profile) {
+      router.replace('/(auth)/onboarding/name');
+      return;
+    }
 
-      // Session without a profile means OTP succeeded but signup never completed.
-      // Resume from the first wizard step — the in-memory wizard state is wiped on
-      // app restart, so jumping to a later step would skip required validations.
-      if (session && !profile) {
-        router.replace('/(auth)/onboarding/name');
-        return;
-      }
-
-      router.replace('/(auth)/home');
-    }, SPLASH_DURATION_MS);
-
-    return () => clearTimeout(timer);
+    router.replace('/(auth)/home');
   }, [isLoading, profile, router, session]);
 
-  return <SplashScreen />;
+  return null;
 }

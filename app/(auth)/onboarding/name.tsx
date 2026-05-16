@@ -1,6 +1,7 @@
 /* Name onboarding route — collects the display name before profile persistence. */
 
 import React, { useState } from 'react';
+import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import { COPY } from '@/copy';
@@ -10,6 +11,7 @@ import {
 } from '@/features/profile/components/ProfileOnboardingStep';
 import { useProfileOnboardingState } from '@/features/profile/hooks/useProfileOnboardingState';
 import { validateDisplayName, type DisplayNameError } from '@/features/profile/helpers/validation';
+import { useHideSplash } from '@/lib/useHideSplash';
 
 const TOTAL_STEPS = 5;
 
@@ -18,6 +20,7 @@ export default function OnboardingNameRoute() {
   const displayName = useProfileOnboardingState((state) => state.displayName);
   const setDisplayName = useProfileOnboardingState((state) => state.setDisplayName);
   const [error, setError] = useState<DisplayNameError | null>(null);
+  const onSplashReady = useHideSplash();
 
   const handleNext = () => {
     const result = validateDisplayName(displayName);
@@ -32,28 +35,30 @@ export default function OnboardingNameRoute() {
   };
 
   return (
-    <ProfileOnboardingStep
-      currentStep={1}
-      totalSteps={TOTAL_STEPS}
-      title={COPY.onboarding.name.title}
-      subtitle={COPY.onboarding.name.subtitle}
-      errorMessage={error ? COPY.onboarding.name.errors[error] : null}
-      onBack={() => router.back()}
-      onNext={handleNext}
-    >
-      <OnboardingTextInput
-        value={displayName}
-        onChangeText={(text) => {
-          setDisplayName(text);
-          setError(null);
-        }}
-        placeholder={COPY.onboarding.name.placeholder}
-        autoCapitalize="words"
-        autoComplete="name"
-        textContentType="givenName"
-        returnKeyType="next"
-        onSubmitEditing={handleNext}
-      />
-    </ProfileOnboardingStep>
+    <View style={{ flex: 1 }} onLayout={onSplashReady}>
+      <ProfileOnboardingStep
+        currentStep={1}
+        totalSteps={TOTAL_STEPS}
+        title={COPY.onboarding.name.title}
+        subtitle={COPY.onboarding.name.subtitle}
+        errorMessage={error ? COPY.onboarding.name.errors[error] : null}
+        onBack={() => router.back()}
+        onNext={handleNext}
+      >
+        <OnboardingTextInput
+          value={displayName}
+          onChangeText={(text) => {
+            setDisplayName(text);
+            setError(null);
+          }}
+          placeholder={COPY.onboarding.name.placeholder}
+          autoCapitalize="words"
+          autoComplete="name"
+          textContentType="givenName"
+          returnKeyType="next"
+          onSubmitEditing={handleNext}
+        />
+      </ProfileOnboardingStep>
+    </View>
   );
 }
