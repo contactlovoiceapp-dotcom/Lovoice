@@ -22,7 +22,7 @@ const config: ExpoConfig = {
     policy: "appVersion",
   },
   splash: {
-    image: "./assets/splash-icon.png",
+    image: "./assets/icon.png",
     resizeMode: "contain",
     backgroundColor: "#f8f5ff",
   },
@@ -37,6 +37,11 @@ const config: ExpoConfig = {
     },
   },
   android: {
+    splash: {
+      image: "./assets/icon.png",
+      resizeMode: "contain",
+      backgroundColor: "#f8f5ff",
+    },
     adaptiveIcon: {
       foregroundImage: "./assets/adaptive-icon.png",
       // White background so the logo renders cleanly on any launcher shape
@@ -52,6 +57,15 @@ const config: ExpoConfig = {
     "expo-font",
     "expo-router",
     "expo-secure-store",
+    [
+      "expo-splash-screen",
+      {
+        image: "./assets/icon.png",
+        imageWidth: 220,
+        resizeMode: "contain",
+        backgroundColor: "#f8f5ff",
+      },
+    ],
     "expo-updates",
     [
       "expo-audio",

@@ -4,6 +4,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import {
+  Platform,
   Pressable,
   Text,
   TextInput,
@@ -30,7 +31,6 @@ import {
   Mic,
   MoreHorizontal,
   Pause,
-  Play,
   RotateCcw,
   Send,
   X,
@@ -56,6 +56,11 @@ interface ProfileCardProps {
 const PLAY_BTN_SIZE = 96;
 const RING_PADDING = 20;
 const TAP_SPRING = { stiffness: 400, damping: 30 } as const;
+const PLAY_BUTTON_RADIUS = PLAY_BTN_SIZE / 2;
+const ANDROID_PLAY_SHADOW = {
+  shadowColor: 'transparent',
+  elevation: 0,
+} as const;
 
 /* ─── Reanimated sub-components ────────────────────────────────────────────── */
 
@@ -174,6 +179,24 @@ function FadeWhen({ visible, children }: { visible: boolean; children: React.Rea
   const animStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
 
   return <Animated.View style={animStyle}>{children}</Animated.View>;
+}
+
+function PlayGlyph({ size = 34, color = 'white' }: { size?: number; color?: string }) {
+  return (
+    <View
+      style={{
+        width: 0,
+        height: 0,
+        marginLeft: size * 0.1,
+        borderTopWidth: size * 0.3,
+        borderBottomWidth: size * 0.3,
+        borderLeftWidth: size * 0.48,
+        borderTopColor: 'transparent',
+        borderBottomColor: 'transparent',
+        borderLeftColor: color,
+      }}
+    />
+  );
 }
 
 /* ─── Helpers ──────────────────────────────────────────────────────────────── */
@@ -528,18 +551,26 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
                 </View>
               )}
 
-              <Animated.View style={[playScaleStyle, SHADOW.play, { borderRadius: 48 }]}>
+              <Animated.View
+                style={[
+                  playScaleStyle,
+                  SHADOW.play,
+                  Platform.OS === 'android' ? ANDROID_PLAY_SHADOW : null,
+                  { borderRadius: PLAY_BUTTON_RADIUS },
+                ]}
+              >
                 <Pressable
                   onPress={handlePlayPress}
                   style={{
-                    width: 96,
-                    height: 96,
-                    borderRadius: 48,
+                    width: PLAY_BTN_SIZE,
+                    height: PLAY_BTN_SIZE,
+                    borderRadius: PLAY_BUTTON_RADIUS,
                     backgroundColor: 'rgba(255,255,255,0.22)',
                     borderWidth: 1,
                     borderColor: 'rgba(255,255,255,0.35)',
                     alignItems: 'center',
                     justifyContent: 'center',
+                    overflow: 'hidden',
                   }}
                 >
                   {!hasRecordedVoice ? (
@@ -549,7 +580,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
                   ) : isPlaying ? (
                     <Pause size={32} fill="white" color="white" />
                   ) : (
-                    <Play size={32} fill="white" color="white" />
+                    <PlayGlyph />
                   )}
                 </Pressable>
               </Animated.View>

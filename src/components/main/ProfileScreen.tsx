@@ -14,7 +14,7 @@ import {
   View,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { LogOut, Mic, Pause, Play, Plus, RefreshCw, X } from 'lucide-react-native';
+import { LogOut, Mic, Pause, Plus, RefreshCw, X } from 'lucide-react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -110,6 +110,24 @@ function normalizeProfileGenders(values: unknown): GenderValue[] {
 }
 
 const VALID_VOICE_THEMES: ReadonlySet<VoiceTheme> = new Set(['sunset', 'chill', 'electric', 'midnight']);
+
+function PlayGlyph({ size = 18, color = COLORS.surface }: { size?: number; color?: string }) {
+  return (
+    <View
+      style={{
+        width: 0,
+        height: 0,
+        marginLeft: size * 0.12,
+        borderTopWidth: size * 0.32,
+        borderBottomWidth: size * 0.32,
+        borderLeftWidth: size * 0.5,
+        borderTopColor: 'transparent',
+        borderBottomColor: 'transparent',
+        borderLeftColor: color,
+      }}
+    />
+  );
+}
 
 function voiceThemeToColorTheme(theme: string | null | undefined): ColorTheme {
   if (theme && VALID_VOICE_THEMES.has(theme as VoiceTheme)) {
@@ -621,13 +639,18 @@ export default function ProfileScreen({ isOnboarding = false, onOnboardingComple
                         ) : voicePlayer.isPlaying ? (
                           <Pause size={18} color={COLORS.surface} fill={COLORS.surface} />
                         ) : (
-                          <Play size={18} color={COLORS.surface} fill={COLORS.surface} style={{ marginLeft: 2 }} />
+                          <PlayGlyph />
                         )}
                       </LinearGradient>
                     </Pressable>
 
                     <TextInput
                       value={voiceTitle}
+                      disableFullscreenUI
+                      importantForAutofill="no"
+                      underlineColorAndroid="transparent"
+                      selectionColor={COLORS.primary}
+                      cursorColor={COLORS.primary}
                       onChangeText={(text) => {
                         setVoiceTitle(text.slice(0, 60));
                         setVoiceDirty(true);
@@ -640,8 +663,15 @@ export default function ProfileScreen({ isOnboarding = false, onOnboardingComple
                         flex: 1,
                         fontFamily: FONT.semibold,
                         fontSize: 14,
+                        lineHeight: 18,
+                        height: 22,
                         color: COLORS.dark,
                         padding: 0,
+                        paddingVertical: 0,
+                        margin: 0,
+                        backgroundColor: 'transparent',
+                        includeFontPadding: false,
+                        textAlignVertical: 'center',
                       }}
                     />
                   </View>
