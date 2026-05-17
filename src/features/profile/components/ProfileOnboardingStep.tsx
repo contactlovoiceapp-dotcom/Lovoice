@@ -2,6 +2,7 @@
 
 import React, { type ReactNode } from 'react';
 import {
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -92,9 +93,13 @@ export function ProfileOnboardingStep({
         <View style={{ position: 'absolute', bottom: '-10%', right: '-20%', width: 500, height: 500, borderRadius: 250, backgroundColor: COLORS.secondary, opacity: 0.05 }} />
       </View>
 
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
+      >
         <ScrollView
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
           contentContainerStyle={{
             flexGrow: 1,
             paddingTop: insets.top + 16,
@@ -178,7 +183,10 @@ export function ProfileOnboardingStep({
             <Pressable
               accessibilityRole="button"
               disabled={!canSubmit}
-              onPress={onNext}
+              onPress={() => {
+                Keyboard.dismiss();
+                onNext();
+              }}
               style={({ pressed }) => ({
                 width: '100%',
                 borderRadius: RADIUS.cta,
