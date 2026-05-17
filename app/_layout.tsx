@@ -63,15 +63,13 @@ export default function RootLayout() {
     PlayfairDisplay_900Black,
   });
 
-  if (!fontsLoaded) return null;
-
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <SafeAreaProvider>
           <View style={{ flex: 1, backgroundColor: COLORS.background }}>
             <AuthRedirector />
-            <Slot />
+            {fontsLoaded ? <Slot /> : null}
           </View>
         </SafeAreaProvider>
       </AuthProvider>
