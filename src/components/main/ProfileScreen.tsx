@@ -213,6 +213,18 @@ export default function ProfileScreen({ isOnboarding = false, onOnboardingComple
   const [cityChanged, setCityChanged] = useState(false);
   const citySearch = useCitySearch();
 
+  // Re-sync UI state whenever the profile identity changes (login, refetch, account switch).
+  useEffect(() => {
+    if (!profile) return;
+    setBioEmojis([
+      profile.bio_emojis?.[0] ?? '',
+      profile.bio_emojis?.[1] ?? '',
+      profile.bio_emojis?.[2] ?? '',
+    ]);
+    setLookingFor(normalizeProfileGenders(profile.looking_for));
+    setConfirmedCity(profile.city ?? '');
+  }, [profile?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const [emojiPickerIndex, setEmojiPickerIndex] = useState<number | null>(null);
   const [emojiManualInput, setEmojiManualInput] = useState('');
 
