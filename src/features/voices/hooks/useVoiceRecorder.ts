@@ -95,7 +95,9 @@ export function useVoiceRecorder(): VoiceRecorderHook {
       hardCapFiredRef.current = true;
       stop();
     }
-    // 'stop' is stable (useCallback with no deps that change on record); including it is safe.
+    // stop is excluded intentionally: state is already in the deps array, and stop's
+    // identity changes whenever state changes. Since the effect re-runs on every state
+    // transition, the captured stop is always current when the hard cap fires.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recorderState.durationMillis, state]);
 
