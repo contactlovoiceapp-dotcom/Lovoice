@@ -6,7 +6,6 @@ import { useRouter } from 'expo-router';
 
 import { COPY } from '@/copy';
 import { COLORS, FONT, RADIUS } from '@/theme';
-import { searchCities, type CitySearchResult } from '@/features/profile/api/citySearch';
 import {
   OnboardingTextInput,
   ProfileOnboardingStep,
@@ -14,6 +13,7 @@ import {
 import { useUpsertProfile } from '@/features/profile/api/profileMutations';
 import { frenchBirthdateToIso } from '@/features/profile/helpers/birthdateInput';
 import { useProfileOnboardingState } from '@/features/profile/hooks/useProfileOnboardingState';
+import { useCitySearch } from '@/features/profile/hooks/useCitySearch';
 
 const TOTAL_STEPS = 5;
 
@@ -24,14 +24,6 @@ type CityError =
   | 'search_failed'
   | 'wizard_incomplete'
   | 'save_failed';
-
-function mapCitySearchError(error: unknown): CityError {
-  if (error instanceof Error && error.message === 'profile.city_query_too_short') {
-    return 'query_too_short';
-  }
-
-  return 'search_failed';
-}
 
 export default function OnboardingCityRoute() {
   const router = useRouter();
@@ -46,38 +38,21 @@ export default function OnboardingCityRoute() {
     clearCitySelection,
   } = useProfileOnboardingState();
   const upsertProfile = useUpsertProfile();
-  const [query, setQuery] = useState(city);
-  const [results, setResults] = useState<CitySearchResult[]>([]);
-  const [selectedResultId, setSelectedResultId] = useState<string | null>(null);
-  const [isSearching, setIsSearching] = useState(false);
+  const citySearch = useCitySearch(city);
   const [error, setError] = useState<CityError | null>(null);
 
   const handleSearch = async () => {
-    setIsSearching(true);
     setError(null);
-    setSelectedResultId(null);
-
-    try {
-      const nextResults = await searchCities(query);
-      const uniqueResults = nextResults.filter(
-        (result, index, list) =>
-          index === list.findIndex((item) => item.city === result.city && item.displayName === result.displayName),
-      );
-
-      setResults(uniqueResults);
-      if (uniqueResults.length === 0) {
-        setError('select_result');
-      }
-    } catch (searchError) {
-      setResults([]);
-      setError(mapCitySearchError(searchError));
-    } finally {
-      setIsSearching(false);
+    const { results: found, error: searchError } = await citySearch.search();
+    if (searchError) {
+      setError(searchError);
+    } else if (found.length === 0) {
+      setError('select_result');
     }
   };
 
   const handleFinish = async () => {
-    if (query.trim().length === 0) {
+    if (citySearch.query.trim().length === 0) {
       setError('required');
       return;
     }
@@ -126,45 +101,44 @@ export default function OnboardingCityRoute() {
     >
       <View style={{ gap: 12 }}>
         <OnboardingTextInput
-          value={query}
+          value={citySearch.query}
           onChangeText={(text) => {
-            setQuery(text);
+            citySearch.setQuery(text);
             setError(null);
-            setSelectedResultId(null);
             clearCitySelection();
           }}
           placeholder={COPY.onboarding.city.placeholder}
           autoCapitalize="words"
           returnKeyType="search"
-          onSubmitEditing={handleSearch}
+          onSubmitEditing={() => { void handleSearch(); }}
         />
 
         <Pressable
           accessibilityRole="button"
-          disabled={isSearching}
-          onPress={handleSearch}
+          disabled={citySearch.isSearching}
+          onPress={() => { void handleSearch(); }}
           style={{
             alignSelf: 'flex-start',
             borderRadius: RADIUS.full,
             backgroundColor: COLORS.border,
             paddingVertical: 10,
             paddingHorizontal: 16,
-            opacity: isSearching ? 0.5 : 1,
+            opacity: citySearch.isSearching ? 0.5 : 1,
           }}
         >
           <Text style={{ fontFamily: FONT.bold, color: COLORS.dark }}>
-            {isSearching ? COPY.onboarding.city.searching : COPY.onboarding.city.searchCta}
+            {citySearch.isSearching ? COPY.onboarding.city.searching : COPY.onboarding.city.searchCta}
           </Text>
         </Pressable>
       </View>
 
-      {results.length > 0 ? (
+      {citySearch.results.length > 0 ? (
         <View style={{ gap: 10 }}>
           <Text style={{ fontFamily: FONT.medium, color: COLORS.textSecondary }}>
             {COPY.onboarding.city.selectResult}
           </Text>
-          {results.map((result) => {
-            const selected = selectedResultId === result.id;
+          {citySearch.results.map((result) => {
+            const selected = citySearch.selectedResultId === result.id;
 
             return (
               <Pressable
@@ -172,10 +146,8 @@ export default function OnboardingCityRoute() {
                 accessibilityRole="button"
                 accessibilityState={{ selected }}
                 onPress={() => {
-                  setSelectedResultId(result.id);
-                  setQuery(result.city);
+                  citySearch.select(result);
                   setCitySelection(result.city, result.coordinates);
-                  setResults([]);
                   setError(null);
                 }}
                 style={{

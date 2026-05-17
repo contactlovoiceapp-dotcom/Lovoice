@@ -23,8 +23,9 @@ import { COPY } from '@/copy';
 import { COLORS, CTA_GRADIENT, FONT, ONBOARDING_GRADIENT, RADIUS, SHADOW, THEME_GRADIENTS } from '@/theme';
 import { ColorTheme } from '@/types';
 import { useAuth } from '@/features/auth/hooks/useAuth';
-import { searchCities, type CitySearchResult } from '@/features/profile/api/citySearch';
+import { type CitySearchResult } from '@/features/profile/api/citySearch';
 import { useUpsertProfile } from '@/features/profile/api/profileMutations';
+import { useCitySearch } from '@/features/profile/hooks/useCitySearch';
 import { useActiveVoice, useVoiceSignedUrl } from '@/features/voices/api/voiceQueries';
 import { useUpdateVoice } from '@/features/voices/api/voiceMutations';
 import { useVoicePlayer } from '@/features/voices/hooks/useVoicePlayer';
@@ -136,13 +137,6 @@ function voiceThemeToColorTheme(theme: string | null | undefined): ColorTheme {
   return ColorTheme.Sunset;
 }
 
-function uniqueCityResults(results: CitySearchResult[]): CitySearchResult[] {
-  return results.filter(
-    (result, index, list) =>
-      index === list.findIndex((item) => item.city === result.city && item.displayName === result.displayName),
-  );
-}
-
 function calculateAge(isoBirthdate: string): number {
   const today = new Date();
   const birth = new Date(isoBirthdate);
@@ -217,10 +211,7 @@ export default function ProfileScreen({ isOnboarding = false, onOnboardingComple
     longitude: number;
   } | null>(null);
   const [cityChanged, setCityChanged] = useState(false);
-  const [cityQuery, setCityQuery] = useState('');
-  const [cityResults, setCityResults] = useState<CitySearchResult[]>([]);
-  const [selectedResultId, setSelectedResultId] = useState<string | null>(null);
-  const [isSearching, setIsSearching] = useState(false);
+  const citySearch = useCitySearch();
 
   const [emojiPickerIndex, setEmojiPickerIndex] = useState<number | null>(null);
   const [emojiManualInput, setEmojiManualInput] = useState('');
@@ -262,27 +253,14 @@ export default function ProfileScreen({ isOnboarding = false, onOnboardingComple
   };
 
   const handleCitySearch = async () => {
-    setIsSearching(true);
-    setError(null);
-    setSelectedResultId(null);
-
-    try {
-      const results = await searchCities(cityQuery);
-      setCityResults(uniqueCityResults(results));
-    } catch {
-      setCityResults([]);
-    } finally {
-      setIsSearching(false);
-    }
+    await citySearch.search();
   };
 
   const handleCitySelect = (result: CitySearchResult) => {
-    setSelectedResultId(result.id);
+    citySearch.select(result);
     setConfirmedCity(result.city);
     setNewCoordinates(result.coordinates);
     setCityChanged(true);
-    setCityResults([]);
-    setCityQuery(result.city);
     setError(null);
   };
 
@@ -928,42 +906,41 @@ export default function ProfileScreen({ isOnboarding = false, onOnboardingComple
                   </Text>
 
                   <OnboardingTextInput
-                    value={cityQuery}
+                    value={citySearch.query}
                     onChangeText={(text) => {
-                      setCityQuery(text);
-                      setSelectedResultId(null);
+                      citySearch.setQuery(text);
                       setNewCoordinates(null);
                     }}
                     placeholder={COPY.onboarding.city.placeholder}
                     autoCapitalize="words"
                     returnKeyType="search"
-                    onSubmitEditing={handleCitySearch}
+                    onSubmitEditing={() => { void handleCitySearch(); }}
                   />
 
                   <Pressable
                     accessibilityRole="button"
-                    disabled={isSearching}
-                    onPress={handleCitySearch}
+                    disabled={citySearch.isSearching}
+                    onPress={() => { void handleCitySearch(); }}
                     style={{
                       alignSelf: 'flex-start',
                       borderRadius: RADIUS.full,
                       backgroundColor: COLORS.border,
                       paddingVertical: 10,
                       paddingHorizontal: 16,
-                      opacity: isSearching ? 0.5 : 1,
+                      opacity: citySearch.isSearching ? 0.5 : 1,
                     }}
                   >
                     <Text style={{ fontFamily: FONT.bold, color: COLORS.dark }}>
-                      {isSearching
+                      {citySearch.isSearching
                         ? COPY.onboarding.city.searching
                         : COPY.onboarding.city.searchCta}
                     </Text>
                   </Pressable>
 
-                  {cityResults.length > 0 ? (
+                  {citySearch.results.length > 0 ? (
                     <View style={{ gap: 8 }}>
-                      {cityResults.map((result) => {
-                        const selected = selectedResultId === result.id;
+                      {citySearch.results.map((result) => {
+                        const selected = citySearch.selectedResultId === result.id;
 
                         return (
                           <Pressable
