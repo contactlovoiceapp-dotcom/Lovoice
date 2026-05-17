@@ -47,7 +47,7 @@ Voice is the core medium. Recording and playback **must feel instant and reliabl
 
 ### Mobile (this repo)
 - **Expo SDK 54**, React Native 0.81, **TypeScript strict**.
-- **NativeWind 4** (Tailwind classes) for styling.
+- **NativeWind 4** is installed (see `global.css`) but components use **inline `style` props** with the constants from `src/theme.ts` (`COLORS`, `FONT`, `RADIUS`, etc.) rather than Tailwind class names. Do not use `className` props — follow the existing inline-style convention.
 - **`expo-router`** for navigation.
 - **`expo-audio`** for recording and playback (NOT `expo-av`, which is deprecated since SDK 54).
 - **`expo-secure-store`** for tokens.
@@ -182,6 +182,8 @@ lovoice-admin/
 ```
 
 The `src/components/onboarding/*` are **prototype components**. They will be progressively refactored or deleted as phases progress. Treat them as visual reference, not as architecture.
+
+> **`src/types.ts` vs `src/types/database.ts`**: `src/types.ts` defines a **temporary mock `Profile` type** used by the local feed store (`useFeedState`) during Phases 0–4. It has fields like `name`, `age`, `emojis`, `isPlaying` that **do not exist in the Supabase `profiles` table**. This type is replaced in Phase 5 when the feed is wired to real data. Do not extend it or rely on it for server-related code. Server-side profile and voice types come from `src/types/database.ts` (generated from Supabase).
 
 ---
 

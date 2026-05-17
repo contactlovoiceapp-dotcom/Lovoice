@@ -87,8 +87,9 @@ The voice introduction. A user can have multiple voices but only **one `is_activ
 | `prompt_id`         | `uuid` FK → `prompts(id)`                                                              | nullable (free-form voice)                                                                                                                   |
 | `storage_path`      | `text`                                                                                 | `voices/{user_id}/{voice_id}.m4a`                                                                                                            |
 | `duration_ms`       | `integer` check (≤ 300_000)                                                            |                                                                                                                                              |
+| `title`             | `text`                                                                                 | nullable; user-editable catchphrase shown on the voice card                                                                                  |
 | `transcript`        | `text`                                                                                 | nullable; filled by AssemblyAI when Phase 9 ships (~Q3 2026)                                                                                  |
-| `theme`             | `text`                                                                                 | UI color theme                                                                                                                               |
+| `theme`             | `text`                                                                                 | UI color theme (`sunset`, `chill`, `electric`, `midnight`)                                                                                   |
 | `status`            | `text` default `'approved'` check in (`pending`,`approved`,`rejected`,`manual_review`) | V1 MVP defaults to `'approved'` (reactive moderation). The `pending` and `manual_review` values are kept in the enum so Phase 9 (~Q3 2026) only flips the default and wires the queue — see §4.3.b. |
 | `moderation_reason` | `text`                                                                                 | filled by Hive                                                                                                                               |
 | `is_active`         | `boolean` default false                                                                | partial unique index per user                                                                                                                |
@@ -301,7 +302,7 @@ create policy "admins_read_audio" on storage.objects
 4. Sample metering at 50 ms for the live waveform.
 5. Hard cap at **300_000 ms**: auto-stop and disable record button.
 6. Save to `FileSystem.documentDirectory + 'pending/{uuid}.m4a'`.
-7. Allow re-record before commit. The temp file is deleted after successful upload or after 24h.
+7. Allow re-record before commit. The temp file is deleted after successful upload or on reset/cancel.
 
 ### 4.2 Upload (client → Storage)
 
@@ -356,10 +357,12 @@ When enabled, `commit_upload` switches the default row status to `'pending'` and
 
 ### 4.4 Playback (client)
 
+> **Note:** §4.4 describes the **Phase 5 target architecture**. The current implementation (Phase 4) uses a single `useVoicePlayer` instance per card. The ring-buffer player (`src/lib/feedPlayer.ts`) is built in Phase 5 alongside the real Supabase feed query.
+
 1. Client fetches a voice row → calls `getSignedUrl(object_path, expiresIn=3600)`.
-2. Holds **3 audio player instances** in a ring buffer for the feed: `current`, `next`, `next+1`. Preload `next` and `next+1` on `prepareAsync`.
+2. Holds **3 audio player instances** in a ring buffer for the feed: `current`, `next`, `next+1`. Preload `next` and `next+1` immediately after they enter the viewport (using `expo-audio`'s `useAudioPlayer` — there is no `prepareAsync` in `expo-audio`; preloading is achieved by initialising a player with the source URI before it is needed).
 3. On feed scroll, rotate the ring (cheap), play the new `current`.
-4. Audio session for playback: `playAndRecord` with `playsInSilentModeIOS = true`, `staysActiveInBackground = true`.
+4. Audio session for playback: `playsInSilentMode: true`, `shouldPlayInBackground: true` (see `configureAudioSessionForPlayback` in `src/lib/audio.ts`).
 5. Handle interruptions (incoming call): pause and resume on interruption end.
 6. For voice messages in chat, use a single shared player (one playing at a time).
 

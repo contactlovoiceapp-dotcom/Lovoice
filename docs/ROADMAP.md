@@ -39,13 +39,13 @@ Reactive moderation (block + report + manual takedown by the operator) is part o
 
 ---
 
-## Phase 3 — Profile onboarding 🟡
+## Phase 3 — Profile onboarding 🟢
 
 **Goal**: after auth, the user creates their profile (name, birthdate, gender, looking-for, city with coordinates).
 
 ---
 
-## Phase 4 — Voice recording + voice upload
+## Phase 4 — Voice recording + voice upload 🟢
 
 **Goal**: user can record, re-record, listen back, and publish their voice.
 
