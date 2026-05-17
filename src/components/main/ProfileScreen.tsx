@@ -304,27 +304,33 @@ export default function ProfileScreen({ isOnboarding = false, onOnboardingComple
         bioEmojis,
         country: profile?.country ?? undefined,
       });
+    } catch {
+      setError('save_failed');
+      return;
+    }
 
-      // Persist voice metadata only when the user actually changed it; avoids needless writes
-      // and respects the catchphrase max length already enforced server-side by update_own_voice.
-      if (activeVoice && voiceDirty) {
+    // Persist voice metadata only when the user actually changed it; avoids needless writes
+    // and respects the catchphrase max length already enforced server-side by update_own_voice.
+    if (activeVoice && voiceDirty) {
+      try {
         await updateVoice.mutateAsync({
           voiceId: activeVoice.id,
           title: voiceTitle.trim() || null,
           theme: mood as VoiceTheme,
         });
         setVoiceDirty(false);
+      } catch {
+        // Profile was saved successfully; only the voice metadata update failed.
+        // updateVoice.isError surfaces the feedback via existing error state.
       }
+    }
 
-      if (isOnboarding) {
-        onOnboardingComplete?.();
-      } else {
-        setSaveSuccess(true);
-        setCityChanged(false);
-        setNewCoordinates(null);
-      }
-    } catch {
-      setError('save_failed');
+    if (isOnboarding) {
+      onOnboardingComplete?.();
+    } else {
+      setSaveSuccess(true);
+      setCityChanged(false);
+      setNewCoordinates(null);
     }
   };
 
