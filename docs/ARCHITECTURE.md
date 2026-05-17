@@ -425,9 +425,18 @@ When enabled, `commit_upload` switches the default row status to `'pending'` and
 
 ## 8. Feed query
 
+The feed applies **bidirectional preference matching**: a candidate appears only if (a) their gender matches what the current user is looking for, AND (b) the current user's gender matches what the candidate is looking for. This prevents showing profiles to people they would never want to meet.
+
 ```sql
 -- Returns up to N voices the current user hasn't seen, isn't blocked from,
--- matching gender preference and within max_distance_km, ordered by recency + light shuffle.
+-- matching gender preferences in both directions and within max_distance_km,
+-- ordered by recency + light shuffle.
+--
+-- Parameters:
+--   $1 looking_for  text[]  — genres the current user wants to see
+--   $2 my_gender    text    — the current user's own gender
+--   $3 location     geography(Point,4326) — current user's location
+--   $4 distance_m   int     — max distance in metres
 select v.*, p.display_name, p.birthdate, p.city, p.bio_emojis
 from voices v
 join profiles p on p.id = v.user_id
@@ -438,13 +447,30 @@ where v.status = 'approved'
   and p.id != auth.uid()
   and not exists (select 1 from feed_seen fs where fs.user_id = auth.uid() and fs.voice_id = v.id)
   and not exists (select 1 from blocks b where (b.blocker_id = auth.uid() and b.blocked_id = p.id) or (b.blocker_id = p.id and b.blocked_id = auth.uid()))
-  and p.gender = any($1::text[])  -- looking_for of current user
-  and ST_DWithin(p.location, $2::geography, $3)
+  and p.gender = any($1::text[])   -- candidate's gender matches what I want
+  and $2 = any(p.looking_for)      -- my gender matches what the candidate wants
+  and ST_DWithin(p.location, $3::geography, $4)
 order by v.created_at desc, random()
 limit 20;
 ```
 
-Wrapped in a `security definer` function `get_feed(max_distance_km int)` callable from the client.
+Wrapped in a `security definer` function `get_feed(looking_for text[], my_gender text, location geography, distance_m int)` callable from the client. The client passes the current user's `looking_for`, `gender`, `location`, and the selected max distance from the filters modal.
+
+### Ordering rationale
+
+`ORDER BY v.created_at DESC, random()` gives a feed that surfaces new voices first while adding enough shuffle to avoid the same ordering on every load. No engagement-based ranking in V1 — that complexity is unnecessary at the validation cohort scale and would be revisited post-Phase 9 if retention data justifies it.
+
+### Filters modal (Phase 5)
+
+The client-side filters modal lets the user adjust:
+
+| Filter | Passed to `get_feed` as |
+|---|---|
+| Looking for (gender) | `$1 looking_for` — overrides profile default for the session |
+| Max distance | `$4 distance_m` |
+| Age range | Post-query client-side filter on `p.birthdate` (avoids index complexity in V1) |
+
+Age is filtered client-side in V1 because adding it server-side would require a functional index on a computed column (`extract(year from age(birthdate))`); the 20-row page size makes client-side filtering negligible.
 
 ---
 
