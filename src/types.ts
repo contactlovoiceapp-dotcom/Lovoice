@@ -16,7 +16,6 @@ export interface Profile {
   transcript?: string;
   emojis: string[];
   theme: ColorTheme;
-  isPlaying?: boolean;
   audioDurationSec: number;
 }
 

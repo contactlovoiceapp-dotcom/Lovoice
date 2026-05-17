@@ -45,6 +45,7 @@ import Waveform from './Waveform';
 
 interface ProfileCardProps {
   profile: Profile;
+  isPlaying: boolean;
   togglePlay: (id: string) => void;
   onFinish?: (id: string) => void;
   hasRecordedVoice?: boolean;
@@ -253,6 +254,7 @@ function ModalOverlay({
 
 const ProfileCard: React.FC<ProfileCardProps> = ({
   profile,
+  isPlaying,
   togglePlay,
   onFinish,
   hasRecordedVoice = true,
@@ -260,7 +262,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
   onToggleLike,
   onRecordVoice,
 }) => {
-  const { theme, isPlaying, audioDurationSec } = profile;
+  const { theme, audioDurationSec } = profile;
   const { width: windowWidth } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   // Floating pill nav (52px) + bottom inset + 12px gap above + 16px breathing

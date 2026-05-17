@@ -24,7 +24,6 @@ const INITIAL_PROFILES: Profile[] = [
       "Alors, j'avais invité mes beaux-parents pour la première fois. J'ai voulu faire le malin avec un bœuf bourguignon. Sauf que j'ai confondu le sel et le sucre...",
     emojis: ['😂', '🌯', '🏄‍♂️'],
     theme: ColorTheme.Sunset,
-    isPlaying: false,
     audioDurationSec: 15,
   },
   {
@@ -37,7 +36,6 @@ const INITIAL_PROFILES: Profile[] = [
       "Je crois que c'est de voir des gens âgés se tenir la main dans la rue. Ça me donne toujours l'espoir que l'amour peut vraiment durer toute une vie.",
     emojis: ['😌', '📚', '☕️'],
     theme: ColorTheme.Chill,
-    isPlaying: false,
     audioDurationSec: 12,
   },
   {
@@ -50,7 +48,6 @@ const INITIAL_PROFILES: Profile[] = [
       "Salut ! Moi c'est Théo. Je suis passionné de voyages et de photographie. Si tu aimes les randos le week-end et les discussions refaire le monde jusqu'à pas d'heure...",
     emojis: ['✈️', '🎒', '🌍'],
     theme: ColorTheme.Electric,
-    isPlaying: false,
     audioDurationSec: 10,
   },
   {
@@ -63,7 +60,6 @@ const INITIAL_PROFILES: Profile[] = [
       "Bon, promettez-moi de ne pas juger. J'écoute du Taylor Swift en boucle, même en soirée, et je pleure devant les vidéos de chats.",
     emojis: ['🌙', '🎵', '🍷'],
     theme: ColorTheme.Midnight,
-    isPlaying: false,
     audioDurationSec: 18,
   },
   {
@@ -76,7 +72,6 @@ const INITIAL_PROFILES: Profile[] = [
       "Le dimanche matin, c'est sacré. Café, croissant, et ma playlist qui va du jazz à l'électro. Un peu comme moi, un mélange improbable.",
     emojis: ['🎶', '☕', '🌻'],
     theme: ColorTheme.Chill,
-    isPlaying: false,
     audioDurationSec: 14,
   },
 ];
@@ -86,6 +81,7 @@ interface FeedState {
   likedIds: Set<string>;
   autoplay: boolean;
   activeProfileIndex: number;
+  playingId: string | null;
   isGenerating: boolean;
 
   setActiveProfileIndex: (index: number) => void;
@@ -93,7 +89,7 @@ interface FeedState {
 
   toggleLike: (id: string) => void;
   togglePlay: (id: string) => void;
-  handleTrackFinish: (finishedId: string) => void;
+  handleTrackFinish: () => void;
   loadMore: () => Promise<void>;
 
   likedProfiles: () => Profile[];
@@ -107,6 +103,7 @@ export const useFeedState = create<FeedState>()(
       likedIds: new Set<string>(),
       autoplay: false,
       activeProfileIndex: 0,
+      playingId: null,
       isGenerating: false,
 
       setActiveProfileIndex: (index) => set({ activeProfileIndex: index }),
@@ -125,32 +122,11 @@ export const useFeedState = create<FeedState>()(
 
       togglePlay: (id) =>
         set((state) => ({
-          profiles: state.profiles.map((p) => ({
-            ...p,
-            isPlaying: p.id === id ? !p.isPlaying : false,
-          })),
+          playingId: state.playingId === id ? null : id,
         })),
 
-      handleTrackFinish: (finishedId) => {
-        const { autoplay, profiles } = get();
-        set({
-          profiles: profiles.map((p) => ({ ...p, isPlaying: false })),
-        });
-        if (autoplay) {
-          const currentIndex = profiles.findIndex((p) => p.id === finishedId);
-          if (currentIndex !== -1 && currentIndex < profiles.length - 1) {
-            const nextId = profiles[currentIndex + 1].id;
-            setTimeout(() => {
-              set((state) => ({
-                profiles: state.profiles.map((p) => ({
-                  ...p,
-                  isPlaying: p.id === nextId,
-                })),
-                activeProfileIndex: currentIndex + 1,
-              }));
-            }, 500);
-          }
-        }
+      handleTrackFinish: () => {
+        set({ playingId: null });
       },
 
       loadMore: async () => {

@@ -41,6 +41,7 @@ export default function DiscoverScreen() {
     likedIds,
     autoplay,
     activeProfileIndex,
+    playingId,
     isGenerating,
     setActiveProfileIndex,
     setAutoplay,
@@ -102,7 +103,7 @@ export default function DiscoverScreen() {
 
   const handleFinish = useCallback(
     (finishedId: string) => {
-      handleTrackFinish(finishedId);
+      handleTrackFinish();
       if (autoplay) {
         const currentIndex = profiles.findIndex((p) => p.id === finishedId);
         if (currentIndex !== -1 && currentIndex < profiles.length - 1) {
@@ -129,6 +130,7 @@ export default function DiscoverScreen() {
       <View style={{ width: windowWidth, height: windowHeight }}>
         <ProfileCard
           profile={item}
+          isPlaying={playingId === item.id}
           togglePlay={togglePlay}
           onFinish={handleFinish}
           hasRecordedVoice={hasRecordedVoice}
@@ -138,7 +140,7 @@ export default function DiscoverScreen() {
         />
       </View>
     ),
-    [windowWidth, windowHeight, togglePlay, handleFinish, hasRecordedVoice, likedIds, handleToggleLike, router],
+    [windowWidth, windowHeight, playingId, togglePlay, handleFinish, hasRecordedVoice, likedIds, handleToggleLike, router],
   );
 
   return (

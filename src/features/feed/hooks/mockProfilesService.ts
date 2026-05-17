@@ -13,7 +13,6 @@ const MOCK_POOL: Profile[] = [
     transcript: "Je suis capable d'écouter du Patrick Bruel en boucle sans aucune honte.",
     emojis: ['🎤', '🍕', '💃'],
     theme: ColorTheme.Sunset,
-    isPlaying: false,
     audioDurationSec: 12,
   },
   {
@@ -25,7 +24,6 @@ const MOCK_POOL: Profile[] = [
     transcript: "J'ai une collection de plus de 200 vinyles et je ne sais pas danser.",
     emojis: ['🎸', '🍷', '🌊'],
     theme: ColorTheme.Chill,
-    isPlaying: false,
     audioDurationSec: 14,
   },
   {
@@ -37,7 +35,6 @@ const MOCK_POOL: Profile[] = [
     transcript: "C'était dans un train, on a parlé pendant 4 heures et on ne s'est jamais revus.",
     emojis: ['✨', '📖', '🌺'],
     theme: ColorTheme.Electric,
-    isPlaying: false,
     audioDurationSec: 16,
   },
   {
@@ -49,7 +46,6 @@ const MOCK_POOL: Profile[] = [
     transcript: 'Grasse mat, café noir, un bon bouquin et surtout personne qui me parle avant midi.',
     emojis: ['📚', '☕', '🐱'],
     theme: ColorTheme.Midnight,
-    isPlaying: false,
     audioDurationSec: 11,
   },
   {
@@ -61,7 +57,6 @@ const MOCK_POOL: Profile[] = [
     transcript: 'Apprends à cuisiner autre chose que des pâtes au beurre, sérieusement.',
     emojis: ['🍳', '😂', '🌻'],
     theme: ColorTheme.Sunset,
-    isPlaying: false,
     audioDurationSec: 9,
   },
   {
@@ -73,7 +68,6 @@ const MOCK_POOL: Profile[] = [
     transcript: "Le son d'une trompette dans un club de jazz à 2h du matin, quand tout le monde se tait.",
     emojis: ['🎺', '🌙', '🥃'],
     theme: ColorTheme.Midnight,
-    isPlaying: false,
     audioDurationSec: 13,
   },
 ];
