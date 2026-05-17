@@ -1,6 +1,6 @@
 /* Discover feed — vertical paging FlatList of voice cards with autoplay and filters. */
 
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Animated,
   FlatList,
@@ -66,6 +66,14 @@ export default function DiscoverScreen() {
   const firstLikeShown = useRef(false);
   const toastOpacity = useRef(new Animated.Value(0)).current;
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) {
+        clearTimeout(toastTimerRef.current);
+      }
+    };
+  }, []);
 
   const showToast = useCallback(
     (message: string) => {
