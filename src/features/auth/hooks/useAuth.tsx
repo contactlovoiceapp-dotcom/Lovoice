@@ -89,26 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const refreshProfile = useCallback(async () => {
-    let nextSession = session;
-
-    if (!nextSession) {
-      const supabase = getSupabaseClient();
-
-      if (!supabase) {
-        throw new Error('Supabase is not configured.');
-      }
-
-      const { data, error: sessionError } = await supabase.auth.getSession();
-
-      if (sessionError) {
-        throw new Error(sessionError.message);
-      }
-
-      nextSession = data.session;
-      setSession(nextSession);
-    }
-
-    await loadProfile(nextSession);
+    await loadProfile(session);
   }, [loadProfile, session]);
 
   const signOut = useCallback(async () => {
@@ -123,11 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (signOutError) {
       throw new Error(signOutError.message);
     }
-
-    profileRequestIdRef.current += 1;
-    setSession(null);
-    setProfile(null);
-    setError(null);
+    // onAuthStateChange('SIGNED_OUT') fires next and clears all auth state.
   }, []);
 
   useEffect(() => {
@@ -140,55 +117,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return undefined;
     }
 
-    void (async () => {
-      const { data, error: sessionError } = await supabase.auth.getSession();
-
-      if (!isMounted) {
-        return;
-      }
-
-      if (sessionError) {
-        setError(sessionError.message);
-        setSession(null);
-        setProfile(null);
-        setIsLoading(false);
-        return;
-      }
-
-      // Verify the session is still valid server-side: if the user was deleted
-      // (e.g. via the reset-dev-account script) but the JWT lingers in SecureStore,
-      // getUser() will fail. Force a sign-out so the app returns to the login screen
-      // instead of landing in a broken onboarding state.
-      if (data.session) {
-        const { error: userError } = await supabase.auth.getUser();
-        if (userError) {
-          await supabase.auth.signOut().catch(() => null);
-          if (!isMounted) return;
-          setSession(null);
-          setProfile(null);
-          setIsLoading(false);
-          return;
-        }
-      }
-
-      setSession(data.session);
-      await loadProfile(data.session);
-
-      if (isMounted) {
-        setIsLoading(false);
-      }
-    })();
-
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      setSession(nextSession);
-      setIsLoading(true);
-      void loadProfile(nextSession).finally(() => {
+    } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      // Enter loading state synchronously when a session is present so the app
+      // never navigates before the profile is ready (prevents redirect flashes).
+      if (nextSession) {
+        setIsLoading(true);
+      }
+
+      void (async () => {
+        // On the initial load with a cached session, validate the JWT server-side.
+        // Catches deleted users whose JWT still lives in SecureStore.
+        if (event === 'INITIAL_SESSION' && nextSession) {
+          const { error: userError } = await supabase.auth.getUser();
+
+          if (userError) {
+            await supabase.auth.signOut().catch(() => null);
+
+            if (isMounted) {
+              setSession(null);
+              setProfile(null);
+              setIsLoading(false);
+            }
+
+            return;
+          }
+        }
+
+        if (!isMounted) return;
+
+        setSession(nextSession);
+        await loadProfile(nextSession);
+
         if (isMounted) {
           setIsLoading(false);
         }
-      });
+      })();
     });
 
     return () => {

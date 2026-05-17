@@ -104,13 +104,12 @@ describe('AuthProvider', () => {
 
     jest.mocked(getSupabaseClient).mockReturnValue({
       auth: {
-        getSession: jest.fn().mockResolvedValue({
-          data: { session: initialSession },
-          error: null,
-        }),
+        // getSession is no longer called; INITIAL_SESSION is fired via onAuthStateChange.
         getUser: jest.fn().mockResolvedValue({ data: { user: initialSession.user }, error: null }),
         onAuthStateChange: jest.fn((callback) => {
           authStateCallback = callback;
+          // Simulate Supabase firing INITIAL_SESSION with the cached session on setup.
+          callback('INITIAL_SESSION', initialSession);
           return {
             data: {
               subscription: {
@@ -195,13 +194,12 @@ describe('AuthProvider', () => {
 
     jest.mocked(getSupabaseClient).mockReturnValue({
       auth: {
-        getSession: jest.fn().mockResolvedValue({
-          data: { session: null },
-          error: null,
-        }),
+        // getSession is no longer called; INITIAL_SESSION is fired via onAuthStateChange.
         getUser: jest.fn().mockResolvedValue({ data: { user: null }, error: null }),
         onAuthStateChange: jest.fn((callback) => {
           authStateCallback = callback;
+          // Simulate Supabase firing INITIAL_SESSION with no cached session on setup.
+          callback('INITIAL_SESSION', null);
           return {
             data: {
               subscription: {
