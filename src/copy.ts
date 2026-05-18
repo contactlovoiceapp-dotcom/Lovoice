@@ -285,7 +285,7 @@ export const COPY = {
     distanceUnit: 'km',
     distanceUnlimitedLabel: 'Illimité',
     distanceUnlimitedSwitch: 'Sans limite de distance',
-    apply: 'Appliquer les filtres',
+    apply: 'Appliquer',
     reset: 'Réinitialiser',
   },
 

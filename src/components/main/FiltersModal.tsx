@@ -299,15 +299,16 @@ const FiltersModal: React.FC<Props> = ({ onClose }) => {
 
           <Pressable
             onPress={handleApply}
-            style={{ flex: 1, borderRadius: RADIUS.full, overflow: 'hidden', ...SHADOW.button }}
+            style={{ flex: 1, borderRadius: RADIUS.full, ...SHADOW.button }}
             accessibilityRole="button"
             accessibilityLabel={COPY.a11y.applyFilters}
           >
+            {/* overflow hidden on the gradient, not the Pressable — shadow is clipped otherwise. */}
             <LinearGradient
               colors={[...CTA_GRADIENT]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
-              style={{ paddingVertical: 16, alignItems: 'center' }}
+              style={{ paddingVertical: 16, alignItems: 'center', borderRadius: RADIUS.full, overflow: 'hidden' }}
             >
               <Text style={{ fontFamily: FONT.bold, fontSize: 16, color: '#ffffff' }}>
                 {COPY.filters.apply}
