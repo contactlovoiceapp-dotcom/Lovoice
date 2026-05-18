@@ -357,14 +357,13 @@ When enabled, `commit_upload` switches the default row status to `'pending'` and
 
 ### 4.4 Playback (client)
 
-> **Note:** §4.4 describes the **Phase 5 target architecture**. The current implementation (Phase 4) uses a single `useVoicePlayer` instance per card. The ring-buffer player (`src/lib/feedPlayer.ts`) is built in Phase 5 alongside the real Supabase feed query.
-
-1. Client fetches a voice row → calls `getSignedUrl(object_path, expiresIn=3600)`.
-2. Holds **3 audio player instances** in a ring buffer for the feed: `current`, `next`, `next+1`. Preload `next` and `next+1` immediately after they enter the viewport (using `expo-audio`'s `useAudioPlayer` — there is no `prepareAsync` in `expo-audio`; preloading is achieved by initialising a player with the source URI before it is needed).
-3. On feed scroll, rotate the ring (cheap), play the new `current`.
-4. Audio session for playback: `playsInSilentMode: true`, `shouldPlayInBackground: true` (see `configureAudioSessionForPlayback` in `src/lib/audio.ts`).
-5. Handle interruptions (incoming call): pause and resume on interruption end.
-6. For voice messages in chat, use a single shared player (one playing at a time).
+1. Client fetches a voice row → calls `getSignedUrl(object_path, expiresIn=3600)`. Signed URLs are cached at the module level in `src/lib/feedPlayer.ts` and refreshed 10 minutes before their 1 h TTL expires.
+2. Holds **3 audio player instances** in a ring buffer for the feed: `current`, `next`, `next+1`. Slot mapping is `itemIndex % 3`, so back-scroll re-loads the previous URI on the slot that previously held it — an accepted trade-off in V1 to keep memory bounded.
+3. Preload `next` and `next+1` immediately after they enter the viewport (using `expo-audio`'s `useAudioPlayer` — there is no `prepareAsync` in `expo-audio`; preloading is achieved by initialising a player with the source URI before it is needed). The non-current slots are kept paused defensively; only `controls.play()` on the current slot triggers playback.
+4. On feed scroll, rotate the ring (cheap), play the new `current`.
+5. Audio session for playback: `playsInSilentMode: true`, `shouldPlayInBackground: true` (see `configureAudioSessionForPlayback` in `src/lib/audio.ts`).
+6. Handle interruptions (incoming call): pause and resume on interruption end.
+7. For voice messages in chat, use a single shared player (one playing at a time).
 
 ---
 
@@ -427,38 +426,54 @@ When enabled, `commit_upload` switches the default row status to `'pending'` and
 
 The feed applies **bidirectional preference matching**: a candidate appears only if (a) their gender matches what the current user is looking for, AND (b) the current user's gender matches what the candidate is looking for. This prevents showing profiles to people they would never want to meet.
 
+The query is wrapped in a `security definer` function `get_feed(p_distance_m int, p_limit int, p_cursor_created_at timestamptz)` callable from the client. The function reads the caller's `gender`, `looking_for` and `location` from `profiles` itself (via `auth.uid()`), so the mobile client only passes session-level filters: max distance, page size, and a `created_at` cursor for pagination.
+
 ```sql
 -- Returns up to N voices the current user hasn't seen, isn't blocked from,
--- matching gender preferences in both directions and within max_distance_km,
+-- matching gender preferences in both directions and within p_distance_m.
 -- ordered by recency + light shuffle.
 --
--- Parameters:
---   $1 looking_for  text[]  — genres the current user wants to see
---   $2 my_gender    text    — the current user's own gender
---   $3 location     geography(Point,4326) — current user's location
---   $4 distance_m   int     — max distance in metres
-select v.*, p.display_name, p.birthdate, p.city, p.bio_emojis
+-- Caller's gender / looking_for / location are read from `profiles` inside the function.
+-- Caller passes only:
+--   p_distance_m         int          — max distance in metres, NULL = unlimited
+--   p_limit              int          — page size (capped server-side at 50)
+--   p_cursor_created_at  timestamptz  — pagination cursor, NULL = first page
+select v.id            as voice_id,
+       v.storage_path,
+       v.duration_ms,
+       v.theme,
+       v.title,
+       pr.body         as prompt_body,
+       v.created_at,
+       v.user_id,
+       p.display_name,
+       p.birthdate,
+       p.city,
+       p.bio_emojis
 from voices v
 join profiles p on p.id = v.user_id
+left join prompts pr on pr.id = v.prompt_id
 where v.status = 'approved'
   and v.is_active = true
   and p.deleted_at is null
   and p.is_banned = false
-  and p.id != auth.uid()
+  and p.id <> auth.uid()
   and not exists (select 1 from feed_seen fs where fs.user_id = auth.uid() and fs.voice_id = v.id)
   and not exists (select 1 from blocks b where (b.blocker_id = auth.uid() and b.blocked_id = p.id) or (b.blocker_id = p.id and b.blocked_id = auth.uid()))
-  and p.gender = any($1::text[])   -- candidate's gender matches what I want
-  and $2 = any(p.looking_for)      -- my gender matches what the candidate wants
-  and ST_DWithin(p.location, $3::geography, $4)
+  and p.gender = any(<caller_looking_for>)
+  and <caller_gender> = any(p.looking_for)
+  and (p_distance_m is null or <caller_location> is null or p.location is null
+       or ST_DWithin(p.location, <caller_location>, p_distance_m))
+  and (p_cursor_created_at is null or v.created_at < p_cursor_created_at)
 order by v.created_at desc, random()
-limit 20;
+limit p_limit;
 ```
 
-Wrapped in a `security definer` function `get_feed(looking_for text[], my_gender text, location geography, distance_m int)` callable from the client. The client passes the current user's `looking_for`, `gender`, `location`, and the selected max distance from the filters modal.
+`prompt_body` is joined in so the card can display the catchphrase without a second query per voice. Distance tolerates NULL on either side: a profile that somehow ended up without a `location` (defensive — the onboarding requires it) is still surfaced.
 
 ### Ordering rationale
 
-`ORDER BY v.created_at DESC, random()` gives a feed that surfaces new voices first while adding enough shuffle to avoid the same ordering on every load. No engagement-based ranking in V1 — that complexity is unnecessary at the validation cohort scale and would be revisited post-Phase 9 if retention data justifies it.
+`ORDER BY v.created_at DESC, random()` gives a feed that surfaces new voices first while adding shuffle within the same recency bucket. No engagement-based ranking in V1 — that complexity is unnecessary at the validation cohort scale and would be revisited post-Phase 9 if retention data justifies it.
 
 ### Filters modal (Phase 5)
 
@@ -466,13 +481,17 @@ The client-side filters modal lets the user adjust:
 
 | Filter | Passed to `get_feed` as |
 |---|---|
-| Looking for (gender) | `$1 looking_for` — overrides profile default for the session |
-| Max distance | `$4 distance_m` |
+| Max distance | `p_distance_m` |
 | Age range | Post-query client-side filter on `p.birthdate` (avoids index complexity in V1) |
 
 Age is filtered client-side in V1 because adding it server-side would require a functional index on a computed column (`extract(year from age(birthdate))`); the 20-row page size makes client-side filtering negligible.
 
----
+The `looking_for` filter is **not** in the modal: orientation is a stable profile attribute, not a session preference. It lives in `profiles.looking_for` and is editable only from the profile screen; `get_feed` reads it directly via `auth.uid()`.
+
+### Empty-state recovery
+
+When the user has consumed every voice that matches their filters, the feed empty-state offers an explicit CTA "Recommencer mon feed" that calls the companion RPC `reset_feed_seen()` (a `security definer` function that deletes all `feed_seen` rows for `auth.uid()`). No automatic cooldown — the re-show is opt-in.
+
 
 ## 9. Account deletion (RGPD)
 

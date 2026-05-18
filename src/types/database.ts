@@ -897,6 +897,32 @@ export type Database = {
         }
         Returns: Database["public"]["Tables"]["voices"]["Row"][]
       }
+      // TODO(any-phase): regenerate via `npx supabase gen types typescript --linked` after pushing the get_feed migration.
+      get_feed: {
+        Args: {
+          p_distance_m?: number | null
+          p_limit?: number
+          p_cursor_created_at?: string | null
+        }
+        Returns: {
+          voice_id: string
+          storage_path: string
+          duration_ms: number
+          theme: string | null
+          title: string | null
+          prompt_body: string | null
+          created_at: string
+          user_id: string
+          display_name: string
+          birthdate: string
+          city: string
+          bio_emojis: string[]
+        }[]
+      }
+      reset_feed_seen: {
+        Args: Record<string, never>
+        Returns: undefined
+      }
       populate_geometry_columns:
         | { Args: { tbl_oid: unknown; use_typmod?: boolean }; Returns: number }
         | { Args: { use_typmod?: boolean }; Returns: string }
