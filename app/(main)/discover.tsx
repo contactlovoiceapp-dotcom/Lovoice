@@ -33,6 +33,85 @@ import ProfileCard from '../../src/components/ProfileCard';
 import DiscoverHeader from '../../src/components/DiscoverHeader';
 import FiltersModal from '../../src/components/main/FiltersModal';
 
+// Shared end-of-feed UI: shown both as the scrollable footer card and as the
+// standalone empty state when no items match the active filters at all.
+function EndOfFeedContent({
+  onOpenFilters,
+  onReset,
+}: {
+  onOpenFilters: () => void;
+  onReset: () => void;
+}) {
+  return (
+    <>
+      <View
+        style={{
+          marginBottom: 24,
+          height: 96,
+          width: 96,
+          alignItems: 'center',
+          justifyContent: 'center',
+          borderRadius: 48,
+          backgroundColor: COLORS.primaryMuted,
+        }}
+      >
+        <Sparkles size={40} color={COLORS.primary} />
+      </View>
+      <Text
+        style={{
+          marginBottom: 8,
+          textAlign: 'center',
+          fontSize: 24,
+          fontFamily: FONT.bold,
+          color: COLORS.dark,
+        }}
+      >
+        {COPY.feed.emptyTitle}
+      </Text>
+      <Text
+        style={{
+          marginBottom: 32,
+          maxWidth: 250,
+          textAlign: 'center',
+          fontFamily: FONT.regular,
+          color: COLORS.textSecondary,
+        }}
+      >
+        {COPY.feed.emptyBody}
+      </Text>
+      <View style={{ gap: 12, width: '100%', alignItems: 'center' }}>
+        <Pressable onPress={onOpenFilters} style={{ width: '100%' }}>
+          <LinearGradient
+            colors={[...CTA_GRADIENT]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={{ borderRadius: RADIUS.cta, paddingHorizontal: 32, paddingVertical: 12 }}
+          >
+            <Text style={{ textAlign: 'center', fontFamily: FONT.bold, color: 'white' }}>
+              {COPY.feed.editFilters}
+            </Text>
+          </LinearGradient>
+        </Pressable>
+        <Pressable
+          onPress={onReset}
+          style={{
+            borderRadius: RADIUS.cta,
+            borderWidth: 1,
+            borderColor: COLORS.border,
+            paddingHorizontal: 32,
+            paddingVertical: 12,
+            width: '100%',
+          }}
+        >
+          <Text style={{ textAlign: 'center', fontFamily: FONT.medium, color: COLORS.textSecondary }}>
+            {COPY.feed.resetSeen}
+          </Text>
+        </Pressable>
+      </View>
+    </>
+  );
+}
+
 // Cards that aren't in the current viewport receive a zeroed, paused snapshot.
 const INACTIVE_SNAPSHOT: FeedPlayerSnapshot = {
   isPlaying: false,
@@ -247,6 +326,7 @@ export default function DiscoverScreen() {
           onRefresh={() => feedQuery.refetch()}
           ListFooterComponent={
             feedQuery.isFetchingNextPage ? (
+              // Loading next page — slim spinner that doesn't disturb paging.
               <View
                 style={{
                   height: 60,
@@ -257,84 +337,36 @@ export default function DiscoverScreen() {
               >
                 <ActivityIndicator size="small" color={COLORS.primary} />
               </View>
+            ) : !feedQuery.hasNextPage ? (
+              // End-of-feed card — same height as a voice card so pagingEnabled snaps to it.
+              <View
+                style={{
+                  width: windowWidth,
+                  height: windowHeight,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  paddingHorizontal: 24,
+                  backgroundColor: COLORS.background,
+                }}
+              >
+                <EndOfFeedContent
+                  onOpenFilters={() => setShowFilters(true)}
+                  onReset={() => setShowResetConfirm(true)}
+                />
+              </View>
             ) : null
           }
         />
       ) : (
-        // Empty state: all pages fetched, but no items pass the age filter or the feed is exhausted.
+        // Standalone empty state when no items match the current filters at all
+        // (e.g. age range too narrow, distance too small, no accounts in DB).
         <View
           style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 }}
         >
-          <View
-            style={{
-              marginBottom: 24,
-              height: 96,
-              width: 96,
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderRadius: 48,
-              backgroundColor: COLORS.primaryMuted,
-            }}
-          >
-            <Sparkles size={40} color={COLORS.primary} />
-          </View>
-          <Text
-            style={{
-              marginBottom: 8,
-              textAlign: 'center',
-              fontSize: 24,
-              fontFamily: FONT.bold,
-              color: COLORS.dark,
-            }}
-          >
-            {COPY.feed.emptyTitle}
-          </Text>
-          <Text
-            style={{
-              marginBottom: 32,
-              maxWidth: 250,
-              textAlign: 'center',
-              fontFamily: FONT.regular,
-              color: COLORS.textSecondary,
-            }}
-          >
-            {COPY.feed.emptyBody}
-          </Text>
-          <View style={{ gap: 12, width: '100%', alignItems: 'center' }}>
-            <Pressable onPress={() => setShowFilters(true)} style={{ width: '100%' }}>
-              <LinearGradient
-                colors={[...CTA_GRADIENT]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={{ borderRadius: RADIUS.cta, paddingHorizontal: 32, paddingVertical: 12 }}
-              >
-                <Text style={{ textAlign: 'center', fontFamily: FONT.bold, color: 'white' }}>
-                  {COPY.feed.editFilters}
-                </Text>
-              </LinearGradient>
-            </Pressable>
-            <Pressable
-              onPress={() => setShowResetConfirm(true)}
-              style={{
-                borderRadius: RADIUS.cta,
-                borderWidth: 1,
-                borderColor: COLORS.border,
-                paddingHorizontal: 32,
-                paddingVertical: 12,
-                width: '100%',
-              }}
-            >
-              <Text
-                style={{
-                  textAlign: 'center',
-                  fontFamily: FONT.medium,
-                  color: COLORS.textSecondary,
-                }}
-              >
-                {COPY.feed.resetSeen}
-              </Text>
-            </Pressable>
-          </View>
+          <EndOfFeedContent
+            onOpenFilters={() => setShowFilters(true)}
+            onReset={() => setShowResetConfirm(true)}
+          />
         </View>
       )}
 

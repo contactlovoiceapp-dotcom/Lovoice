@@ -330,8 +330,19 @@ export function useFeedPlayer({
     // Re-arm the finish detector so a replay (RotateCcw) can also fire onCurrentEnded.
     finishedHandledRef.current = false;
     prevDidJustFinishRef.current = false;
+    // After didJustFinish, expo-audio leaves the playhead at the end — play() alone is a
+    // no-op. Seek back to 0 so the replay button actually restarts the track.
+    const st = statuses[currentSlot];
+    if (st.didJustFinish || (st.duration > 0 && (st.currentTime ?? 0) >= st.duration - 0.5)) {
+      try {
+        players[currentSlot].seekTo(0);
+      } catch {
+        // Swallow: if seekTo throws (e.g. native player recycled) the subsequent play()
+        // will silently fail and the user can tap again.
+      }
+    }
     players[currentSlot].play();
-  }, [currentSlot, players]);
+  }, [currentSlot, players, statuses]);
 
   const pause = useCallback(() => {
     if (currentSlot === null) return;
