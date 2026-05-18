@@ -120,7 +120,7 @@ Cover these once on iOS and once on Android. Backend curl walkthrough lives at
 3. **Single-instance feed player** (`src/lib/feedPlayer.ts`) — one `useAudioPlayer` whose source is swapped via `player.replace(signedUrl)` on every active-card change. Signed URLs for the next two upcoming voices are prefetched in the background so the swap is near-instant; the module-scoped URL cache also serves re-surfacing voices after `reset_feed_seen`. URLs refresh 10 minutes before their 1 h TTL expires. The play button is hard-gated by `snapshot.isLoading` to prevent calling `play()` during a source swap.
 4. `ProfileCard` consumes a `{ snapshot, controls }` pair driven by the feed player; the `setInterval` simulation is gone. `hasListened` is derived from `positionMs >= durationMs - 500`.
 5. **Seen tracking** debounced batcher (`src/features/feed/hooks/useFeedSeenBatcher.ts`): the screen enqueues a `voice_id` once playback crosses 50 %. Flushes at 5 candidates, every 30 s, on screen blur (`useFocusEffect`), and on unmount.
-6. **Autoplay** uses `useFeedPlayer.onCurrentEnded` (which edge-detects the slot's `didJustFinish`) to scroll-to-next when the autoplay toggle is on.
+6. **Autoplay** uses `useFeedPlayer.onCurrentEnded` (which edge-detects `status.didJustFinish` on the single player) to scroll-to-next when the autoplay toggle is on. The next card loads automatically via the source-loading effect, but playback does NOT start automatically yet — that is the next planned improvement.
 7. **Empty-state** offers two CTAs: "Modifier mes filtres" (opens the filters modal) and "Recommencer mon feed" (confirmation modal → `reset_feed_seen` RPC). No automatic cooldown — the re-show is opt-in (ARCHITECTURE §8 "Empty-state recovery").
 8. **Filters modal** rewritten: age range (18–80) + max distance km (5–1000 with "Sans limite" switch). Apply / Reset buttons. Filters live in `useFeedState` (Zustand), session-only (no SecureStore persistence in V1). Age is filtered client-side post-query per ARCHITECTURE §8. **No `looking_for` filter** — orientation is a stable profile attribute, not a session preference.
 9. **Pull-to-refresh** on the FlatList re-fetches the first page (re-shuffle).
@@ -131,7 +131,7 @@ Cover these once on iOS and once on Android. Backend curl walkthrough lives at
 - Real feed scrolling with live audio from Storage (`useFeedItems`).
 - Autoplay mode chains voices using `expo-audio`'s `didJustFinish` event.
 - `feed_seen` populated via debounced batches; `reset_feed_seen` RPC available for the empty-state CTA.
-- 35 Jest suites / 252 tests green; no `any`, no `@ts-ignore`.
+- 35 Jest suites / 259 tests green; no `any`, no `@ts-ignore`.
 
 ### Acceptance criteria
 
