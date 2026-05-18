@@ -20,6 +20,7 @@ jest.mock('expo-router', () => ({
     back: jest.fn(),
     navigate: jest.fn(),
   }),
+  useFocusEffect: (cb: () => void) => cb(),
 }));
 
 jest.mock('../../../../src/features/auth/hooks/useAuth', () => ({
@@ -44,6 +45,7 @@ jest.mock('../../../../src/features/voices/api/voiceQueries', () => ({
 
 jest.mock('../../../../src/features/voices/api/voiceMutations', () => ({
   useUpdateVoice: () => ({ mutateAsync: jest.fn().mockResolvedValue(undefined), isPending: false }),
+  useDeleteVoice: () => ({ mutateAsync: jest.fn().mockResolvedValue(undefined), isPending: false }),
 }));
 
 jest.mock('../../../../src/features/voices/hooks/useVoicePlayer', () => ({
@@ -54,6 +56,7 @@ jest.mock('../../../../src/features/voices/hooks/useVoicePlayer', () => ({
     play: jest.fn(),
     pause: jest.fn(),
     seek: jest.fn(),
+    stop: jest.fn(),
     unload: jest.fn(),
   }),
 }));

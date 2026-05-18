@@ -123,6 +123,7 @@ const INACTIVE_SNAPSHOT: FeedPlayerSnapshot = {
 const INACTIVE_CONTROLS: FeedPlayerControls = {
   play: () => undefined,
   pause: () => undefined,
+  stop: () => undefined,
 };
 const DEFAULT_THEME: FeedItemTheme = 'sunset';
 
@@ -152,12 +153,6 @@ export default function DiscoverScreen() {
   const [showFilters, setShowFilters] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
 
-  // Keep activeIndex in-bounds if the visible items list shrinks (filter change or refetch).
-  useEffect(() => {
-    if (items.length > 0 && activeIndex >= items.length) {
-      setActiveIndex(items.length - 1);
-    }
-  }, [items.length, activeIndex]);
 
   const seenBatcher = useFeedSeenBatcher();
   const resetFeedSeen = useResetFeedSeen();
@@ -184,13 +179,20 @@ export default function DiscoverScreen() {
     onCurrentEnded: handleEnded,
   });
 
-  // Flush pending seen batch when the screen loses focus (navigation away, tab switch, etc.).
+  // Stop audio (pause + reset to 0) and flush pending seen batch when the screen loses focus.
+  // Use refs to avoid re-registering the effect on every scroll (controls identity changes on index change).
+  const controlsRef = useRef(controls);
+  controlsRef.current = controls;
+  const seenBatcherRef = useRef(seenBatcher);
+  seenBatcherRef.current = seenBatcher;
+
   useFocusEffect(
     useCallback(() => {
       return () => {
-        seenBatcher.flush();
+        controlsRef.current.stop();
+        seenBatcherRef.current.flush();
       };
-    }, [seenBatcher]),
+    }, []),
   );
 
   // Track 50% listen progress and enqueue the voice as a seen candidate.
@@ -221,11 +223,38 @@ export default function DiscoverScreen() {
   }, [activeIndex, items.length, feedQuery]);
 
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 80 }).current;
+  // Track the items count and active index in refs so the viewability callback (which must be
+  // stable) can read them without needing to be recreated.
+  const itemsCountRef = useRef(items.length);
+  itemsCountRef.current = items.length;
+  const activeIndexRef = useRef(activeIndex);
+  activeIndexRef.current = activeIndex;
+
+  // Clamp activeIndex only when the items list shrinks (filter change / refetch that
+  // removes items the user is looking at). Must NOT depend on activeIndex itself:
+  // activeIndex is deliberately set to items.length when scrolled to the end-of-feed
+  // footer, and re-running on every activeIndex change would race with swipe-triggered
+  // setActiveIndex calls from onViewableItemsChanged below.
+  useEffect(() => {
+    if (items.length > 0 && activeIndexRef.current >= items.length) {
+      setActiveIndex(items.length - 1);
+    }
+  }, [items.length]);
+
   const onViewableItemsChanged = useRef(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
-      if (viewableItems.length > 0 && viewableItems[0].index !== null) {
-        setActiveIndex(viewableItems[0].index);
-      }
+      const newIndex =
+        viewableItems.length > 0 && viewableItems[0].index !== null
+          ? viewableItems[0].index
+          : itemsCountRef.current;
+
+      if (newIndex === activeIndexRef.current) return;
+
+      // Pause immediately for instant audio cutoff during the swipe animation.
+      // The load effect will pause again + call replace() on the next render anyway,
+      // but this call ensures silence before that re-render lands.
+      controlsRef.current.pause();
+      setActiveIndex(newIndex);
     },
   ).current;
 

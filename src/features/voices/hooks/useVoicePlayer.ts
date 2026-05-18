@@ -19,16 +19,17 @@ export interface VoicePlayerHook {
   pause: () => void;
   /** Seek to an absolute position. */
   seek: (ms: number) => void;
+  /** Pause + seek to 0 so the next play() restarts from the beginning. */
+  stop: () => void;
   /** Pause and clear the source so the player releases its audio focus. */
   unload: () => void;
 }
 
 export function useVoicePlayer({ uri }: { uri: string | null }): VoicePlayerHook {
-  // sessionConfiguredRef prevents redundant setAudioModeAsync calls on every play().
   const sessionConfiguredRef = useRef(false);
-  // Skip the URI effect on the very first render: the player is already initialised with
-  // the source by useAudioPlayer(source) and there is nothing to pause yet.
   const isFirstRenderRef = useRef(true);
+  // When stop() is called (tab switch), the next play() must seekTo(0) first.
+  const needsRestartRef = useRef(false);
 
   const source: AudioSource = uri ?? null;
   // updateInterval at 100ms gives smooth progress bars without excessive JS bridge traffic.
@@ -83,11 +84,29 @@ export function useVoicePlayer({ uri }: { uri: string | null }): VoicePlayerHook
       await configureAudioSessionForPlayback();
       sessionConfiguredRef.current = true;
     }
+    // After stop() or when the track ended, seek back to 0 before playing.
+    const shouldRestart =
+      needsRestartRef.current ||
+      status.didJustFinish ||
+      (status.duration > 0 && status.currentTime >= status.duration - 0.1);
+
+    if (shouldRestart) {
+      try {
+        player.seekTo(0);
+      } catch {
+        // Native player recycled — the subsequent play() will handle it.
+      }
+      needsRestartRef.current = false;
+    }
     player.play();
-  }, [player]);
+  }, [player, status.didJustFinish, status.duration, status.currentTime]);
 
   const pause = useCallback(() => {
-    player.pause();
+    try {
+      player.pause();
+    } catch {
+      // Native player already released by expo-audio — nothing to do.
+    }
   }, [player]);
 
   const seek = useCallback(
@@ -97,6 +116,17 @@ export function useVoicePlayer({ uri }: { uri: string | null }): VoicePlayerHook
     },
     [player],
   );
+
+  const stop = useCallback(() => {
+    try {
+      player.pause();
+    } catch {
+      // Native player already released by expo-audio — nothing to do.
+    }
+    // Don't seekTo here — defer to the next play() call where the player is
+    // guaranteed to be in a stable loaded state.
+    needsRestartRef.current = true;
+  }, [player]);
 
   const unload = useCallback(() => {
     // expo-audio 0.5 doesn't accept null in replace(), so we just pause to release the audio
@@ -117,6 +147,7 @@ export function useVoicePlayer({ uri }: { uri: string | null }): VoicePlayerHook
     play,
     pause,
     seek,
+    stop,
     unload,
   };
 }

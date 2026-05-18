@@ -1,11 +1,11 @@
-/* Tests for the ring-buffer feed player: pure slot mapping and hook smoke coverage with cycling players. */
+/* Tests for the single-instance feed player: source loading, URL prefetch, controls and lifecycle. */
 
 import { act, renderHook, waitFor } from '@testing-library/react-native';
 
 import { getSupabaseClient } from '@/lib/supabase';
 import type { FeedItem } from '@/features/feed/types';
 
-import { computeRingSlots, useFeedPlayer } from '../feedPlayer';
+import { __resetSignedUrlCacheForTests, useFeedPlayer } from '../feedPlayer';
 
 jest.mock('@/lib/supabase', () => ({
   getSupabaseClient: jest.fn(),
@@ -17,19 +17,19 @@ const expoAudioMock = jest.requireMock('expo-audio') as {
 };
 
 const expoAudioMocks = (global as Record<string, unknown>).__expoAudioMocks as {
-  players: Array<{
-    id: string;
+  player: {
     play: jest.Mock;
     pause: jest.Mock;
+    seekTo: jest.Mock;
     replace: jest.Mock;
-  }>;
-  playerStatuses: Array<{
+  };
+  playerStatus: {
     playing: boolean;
     currentTime: number;
     duration: number;
     isBuffering: boolean;
     didJustFinish: boolean;
-  }>;
+  };
 };
 
 function makeItem(overrides: Partial<FeedItem> & Pick<FeedItem, 'voiceId'>): FeedItem {
@@ -49,11 +49,11 @@ function makeItem(overrides: Partial<FeedItem> & Pick<FeedItem, 'voiceId'>): Fee
   };
 }
 
-function mockSupabaseSignedUrl(url = 'https://signed.example/voice.m4a'): {
-  createSignedUrl: jest.Mock;
-} {
-  const createSignedUrl = jest.fn(() =>
-    Promise.resolve({ data: { signedUrl: url }, error: null }),
+function mockSupabaseSignedUrls(
+  perPath: (path: string) => string = (path) => `https://signed.example/${path}`,
+): { createSignedUrl: jest.Mock } {
+  const createSignedUrl = jest.fn((path: string) =>
+    Promise.resolve({ data: { signedUrl: perPath(path) }, error: null }),
   );
   jest.mocked(getSupabaseClient).mockReturnValue({
     storage: { from: () => ({ createSignedUrl }) },
@@ -61,86 +61,23 @@ function mockSupabaseSignedUrl(url = 'https://signed.example/voice.m4a'): {
   return { createSignedUrl };
 }
 
-function installCyclingPlayers(): void {
-  // Each render allocates exactly 3 players in deterministic order. We cycle modulo 3 so
-  // subsequent re-renders re-map to the same player slot identities.
-  let counter = 0;
-  expoAudioMock.useAudioPlayer.mockImplementation(() => {
-    const slot = counter % 3;
-    counter += 1;
-    return expoAudioMocks.players[slot];
-  });
-  expoAudioMock.useAudioPlayerStatus.mockImplementation((player: unknown) => {
-    const idx = expoAudioMocks.players.findIndex((p) => p === player);
-    return expoAudioMocks.playerStatuses[idx >= 0 ? idx : 0];
-  });
-}
-
 beforeEach(() => {
   jest.clearAllMocks();
-  expoAudioMocks.players.forEach((p) => {
-    p.play.mockClear();
-    p.pause.mockClear();
-    p.replace.mockClear();
-  });
-  expoAudioMocks.playerStatuses.forEach((s) => {
-    s.playing = false;
-    s.currentTime = 0;
-    s.duration = 0;
-    s.isBuffering = false;
-    s.didJustFinish = false;
-  });
-  installCyclingPlayers();
-});
-
-describe('computeRingSlots', () => {
-  it('returns all-null when the list is empty', () => {
-    expect(computeRingSlots(0, 0)).toEqual({ current: null, next: null, nextNext: null });
-  });
-
-  it('returns only current when the list has one item', () => {
-    expect(computeRingSlots(0, 1)).toEqual({
-      current: { slot: 0, itemIndex: 0 },
-      next: null,
-      nextNext: null,
-    });
-  });
-
-  it('maps the first three items to slots 0/1/2', () => {
-    expect(computeRingSlots(0, 3)).toEqual({
-      current: { slot: 0, itemIndex: 0 },
-      next: { slot: 1, itemIndex: 1 },
-      nextNext: { slot: 2, itemIndex: 2 },
-    });
-  });
-
-  it('rotates slots forward when advancing past the buffer size', () => {
-    expect(computeRingSlots(1, 10)).toEqual({
-      current: { slot: 1, itemIndex: 1 },
-      next: { slot: 2, itemIndex: 2 },
-      nextNext: { slot: 0, itemIndex: 3 },
-    });
-  });
-
-  it('returns nulls for unavailable next/nextNext at the tail', () => {
-    expect(computeRingSlots(10, 11)).toEqual({
-      current: { slot: 1, itemIndex: 10 },
-      next: null,
-      nextNext: null,
-    });
-  });
-
-  it('returns all-null for out-of-bounds currentIndex', () => {
-    expect(computeRingSlots(-1, 5)).toEqual({ current: null, next: null, nextNext: null });
-    expect(computeRingSlots(5, 5)).toEqual({ current: null, next: null, nextNext: null });
-  });
+  __resetSignedUrlCacheForTests();
+  expoAudioMocks.player.play.mockClear();
+  expoAudioMocks.player.pause.mockClear();
+  expoAudioMocks.player.seekTo.mockClear();
+  expoAudioMocks.player.replace.mockClear();
+  expoAudioMocks.playerStatus.playing = false;
+  expoAudioMocks.playerStatus.currentTime = 0;
+  expoAudioMocks.playerStatus.duration = 0;
+  expoAudioMocks.playerStatus.isBuffering = false;
+  expoAudioMocks.playerStatus.didJustFinish = false;
 });
 
 describe('useFeedPlayer — empty list', () => {
   it('returns a zeroed snapshot when items is empty', () => {
-    const { result } = renderHook(() =>
-      useFeedPlayer({ items: [], currentIndex: 0 }),
-    );
+    const { result } = renderHook(() => useFeedPlayer({ items: [], currentIndex: 0 }));
     expect(result.current.snapshot).toEqual({
       isPlaying: false,
       positionMs: 0,
@@ -149,62 +86,112 @@ describe('useFeedPlayer — empty list', () => {
       error: null,
     });
   });
+
+  it('does not call replace() when the list is empty', () => {
+    renderHook(() => useFeedPlayer({ items: [], currentIndex: 0 }));
+    expect(expoAudioMocks.player.replace).not.toHaveBeenCalled();
+  });
 });
 
 describe('useFeedPlayer — initial load', () => {
-  it('replaces slot 0 once the signed URL resolves for the first item', async () => {
-    mockSupabaseSignedUrl('https://signed.example/voice-1.m4a');
+  it('fetches the signed URL and replaces the player source with it', async () => {
+    mockSupabaseSignedUrls(() => 'https://signed.example/voice-1.m4a');
     const item = makeItem({ voiceId: 'voice-1', storagePath: 'user/voice-1.m4a' });
 
     renderHook(() => useFeedPlayer({ items: [item], currentIndex: 0 }));
 
     await waitFor(() => {
-      expect(expoAudioMocks.players[0].replace).toHaveBeenCalledWith(
+      expect(expoAudioMocks.player.replace).toHaveBeenCalledWith(
         'https://signed.example/voice-1.m4a',
       );
     });
-    // Other slots should never receive a replace for an empty target.
-    expect(expoAudioMocks.players[1].replace).not.toHaveBeenCalled();
-    expect(expoAudioMocks.players[2].replace).not.toHaveBeenCalled();
+  });
+
+  it('pauses immediately so any previous audio stops the moment the swipe lands', async () => {
+    mockSupabaseSignedUrls();
+    const item = makeItem({ voiceId: 'voice-1', storagePath: 'user/voice-1.m4a' });
+
+    renderHook(() => useFeedPlayer({ items: [item], currentIndex: 0 }));
+
+    // The pause() in the load effect runs synchronously, before the await for the URL.
+    expect(expoAudioMocks.player.pause).toHaveBeenCalled();
   });
 });
 
-describe('useFeedPlayer — controls.play()', () => {
-  it('plays the current slot and pauses the other two', async () => {
-    mockSupabaseSignedUrl();
+describe('useFeedPlayer — URL prefetch', () => {
+  it('prefetches signed URLs for the next two upcoming items', async () => {
+    const { createSignedUrl } = mockSupabaseSignedUrls();
     const items = [
-      makeItem({ voiceId: 'v0', storagePath: 'p0.m4a' }),
-      makeItem({ voiceId: 'v1', storagePath: 'p1.m4a' }),
-      makeItem({ voiceId: 'v2', storagePath: 'p2.m4a' }),
+      makeItem({ voiceId: 'v0', storagePath: 'p0' }),
+      makeItem({ voiceId: 'v1', storagePath: 'p1' }),
+      makeItem({ voiceId: 'v2', storagePath: 'p2' }),
+      makeItem({ voiceId: 'v3', storagePath: 'p3' }),
     ];
 
-    const { result } = renderHook(() =>
-      useFeedPlayer({ items, currentIndex: 0 }),
-    );
+    renderHook(() => useFeedPlayer({ items, currentIndex: 0 }));
 
     await waitFor(() => {
-      expect(expoAudioMocks.players[0].replace).toHaveBeenCalled();
+      // Current item + two prefetches = three signed URL calls.
+      expect(createSignedUrl).toHaveBeenCalledWith('p0', expect.any(Number));
+      expect(createSignedUrl).toHaveBeenCalledWith('p1', expect.any(Number));
+      expect(createSignedUrl).toHaveBeenCalledWith('p2', expect.any(Number));
     });
+    // p3 is too far ahead to prefetch.
+    expect(createSignedUrl).not.toHaveBeenCalledWith('p3', expect.any(Number));
+  });
 
-    expoAudioMocks.players[0].pause.mockClear();
-    expoAudioMocks.players[1].pause.mockClear();
-    expoAudioMocks.players[2].pause.mockClear();
+  it('does not prefetch beyond the end of the list', async () => {
+    const { createSignedUrl } = mockSupabaseSignedUrls();
+    const items = [makeItem({ voiceId: 'v0', storagePath: 'p0' })];
 
-    act(() => {
-      result.current.controls.play();
+    renderHook(() => useFeedPlayer({ items, currentIndex: 0 }));
+
+    await waitFor(() => {
+      expect(createSignedUrl).toHaveBeenCalledWith('p0', expect.any(Number));
     });
-
-    expect(expoAudioMocks.players[0].play).toHaveBeenCalledTimes(1);
-    // Defensive pause-others discipline.
-    expect(expoAudioMocks.players[1].pause).toHaveBeenCalled();
-    expect(expoAudioMocks.players[2].pause).toHaveBeenCalled();
+    // Only one item → only one URL fetch (no next, no nextNext).
+    expect(createSignedUrl).toHaveBeenCalledTimes(1);
   });
 });
 
 describe('useFeedPlayer — currentIndex advance', () => {
-  it('rotates so slot 0 holds item 3 (next-after-next) when currentIndex moves from 0 to 1', async () => {
-    const createSignedUrl = jest.fn((path: string) =>
-      Promise.resolve({ data: { signedUrl: `https://signed.example/${path}` }, error: null }),
+  it('pauses and replaces the player source when the active item changes', async () => {
+    mockSupabaseSignedUrls();
+    const items = [
+      makeItem({ voiceId: 'v0', storagePath: 'p0' }),
+      makeItem({ voiceId: 'v1', storagePath: 'p1' }),
+    ];
+
+    const { rerender } = renderHook(
+      ({ index }: { index: number }) => useFeedPlayer({ items, currentIndex: index }),
+      { initialProps: { index: 0 } },
+    );
+
+    await waitFor(() => {
+      expect(expoAudioMocks.player.replace).toHaveBeenCalledWith('https://signed.example/p0');
+    });
+
+    expoAudioMocks.player.replace.mockClear();
+    expoAudioMocks.player.pause.mockClear();
+
+    rerender({ index: 1 });
+
+    // Synchronous pause before the async URL fetch — instant audio cutoff on swipe.
+    expect(expoAudioMocks.player.pause).toHaveBeenCalled();
+
+    await waitFor(() => {
+      expect(expoAudioMocks.player.replace).toHaveBeenCalledWith('https://signed.example/p1');
+    });
+  });
+
+  it('discards a stale in-flight load when the user swipes again before it resolves', async () => {
+    // Construct a controllable URL fetcher so we can resolve loads out of order.
+    const resolvers: Record<string, (url: string) => void> = {};
+    const createSignedUrl = jest.fn(
+      (path: string) =>
+        new Promise<{ data: { signedUrl: string }; error: null }>((resolve) => {
+          resolvers[path] = (url) => resolve({ data: { signedUrl: url }, error: null });
+        }),
     );
     jest.mocked(getSupabaseClient).mockReturnValue({
       storage: { from: () => ({ createSignedUrl }) },
@@ -214,7 +201,6 @@ describe('useFeedPlayer — currentIndex advance', () => {
       makeItem({ voiceId: 'v0', storagePath: 'p0' }),
       makeItem({ voiceId: 'v1', storagePath: 'p1' }),
       makeItem({ voiceId: 'v2', storagePath: 'p2' }),
-      makeItem({ voiceId: 'v3', storagePath: 'p3' }),
     ];
 
     const { rerender } = renderHook(
@@ -222,35 +208,154 @@ describe('useFeedPlayer — currentIndex advance', () => {
       { initialProps: { index: 0 } },
     );
 
+    // p0 (current), p1 + p2 (prefetch) all start fetching.
     await waitFor(() => {
-      expect(expoAudioMocks.players[0].replace).toHaveBeenCalledWith('https://signed.example/p0');
-      expect(expoAudioMocks.players[1].replace).toHaveBeenCalledWith('https://signed.example/p1');
-      expect(expoAudioMocks.players[2].replace).toHaveBeenCalledWith('https://signed.example/p2');
+      expect(resolvers.p0).toBeDefined();
+      expect(resolvers.p1).toBeDefined();
+      expect(resolvers.p2).toBeDefined();
     });
 
-    expoAudioMocks.players[0].replace.mockClear();
-    expoAudioMocks.players[1].replace.mockClear();
-    expoAudioMocks.players[2].replace.mockClear();
-
+    // User swipes to index 1 before p0's URL resolves → token bumps, p1 becomes current.
     rerender({ index: 1 });
+    // User swipes again to index 2 before p1's URL resolves → token bumps again.
+    rerender({ index: 2 });
+
+    // Now resolve p1's URL (stale: token was bumped past it). Should NOT call replace.
+    await act(async () => {
+      resolvers.p1('https://signed.example/p1');
+    });
+
+    expect(expoAudioMocks.player.replace).not.toHaveBeenCalledWith('https://signed.example/p1');
+
+    // Resolve p2's URL (latest token). MUST call replace.
+    await act(async () => {
+      resolvers.p2('https://signed.example/p2');
+    });
 
     await waitFor(() => {
-      // Slot 0 (index 0 % 3 == 0, index 3 % 3 == 0) must be re-loaded with item 3.
-      expect(expoAudioMocks.players[0].replace).toHaveBeenCalledWith('https://signed.example/p3');
+      expect(expoAudioMocks.player.replace).toHaveBeenCalledWith('https://signed.example/p2');
     });
-    // Slots 1 (current, item 1) and 2 (next, item 2) already hold the right items.
-    expect(expoAudioMocks.players[1].replace).not.toHaveBeenCalled();
-    expect(expoAudioMocks.players[2].replace).not.toHaveBeenCalled();
+  });
+});
+
+describe('useFeedPlayer — controls.play()', () => {
+  it('calls player.play() once the source has finished loading', async () => {
+    mockSupabaseSignedUrls();
+    const item = makeItem({ voiceId: 'v0', storagePath: 'p0' });
+
+    const { result } = renderHook(() => useFeedPlayer({ items: [item], currentIndex: 0 }));
+
+    await waitFor(() => {
+      expect(expoAudioMocks.player.replace).toHaveBeenCalled();
+    });
+
+    act(() => {
+      result.current.controls.play();
+    });
+
+    expect(expoAudioMocks.player.play).toHaveBeenCalledTimes(1);
+  });
+
+  it('is a no-op while the source is still loading', () => {
+    // Hold the URL fetch unresolved.
+    const createSignedUrl = jest.fn(() => new Promise(() => undefined));
+    jest.mocked(getSupabaseClient).mockReturnValue({
+      storage: { from: () => ({ createSignedUrl }) },
+    } as unknown as ReturnType<typeof getSupabaseClient>);
+
+    const item = makeItem({ voiceId: 'v0', storagePath: 'p0' });
+    const { result } = renderHook(() => useFeedPlayer({ items: [item], currentIndex: 0 }));
+
+    // While loading, snapshot.isLoading is true.
+    expect(result.current.snapshot.isLoading).toBe(true);
+
+    act(() => {
+      result.current.controls.play();
+    });
+
+    expect(expoAudioMocks.player.play).not.toHaveBeenCalled();
+  });
+
+  it('seeks to 0 before playing when the track ended naturally', async () => {
+    mockSupabaseSignedUrls();
+    const item = makeItem({ voiceId: 'v0', storagePath: 'p0' });
+
+    const { result, rerender } = renderHook(
+      ({ tick: _tick }: { tick: number }) =>
+        useFeedPlayer({ items: [item], currentIndex: 0 }),
+      { initialProps: { tick: 0 } },
+    );
+
+    await waitFor(() => {
+      expect(expoAudioMocks.player.replace).toHaveBeenCalled();
+    });
+
+    act(() => {
+      expoAudioMocks.playerStatus.didJustFinish = true;
+      expoAudioMocks.playerStatus.duration = 30;
+      expoAudioMocks.playerStatus.currentTime = 30;
+      rerender({ tick: 1 });
+    });
+
+    act(() => {
+      result.current.controls.play();
+    });
+
+    expect(expoAudioMocks.player.seekTo).toHaveBeenCalledWith(0);
+    expect(expoAudioMocks.player.play).toHaveBeenCalled();
+  });
+});
+
+describe('useFeedPlayer — controls.pause()', () => {
+  it('calls player.pause()', async () => {
+    mockSupabaseSignedUrls();
+    const item = makeItem({ voiceId: 'v0', storagePath: 'p0' });
+
+    const { result } = renderHook(() => useFeedPlayer({ items: [item], currentIndex: 0 }));
+
+    await waitFor(() => {
+      expect(expoAudioMocks.player.replace).toHaveBeenCalled();
+    });
+
+    expoAudioMocks.player.pause.mockClear();
+
+    act(() => {
+      result.current.controls.pause();
+    });
+
+    expect(expoAudioMocks.player.pause).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('useFeedPlayer — controls.stop()', () => {
+  it('pauses and seeks back to 0', async () => {
+    mockSupabaseSignedUrls();
+    const item = makeItem({ voiceId: 'v0', storagePath: 'p0' });
+
+    const { result } = renderHook(() => useFeedPlayer({ items: [item], currentIndex: 0 }));
+
+    await waitFor(() => {
+      expect(expoAudioMocks.player.replace).toHaveBeenCalled();
+    });
+
+    expoAudioMocks.player.pause.mockClear();
+    expoAudioMocks.player.seekTo.mockClear();
+
+    act(() => {
+      result.current.controls.stop();
+    });
+
+    expect(expoAudioMocks.player.pause).toHaveBeenCalledTimes(1);
+    expect(expoAudioMocks.player.seekTo).toHaveBeenCalledWith(0);
   });
 });
 
 describe('useFeedPlayer — onCurrentEnded', () => {
   it('fires exactly once on the false→true edge and re-arms only on play()', async () => {
-    mockSupabaseSignedUrl();
+    mockSupabaseSignedUrls();
     const onCurrentEnded = jest.fn();
     const item = makeItem({ voiceId: 'voice-end', storagePath: 'voice-end.m4a' });
 
-    // `tick` is a forced-rerender knob; the hook itself doesn't read it.
     const { result, rerender } = renderHook(
       ({ tick: _tick }: { tick: number }) =>
         useFeedPlayer({ items: [item], currentIndex: 0, onCurrentEnded }),
@@ -258,12 +363,11 @@ describe('useFeedPlayer — onCurrentEnded', () => {
     );
 
     await waitFor(() => {
-      expect(expoAudioMocks.players[0].replace).toHaveBeenCalled();
+      expect(expoAudioMocks.player.replace).toHaveBeenCalled();
     });
 
-    // Simulate playback hitting the end on slot 0.
     act(() => {
-      expoAudioMocks.playerStatuses[0].didJustFinish = true;
+      expoAudioMocks.playerStatus.didJustFinish = true;
       rerender({ tick: 1 });
     });
 
@@ -278,14 +382,14 @@ describe('useFeedPlayer — onCurrentEnded', () => {
 
     // Re-arming: a play() call must allow a subsequent end to fire again.
     act(() => {
-      expoAudioMocks.playerStatuses[0].didJustFinish = false;
+      expoAudioMocks.playerStatus.didJustFinish = false;
       rerender({ tick: 3 });
     });
     act(() => {
       result.current.controls.play();
     });
     act(() => {
-      expoAudioMocks.playerStatuses[0].didJustFinish = true;
+      expoAudioMocks.playerStatus.didJustFinish = true;
       rerender({ tick: 4 });
     });
 

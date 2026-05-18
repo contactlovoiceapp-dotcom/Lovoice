@@ -1,6 +1,6 @@
 /* Shared profile screen — renders the full profile editor for both the main tab and onboarding setup. */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -17,7 +17,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { LogOut, Mic, Pause, Plus, RefreshCw, Trash2, X } from 'lucide-react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 
 import { COPY } from '@/copy';
 import { COLORS, CTA_GRADIENT, FONT, ONBOARDING_GRADIENT, RADIUS, SHADOW, THEME_GRADIENTS } from '@/theme';
@@ -183,6 +183,19 @@ export default function ProfileScreen({ isOnboarding = false, onOnboardingComple
   const signedUrlQuery = useVoiceSignedUrl(activeVoice?.storage_path ?? null);
   const signedUrl = signedUrlQuery.data ?? null;
   const voicePlayer = useVoicePlayer({ uri: signedUrl });
+
+  // Stop playback (pause + reset to 0) when navigating away from the profile tab.
+  // Use a ref to avoid re-registering the effect on every render (voicePlayer status changes every tick).
+  const voicePlayerRef = useRef(voicePlayer);
+  voicePlayerRef.current = voicePlayer;
+
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        voicePlayerRef.current.stop();
+      };
+    }, []),
+  );
 
   const [voiceTitle, setVoiceTitle] = useState('');
   const [mood, setMood] = useState<ColorTheme>(ColorTheme.Sunset);

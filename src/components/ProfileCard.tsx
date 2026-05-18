@@ -1,5 +1,5 @@
 /* Full-screen immersive profile card — the heart of the Discover feed.
-   Consumes a FeedItem + a ring-buffer player snapshot/controls pair; renders the audio
+   Consumes a FeedItem + a feed player snapshot/controls pair; renders the audio
    progress ring, waveform, identity row, and the three overlay modals (reply, report, locked). */
 
 import React, { useEffect, useRef, useState } from 'react';
