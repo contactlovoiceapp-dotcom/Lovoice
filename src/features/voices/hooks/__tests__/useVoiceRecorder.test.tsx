@@ -170,6 +170,79 @@ describe('useVoiceRecorder — reset()', () => {
   });
 });
 
+describe('useVoiceRecorder — isLikelySilent', () => {
+  it('is false initially', () => {
+    const { result } = renderHook(() => useVoiceRecorder());
+    expect(result.current.isLikelySilent).toBe(false);
+  });
+
+  it('is true after stop() when all metering samples are below the voice threshold (-30 dBFS)', async () => {
+    const { useAudioRecorderState: mockUseState } = jest.requireMock('expo-audio') as {
+      useAudioRecorderState: jest.Mock;
+    };
+    // -50 dBFS is ambient noise level — never reaches the -30 voice threshold.
+    mockUseState.mockReturnValue({
+      ...mocks.recorderState,
+      metering: -50,
+      durationMillis: 15_000,
+    });
+
+    const { result } = renderHook(() => useVoiceRecorder());
+
+    await act(async () => {
+      await result.current.start();
+    });
+    await act(async () => {
+      await result.current.stop();
+    });
+
+    expect(result.current.isLikelySilent).toBe(true);
+  });
+
+  it('is false after stop() when metering consistently exceeds the voice threshold (-30 dBFS)', async () => {
+    const { useAudioRecorderState: mockUseState } = jest.requireMock('expo-audio') as {
+      useAudioRecorderState: jest.Mock;
+    };
+    // -20 dBFS is a clear voice signal, well above the -30 threshold.
+    mockUseState.mockReturnValue({
+      ...mocks.recorderState,
+      metering: -20,
+      durationMillis: 15_000,
+    });
+
+    const { result } = renderHook(() => useVoiceRecorder());
+
+    await act(async () => {
+      await result.current.start();
+    });
+    await act(async () => {
+      await result.current.stop();
+    });
+
+    expect(result.current.isLikelySilent).toBe(false);
+  });
+
+  it('resets to false after reset()', async () => {
+    const { useAudioRecorderState: mockUseState } = jest.requireMock('expo-audio') as {
+      useAudioRecorderState: jest.Mock;
+    };
+    mockUseState.mockReturnValue({
+      ...mocks.recorderState,
+      metering: -50,
+      durationMillis: 15_000,
+    });
+
+    const { result } = renderHook(() => useVoiceRecorder());
+
+    await act(async () => { await result.current.start(); });
+    await act(async () => { await result.current.stop(); });
+    expect(result.current.isLikelySilent).toBe(true);
+
+    await act(async () => { await result.current.reset(); });
+    expect(result.current.isLikelySilent).toBe(false);
+  });
+});
+
 describe('useVoiceRecorder — canStop', () => {
   it('is false at zero duration', () => {
     const { result } = renderHook(() => useVoiceRecorder());

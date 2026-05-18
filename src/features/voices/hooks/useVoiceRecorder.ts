@@ -35,6 +35,8 @@ export interface VoiceRecorderHook {
   durationMs: number;
   meteringDb: number[];
   canStop: boolean;
+  /** True when the recording peak never exceeded SILENCE_THRESHOLD_DB — likely silence or white noise. */
+  isLikelySilent: boolean;
   result: VoiceRecorderResult | null;
   error: string | null;
   start: () => Promise<void>;
@@ -43,6 +45,13 @@ export interface VoiceRecorderHook {
   stop: () => Promise<void>;
   reset: () => Promise<void>;
 }
+
+// A real voice consistently exceeds this level; ambient noise rarely does for sustained periods.
+// -30 dBFS sits above typical room noise peaks (-45 to -35) and below a quiet close-mic voice (-25 to -15).
+const VOICE_THRESHOLD_DB = -30;
+// If fewer than 5% of metering samples exceed VOICE_THRESHOLD_DB we consider the recording silent.
+// Ambient noise may occasionally spike above -30, but a real voice will do so continuously.
+const VOICE_SAMPLE_MIN_RATIO = 0.05;
 
 // Ring buffer capacity: 3 seconds of history at 50ms intervals, enough for a smooth waveform.
 const METERING_RING_SIZE = 60;
@@ -59,11 +68,16 @@ export function useVoiceRecorder(): VoiceRecorderHook {
   const [state, setState] = useState<RecorderState>('idle');
   const [durationMs, setDurationMs] = useState(0);
   const [meteringDb, setMeteringDb] = useState<number[]>([]);
+  const [isLikelySilent, setIsLikelySilent] = useState(false);
   const [result, setResult] = useState<VoiceRecorderResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Tracks whether stop was triggered by the hard cap to avoid double-stop.
   const hardCapFiredRef = useRef(false);
+  // Counts all metering samples and those above VOICE_THRESHOLD_DB for ratio-based silence detection.
+  // We use refs (not state) to avoid re-renders on every 50ms tick.
+  const totalSamplesRef = useRef(0);
+  const voiceSamplesRef = useRef(0);
 
   const recorder = useAudioRecorder(VOICE_AUDIO_FORMAT);
   // Poll at METERING_INTERVAL_MS for live duration and metering updates.
@@ -77,8 +91,13 @@ export function useVoiceRecorder(): VoiceRecorderHook {
     setDurationMs(Math.min(recorderState.durationMillis, MAX_VOICE_DURATION_MS));
 
     if (recorderState.metering !== undefined && state === 'recording') {
+      const sample = recorderState.metering as number;
+      totalSamplesRef.current += 1;
+      if (sample > VOICE_THRESHOLD_DB) {
+        voiceSamplesRef.current += 1;
+      }
       setMeteringDb((prev) => {
-        const next = [...prev, recorderState.metering as number];
+        const next = [...prev, sample];
         // Trim to ring size so the array never grows past METERING_RING_SIZE.
         return next.length > METERING_RING_SIZE ? next.slice(-METERING_RING_SIZE) : next;
       });
@@ -133,8 +152,11 @@ export function useVoiceRecorder(): VoiceRecorderHook {
       recorder.record();
 
       hardCapFiredRef.current = false;
+      totalSamplesRef.current = 0;
+      voiceSamplesRef.current = 0;
       setDurationMs(0);
       setMeteringDb([]);
+      setIsLikelySilent(false);
       setResult(null);
       setError(null);
       setState('recording');
@@ -180,6 +202,10 @@ export function useVoiceRecorder(): VoiceRecorderHook {
       const rawDuration = recorderState.durationMillis || durationMs;
       const finalDuration = Math.min(rawDuration, MAX_VOICE_DURATION_MS);
 
+      const voiceRatio = totalSamplesRef.current > 0
+        ? voiceSamplesRef.current / totalSamplesRef.current
+        : 0;
+      setIsLikelySilent(voiceRatio < VOICE_SAMPLE_MIN_RATIO);
       setResult({ uri: finalUri, durationMs: finalDuration });
       setState('stopped');
       await configureAudioSessionForPlayback();
@@ -211,7 +237,10 @@ export function useVoiceRecorder(): VoiceRecorderHook {
       setError(null);
       setDurationMs(0);
       setMeteringDb([]);
+      setIsLikelySilent(false);
       hardCapFiredRef.current = false;
+      totalSamplesRef.current = 0;
+      voiceSamplesRef.current = 0;
       setState('idle');
       await configureAudioSessionForPlayback();
     }
@@ -219,5 +248,5 @@ export function useVoiceRecorder(): VoiceRecorderHook {
 
   const canStop = durationMs >= MIN_VOICE_DURATION_MS;
 
-  return { state, durationMs, meteringDb, canStop, result, error, start, pause, resume, stop, reset };
+  return { state, durationMs, meteringDb, canStop, isLikelySilent, result, error, start, pause, resume, stop, reset };
 }

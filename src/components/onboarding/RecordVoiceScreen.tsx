@@ -254,6 +254,7 @@ const RecordVoiceScreen: React.FC<Props> = ({ onNext, onSkip, onCancel }) => {
   const isUploading = uploadVoice.isPending;
   const uploadFailed = uploadVoice.isError && !isUploading;
   const permissionDenied = recorder.state === 'error' && recorder.error === 'permission_denied';
+  const isSilent = isStopped && recorder.isLikelySilent;
 
   // Display in seconds: durationMs updates at 50ms granularity but formatTime only renders m:ss,
   // so the visible value still ticks once per second.
@@ -267,6 +268,8 @@ const RecordVoiceScreen: React.FC<Props> = ({ onNext, onSkip, onCancel }) => {
     statusText = COPY.record.uploadingStatus;
   } else if (uploadFailed) {
     statusText = COPY.record.uploadErrorStatus;
+  } else if (isSilent) {
+    statusText = COPY.record.silenceWarningStatus;
   } else if (isStopped) {
     statusText = isPreviewPlaying ? COPY.record.previewPlayingStatus : COPY.record.recordedStatus;
   } else if (isRecording) {
@@ -283,6 +286,8 @@ const RecordVoiceScreen: React.FC<Props> = ({ onNext, onSkip, onCancel }) => {
     continueLabel = COPY.record.ctaUploading;
   } else if (uploadFailed) {
     continueLabel = COPY.record.ctaRetry;
+  } else if (isSilent) {
+    continueLabel = COPY.record.ctaReRecord;
   } else if (isStopped) {
     continueLabel = COPY.common.continue;
   } else if (isRecording) {
@@ -321,6 +326,26 @@ const RecordVoiceScreen: React.FC<Props> = ({ onNext, onSkip, onCancel }) => {
     await recorder.start();
   }, [isRecording, isStopped, isUploading, permissionDenied, player, recorder]);
 
+  const handleUploadAndProceed = useCallback(async () => {
+    if (!recorder.result) return;
+    try {
+      player.unload();
+      await uploadVoice.mutateAsync({
+        uri: recorder.result.uri,
+        durationMs: recorder.result.durationMs,
+      });
+      onNext();
+    } catch {
+      // Error surfaces via uploadVoice.error and the retry CTA.
+    }
+  }, [onNext, player, recorder.result, uploadVoice]);
+
+  const handleRestart = useCallback(async () => {
+    player.unload();
+    await recorder.reset();
+    uploadVoice.reset();
+  }, [player, recorder, uploadVoice]);
+
   const handleContinue = useCallback(async () => {
     if (isUploading) return;
     if (permissionDenied) {
@@ -339,25 +364,13 @@ const RecordVoiceScreen: React.FC<Props> = ({ onNext, onSkip, onCancel }) => {
       await recorder.start();
       return;
     }
-    if (!recorder.result) return;
-
-    try {
-      player.unload();
-      await uploadVoice.mutateAsync({
-        uri: recorder.result.uri,
-        durationMs: recorder.result.durationMs,
-      });
-      onNext();
-    } catch {
-      // Error surfaces via uploadVoice.error and the retry CTA.
+    // Silent recording: the primary CTA triggers a re-record instead of uploading.
+    if (isSilent) {
+      await handleRestart();
+      return;
     }
-  }, [isRecording, isStopped, isUploading, onNext, permissionDenied, player, recorder, uploadVoice]);
-
-  const handleRestart = useCallback(async () => {
-    player.unload();
-    await recorder.reset();
-    uploadVoice.reset();
-  }, [player, recorder, uploadVoice]);
+    await handleUploadAndProceed();
+  }, [handleRestart, handleUploadAndProceed, isRecording, isSilent, isStopped, isUploading, permissionDenied, recorder]);
 
   const handleCancel = useCallback(async () => {
     player.unload();
@@ -508,11 +521,25 @@ const RecordVoiceScreen: React.FC<Props> = ({ onNext, onSkip, onCancel }) => {
                   textAlign: 'center',
                   fontSize: 14,
                   fontFamily: FONT.medium,
-                  color: uploadFailed || permissionDenied ? COLORS.primary : COLORS.textSecondary,
+                  color: uploadFailed || permissionDenied || isSilent ? COLORS.primary : COLORS.textSecondary,
                 }}
               >
                 {statusText}
               </Text>
+
+              {isSilent && (
+                <Text
+                  style={{
+                    marginTop: 4,
+                    textAlign: 'center',
+                    fontSize: 12,
+                    fontFamily: FONT.medium,
+                    color: COLORS.textTertiary,
+                  }}
+                >
+                  {COPY.record.silenceWarningHint}
+                </Text>
+              )}
 
               {minimumGuidanceText !== '' && (
                 <Text
@@ -608,6 +635,20 @@ const RecordVoiceScreen: React.FC<Props> = ({ onNext, onSkip, onCancel }) => {
                 </View>
               </LinearGradient>
             </Pressable>
+
+            {isSilent && onSkip && (
+              <Pressable
+                accessibilityRole="button"
+                onPress={handleSkip}
+                style={{ alignSelf: 'center', paddingVertical: 8 }}
+              >
+                <Text
+                  style={{ fontSize: 14, fontFamily: FONT.medium, color: COLORS.textTertiary, textDecorationLine: 'underline' }}
+                >
+                  {COPY.record.ctaContinueWithoutVoice}
+                </Text>
+              </Pressable>
+            )}
 
             {!isStopped && !isRecording && !isUploading && onSkip ? (
               <Pressable

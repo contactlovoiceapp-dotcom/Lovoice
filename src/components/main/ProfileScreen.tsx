@@ -14,7 +14,7 @@ import {
   View,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { LogOut, Mic, Pause, Plus, RefreshCw, X } from 'lucide-react-native';
+import { LogOut, Mic, Pause, Plus, RefreshCw, Trash2, X } from 'lucide-react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -27,7 +27,7 @@ import { type CitySearchResult } from '@/features/profile/api/citySearch';
 import { useUpsertProfile } from '@/features/profile/api/profileMutations';
 import { useCitySearch } from '@/features/profile/hooks/useCitySearch';
 import { useActiveVoice, useVoiceSignedUrl } from '@/features/voices/api/voiceQueries';
-import { useUpdateVoice } from '@/features/voices/api/voiceMutations';
+import { useDeleteVoice, useUpdateVoice } from '@/features/voices/api/voiceMutations';
 import { useVoicePlayer } from '@/features/voices/hooks/useVoicePlayer';
 import type { VoiceTheme } from '@/features/voices/types';
 import { formatRelativeTime } from '@/lib/formatRelativeTime';
@@ -176,6 +176,7 @@ export default function ProfileScreen({ isOnboarding = false, onOnboardingComple
   const { signOut, profile } = useAuth();
   const upsertProfile = useUpsertProfile();
   const updateVoice = useUpdateVoice();
+  const deleteVoice = useDeleteVoice();
 
   const activeVoiceQuery = useActiveVoice(profile?.id ?? null);
   const activeVoice = activeVoiceQuery.data ?? null;
@@ -341,6 +342,30 @@ export default function ProfileScreen({ isOnboarding = false, onOnboardingComple
       Alert.alert(COPY.profile.signOutTitle, COPY.profile.signOutError);
     }
   }, [signOut]);
+
+  const handleDeleteVoice = useCallback(() => {
+    if (!activeVoice || !profile?.id) return;
+
+    Alert.alert(
+      COPY.profile.deleteVoiceConfirmTitle,
+      COPY.profile.deleteVoiceConfirmBody,
+      [
+        { text: COPY.common.cancel, style: 'cancel' },
+        {
+          text: COPY.profile.deleteVoiceConfirmCta,
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              voicePlayer.unload();
+              await deleteVoice.mutateAsync({ voiceId: activeVoice.id, userId: profile.id });
+            } catch {
+              Alert.alert(COPY.profile.deleteVoiceConfirmTitle, COPY.profile.deleteVoiceError);
+            }
+          },
+        },
+      ],
+    );
+  }, [activeVoice, deleteVoice, profile?.id, voicePlayer]);
 
   const age = profile?.birthdate ? calculateAge(profile.birthdate) : null;
   const genderText = GENDER_LABELS[profile?.gender ?? ''] ?? '';
@@ -578,29 +603,32 @@ export default function ProfileScreen({ isOnboarding = false, onOnboardingComple
                       {activeVoice ? formatRelativeTime(activeVoice.created_at) : ''}
                     </Text>
                     {!isOnboarding && (
-                      <Pressable
-                        accessibilityRole="button"
-                        accessibilityLabel={COPY.a11y.retakeVoice}
-                        onPress={() => router.push('/(main)/profile/record')}
-                        style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          gap: 4,
-                          marginTop: 6,
-                          alignSelf: 'flex-start',
-                        }}
-                      >
-                        <RefreshCw size={12} color={COLORS.textSecondary} />
-                        <Text
-                          style={{
-                            fontSize: 12,
-                            fontFamily: FONT.medium,
-                            color: COLORS.textSecondary,
-                          }}
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16, marginTop: 6 }}>
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel={COPY.a11y.retakeVoice}
+                          onPress={() => router.push('/(main)/profile/record')}
+                          style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
                         >
-                          {COPY.profile.recordVoiceAgain}
-                        </Text>
-                      </Pressable>
+                          <RefreshCw size={12} color={COLORS.textSecondary} />
+                          <Text style={{ fontSize: 12, fontFamily: FONT.medium, color: COLORS.textSecondary }}>
+                            {COPY.profile.recordVoiceAgain}
+                          </Text>
+                        </Pressable>
+
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel={COPY.a11y.deleteVoice}
+                          disabled={deleteVoice.isPending}
+                          onPress={handleDeleteVoice}
+                          style={{ flexDirection: 'row', alignItems: 'center', gap: 4, opacity: deleteVoice.isPending ? 0.4 : 1 }}
+                        >
+                          <Trash2 size={12} color={COLORS.primary} />
+                          <Text style={{ fontSize: 12, fontFamily: FONT.medium, color: COLORS.primary }}>
+                            {COPY.a11y.deleteVoice}
+                          </Text>
+                        </Pressable>
+                      </View>
                     )}
                   </View>
 

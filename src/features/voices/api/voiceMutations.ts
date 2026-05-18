@@ -143,6 +143,40 @@ export function useUploadVoice(): UseMutationResult<VoiceRow, Error, UploadVoice
   });
 }
 
+export function useDeleteVoice(): UseMutationResult<void, Error, { voiceId: string; userId: string }> {
+  const queryClient = useQueryClient();
+  const { session } = useAuth();
+
+  return useMutation({
+    mutationFn: async ({ voiceId }) => {
+      if (!session) {
+        throw new Error('voice.session_missing');
+      }
+
+      const supabase = getSupabaseClient();
+
+      if (!supabase) {
+        throw new Error('voice.supabase_unavailable');
+      }
+
+      const { data, error } = await supabase.rpc('delete_own_voice', {
+        p_voice_id: voiceId,
+      });
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      if (!data) {
+        throw new Error('voice.not_found');
+      }
+    },
+    onSuccess: async (_result, { userId }) => {
+      await queryClient.invalidateQueries({ queryKey: voiceQueryKeys.active(userId) });
+    },
+  });
+}
+
 export function useUpdateVoice(): UseMutationResult<VoiceRow, Error, UpdateVoiceInput> {
   const queryClient = useQueryClient();
   const { session } = useAuth();

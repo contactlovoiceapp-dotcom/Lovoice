@@ -897,6 +897,11 @@ export type Database = {
         }
         Returns: Database["public"]["Tables"]["voices"]["Row"][]
       }
+      // TODO(any-phase): regenerate via `npx supabase gen types typescript --linked` after pushing the delete_own_voice migration.
+      delete_own_voice: {
+        Args: { p_voice_id: string }
+        Returns: number
+      }
       // TODO(any-phase): regenerate via `npx supabase gen types typescript --linked` after pushing the get_feed migration.
       get_feed: {
         Args: {
