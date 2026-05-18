@@ -330,11 +330,14 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
     return () => cancelAnimation(chevronY);
   }, []);
 
-  // Sticky "has reached the end" flag — used to swap the play button to a RotateCcw replay.
-  // We latch via state (not just a ref) so the UI re-renders the moment it flips.
+  // Tracks whether the user has heard the track through to the end.
+  // Reset to false when positionMs drops back near 0 (i.e. after a seekTo(0) replay)
+  // so that pausing mid-replay restores the normal play button, not the RotateCcw.
   useEffect(() => {
     if (durationMs > 0 && positionMs >= durationMs - HAS_LISTENED_TOLERANCE_MS) {
       setHasListened(true);
+    } else if (positionMs < 1000) {
+      setHasListened(false);
     }
   }, [positionMs, durationMs]);
 
