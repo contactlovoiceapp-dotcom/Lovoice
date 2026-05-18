@@ -1,27 +1,41 @@
-/* Feed store tests — protect the persistence boundary so transient feed data never leaks to disk. */
+/* Smoke tests for the feed UI store: autoplay toggle and filters slice. */
 
-import * as SecureStore from 'expo-secure-store';
+import { act } from '@testing-library/react-native';
 
-import { useFeedState } from '../useFeedState';
+import { useFeedState, DEFAULT_FILTERS } from '../useFeedState';
 
 describe('useFeedState', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    act(() => {
+      useFeedState.setState({
+        autoplay: false,
+        filters: DEFAULT_FILTERS,
+      });
+    });
   });
 
-  it('exposes feed gestures and never persists transient feed data', async () => {
-    // Triggering any setter forces zustand to flush the persisted slice through SecureStore.
-    useFeedState.getState().setAutoplay(true);
+  it('setAutoplay flips state from false to true', () => {
+    act(() => {
+      useFeedState.getState().setAutoplay(true);
+    });
+    expect(useFeedState.getState().autoplay).toBe(true);
+  });
 
-    const setItemAsync = jest.mocked(SecureStore.setItemAsync);
+  it('setFilters updates the filters slice', () => {
+    const next = { minAge: 25, maxAge: 40, maxDistanceMeters: 50000 };
+    act(() => {
+      useFeedState.getState().setFilters(next);
+    });
+    expect(useFeedState.getState().filters).toEqual(next);
+  });
 
-    // Wait one microtask so the persist middleware can flush asynchronously.
-    await Promise.resolve();
-
-    expect(setItemAsync).toHaveBeenCalled();
-    const lastSerialized = setItemAsync.mock.calls.at(-1)?.[1] ?? '';
-    expect(lastSerialized).not.toContain('profiles');
-    expect(lastSerialized).not.toContain('likedIds');
-    expect(lastSerialized).not.toContain('hasRecordedVoice');
+  it('resetFilters restores DEFAULT_FILTERS', () => {
+    act(() => {
+      useFeedState.getState().setFilters({ minAge: 30, maxAge: 50, maxDistanceMeters: 10000 });
+    });
+    act(() => {
+      useFeedState.getState().resetFilters();
+    });
+    expect(useFeedState.getState().filters).toEqual(DEFAULT_FILTERS);
   });
 });

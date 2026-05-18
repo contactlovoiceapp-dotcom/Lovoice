@@ -12,8 +12,7 @@ import Animated, {
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
-import { ColorTheme } from '../types';
-import { RADIUS } from '../theme';
+import { RADIUS, THEME_GRADIENTS } from '../theme';
 
 const BAR_COUNT = 50;
 
@@ -21,9 +20,12 @@ const MIN_HEIGHT = 0.15;
 const TARGET_HEIGHT = 0.85;
 const OSCILLATION_DURATION_MS = 600;
 
+// Lowercase string union — mirrors `voices.theme` values and FeedItemTheme.
+type WaveformTheme = keyof typeof THEME_GRADIENTS;
+
 interface WaveformProps {
   isPlaying: boolean;
-  theme: ColorTheme;
+  theme: WaveformTheme;
   height?: number;
 }
 
@@ -34,15 +36,15 @@ interface WaveformBarProps {
   delay: number;
 }
 
-function getBarColor(theme: ColorTheme): string {
+function getBarColor(theme: WaveformTheme): string {
   switch (theme) {
-    case ColorTheme.Sunset:
+    case 'sunset':
       return '#fbbf24';
-    case ColorTheme.Chill:
+    case 'chill':
       return '#a78bfa';
-    case ColorTheme.Electric:
+    case 'electric':
       return '#e724ab';
-    case ColorTheme.Midnight:
+    case 'midnight':
       return '#9ca3af';
     default:
       return 'rgba(255,255,255,0.5)';

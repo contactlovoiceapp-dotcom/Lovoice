@@ -4,15 +4,23 @@ import React, { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { Heart, Sparkles, User } from 'lucide-react-native';
 
-import type { Profile } from '../../types';
 import { COLORS, FONT, RADIUS, SHADOW } from '../../theme';
 import { COPY } from '../../copy';
 
 type LikesSubTab = 'received' | 'given';
 
+// TODO(phase-6): wire useLikes / useLikedVoices queries.
+interface LikesScreenProfile {
+  id: string;
+  displayName: string;
+  age: number;
+  city: string;
+  emojis: string[];
+}
+
 interface LikesScreenProps {
-  likedProfiles: Profile[];
-  receivedLikeProfiles: Profile[];
+  likedProfiles: LikesScreenProfile[];
+  receivedLikeProfiles: LikesScreenProfile[];
   onUnlike: (id: string) => void;
   onOpenReceivedLike: (id: string) => void;
 }
@@ -132,7 +140,7 @@ function EmptyState({
   );
 }
 
-function ProfileMeta({ profile }: { profile: Profile }) {
+function ProfileMeta({ profile }: { profile: LikesScreenProfile }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 2 }}>
       <Text style={{ fontFamily: FONT.regular, fontSize: 13, color: COLORS.textSecondary }}>
@@ -233,7 +241,7 @@ const LikesScreen: React.FC<LikesScreenProps> = ({
                 <View>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                     <Text style={{ fontFamily: FONT.semibold, fontSize: 16, color: COLORS.dark }}>
-                      {profile.name}, {profile.age}
+                      {profile.displayName}, {profile.age}
                     </Text>
                     <View
                       style={{
@@ -298,7 +306,7 @@ const LikesScreen: React.FC<LikesScreenProps> = ({
             >
               <View style={{ flex: 1 }}>
                 <Text style={{ fontFamily: FONT.semibold, fontSize: 16, color: COLORS.dark }}>
-                  {profile.name}, {profile.age}
+                  {profile.displayName}, {profile.age}
                 </Text>
                 <ProfileMeta profile={profile} />
               </View>

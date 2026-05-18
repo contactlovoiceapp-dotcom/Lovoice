@@ -26,6 +26,7 @@ export const COPY = {
     clearEmoji: 'Supprimer cet emoji',
     closeFilters: 'Fermer les filtres',
     applyFilters: 'Appliquer les filtres',
+    resetFilters: 'Réinitialiser les filtres',
   },
 
   home: {
@@ -195,6 +196,14 @@ export const COPY = {
       'Tu as écouté toutes les voix du coin. Élargis tes filtres ou reviens plus tard.',
     editFilters: 'Modifier mes filtres',
     fallbackPrompt: 'Écoute ma voix…',
+    resetSeen: 'Recommencer mon feed',
+    resetConfirmTitle: 'Recommencer ton feed ?',
+    resetConfirmBody:
+      'Toutes les voix que tu as déjà entendues redeviendront disponibles. Ton historique de likes et de messages est conservé.',
+    resetConfirmCta: 'Tout recommencer',
+    resetError: 'La réinitialisation a échoué. Réessaie dans un instant.',
+    loadError: 'Impossible de charger les voix. Réessaie.',
+    retry: 'Réessayer',
   },
 
   actions: {
@@ -268,14 +277,16 @@ export const COPY = {
 
   filters: {
     title: 'Filtres',
-    newVoices: 'Nouvelles voix',
-    newProfiles: 'Nouveaux profils',
     ageRange: "Tranche d'âge",
     ageUnit: 'ans',
     ageMin: 'Âge minimum',
     ageMax: 'Âge maximum',
-    location: 'Localisation',
+    distance: 'Distance maximum',
+    distanceUnit: 'km',
+    distanceUnlimitedLabel: 'Illimité',
+    distanceUnlimitedSwitch: 'Sans limite de distance',
     apply: 'Appliquer les filtres',
+    reset: 'Réinitialiser',
   },
 
   onboarding: {

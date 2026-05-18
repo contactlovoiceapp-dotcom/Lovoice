@@ -1,6 +1,6 @@
 /* Full-screen immersive profile card — the heart of the Discover feed.
-   Renders the audio player, progress ring, waveform, profile info,
-   action buttons, and three overlay modals (reply, report, locked). */
+   Consumes a FeedItem + a ring-buffer player snapshot/controls pair; renders the audio
+   progress ring, waveform, identity row, and the three overlay modals (reply, report, locked). */
 
 import React, { useEffect, useRef, useState } from 'react';
 import {
@@ -37,17 +37,22 @@ import {
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 
-import type { Profile } from '../types';
 import { COLORS, FONT, RADIUS, SHADOW, THEME_GRADIENTS, hexToRgba } from '../theme';
 import { COPY } from '../copy';
 import { formatTime } from '../lib/formatTime';
+import { ageFromBirthdate } from '../lib/age';
+import type { FeedItem } from '../features/feed/types';
+import type { FeedPlayerControls, FeedPlayerSnapshot } from '../lib/feedPlayer';
 import Waveform from './Waveform';
 
 interface ProfileCardProps {
-  profile: Profile;
-  isPlaying: boolean;
-  togglePlay: (id: string) => void;
-  onFinish?: (id: string) => void;
+  item: FeedItem;
+  /**
+   * Player state for THIS card. Falsy snapshot fields are valid and rendered as zeros.
+   * Cards that aren't the current viewport item receive a "paused / no progress" snapshot.
+   */
+  snapshot: FeedPlayerSnapshot;
+  controls: FeedPlayerControls;
   hasRecordedVoice?: boolean;
   isLiked: boolean;
   onToggleLike: () => void;
@@ -62,6 +67,8 @@ const ANDROID_PLAY_SHADOW = {
   shadowColor: 'transparent',
   elevation: 0,
 } as const;
+// Tolerance window in ms — playback rarely reports the exact final position.
+const HAS_LISTENED_TOLERANCE_MS = 500;
 
 /* ─── Reanimated sub-components ────────────────────────────────────────────── */
 
@@ -253,29 +260,31 @@ function ModalOverlay({
 /* ─── ProfileCard ──────────────────────────────────────────────────────────── */
 
 const ProfileCard: React.FC<ProfileCardProps> = ({
-  profile,
-  isPlaying,
-  togglePlay,
-  onFinish,
+  item,
+  snapshot,
+  controls,
   hasRecordedVoice = true,
   isLiked,
   onToggleLike,
   onRecordVoice,
 }) => {
-  const { theme, audioDurationSec } = profile;
+  const theme = item.theme;
   const { width: windowWidth } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   // Floating pill nav (52px) + bottom inset + 12px gap above + 16px breathing
   const bottomNavHeight = 52 + insets.bottom + 12 + 16;
 
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [elapsed, setElapsed] = useState(0);
   const [hasListened, setHasListened] = useState(false);
   const [showReplyModal, setShowReplyModal] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportReason, setReportReason] = useState('');
   const [showLockedModal, setShowLockedModal] = useState(false);
 
+  const { isPlaying, positionMs, durationMs, isLoading, error } = snapshot;
+  // The server-known duration is the ground truth until the player loads; preserves the
+  // "0:30" total on the right side of the timer the moment the card mounts.
+  const knownDurationSec = durationMs > 0 ? durationMs / 1000 : item.durationMs / 1000;
+  const elapsedSec = durationMs > 0 ? positionMs / 1000 : 0;
 
   const likeScale = useSharedValue(1);
   const replyScale = useSharedValue(1);
@@ -321,51 +330,40 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
     return () => cancelAnimation(chevronY);
   }, []);
 
+  // Sticky "has reached the end" flag — used to swap the play button to a RotateCcw replay.
+  // We latch via state (not just a ref) so the UI re-renders the moment it flips.
+  useEffect(() => {
+    if (durationMs > 0 && positionMs >= durationMs - HAS_LISTENED_TOLERANCE_MS) {
+      setHasListened(true);
+    }
+  }, [positionMs, durationMs]);
+
+  // Surface unexpected player failures so they show up in Sentry breadcrumbs while keeping the UI quiet.
+  useEffect(() => {
+    if (error) {
+      console.warn('profile_card.player_error', error);
+    }
+  }, [error]);
+
+  const playButtonDisabled = !!error || isLoading;
+
   const handlePlayPress = () => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (!hasRecordedVoice) {
       setShowLockedModal(true);
       return;
     }
-    togglePlay(profile.id);
+    if (playButtonDisabled) return;
+    if (isPlaying) {
+      controls.pause();
+    } else {
+      controls.play();
+    }
   };
 
   useEffect(() => {
-    let interval: ReturnType<typeof setInterval> | undefined;
-    if (isPlaying) {
-      interval = setInterval(() => {
-        setElapsed((prev) => Math.min(prev + 0.1, audioDurationSec));
-      }, 100);
-    }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [isPlaying, audioDurationSec]);
-
-  useEffect(() => {
-    if (!isPlaying && elapsed > 0 && elapsed >= audioDurationSec - 0.5) {
-      setHasListened(true);
-    }
-  }, [isPlaying, elapsed, audioDurationSec]);
-
-  useEffect(() => {
-    if (isPlaying) {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-      timeoutRef.current = setTimeout(() => {
-        onFinish?.(profile.id);
-      }, audioDurationSec * 1000);
-    } else if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
-    }
-    return () => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    };
-  }, [isPlaying, audioDurationSec, onFinish, profile.id]);
-
-  useEffect(() => {
-    intensity.value = withTiming(isPlaying || elapsed > 0 ? 1 : 0, { duration: 300 });
-  }, [isPlaying, elapsed]);
+    intensity.value = withTiming(isPlaying || elapsedSec > 0 ? 1 : 0, { duration: 300 });
+  }, [isPlaying, elapsedSec]);
 
   useEffect(() => {
     if (isPlaying) {
@@ -396,8 +394,8 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
   }, [isPlaying]);
 
   const progress =
-    audioDurationSec > 0 ? (elapsed / audioDurationSec) * 100 : 0;
-  const waveformProgress = audioDurationSec > 0 ? elapsed / audioDurationSec : 0;
+    durationMs > 0 ? (positionMs / durationMs) * 100 : 0;
+  const waveformProgress = durationMs > 0 ? positionMs / durationMs : 0;
   const themeData = THEME_GRADIENTS[theme] ?? THEME_GRADIENTS.sunset;
   const ringRadius = (PLAY_BTN_SIZE + RING_PADDING) / 2;
   const ringCircumference = ringRadius * 2 * Math.PI;
@@ -415,6 +413,12 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
     }
     onToggleLike();
   };
+
+  // Catchphrase preference: user-authored title → seeded prompt body → generic placeholder.
+  const catchphrase = item.title ?? item.promptBody;
+  const displayAge = ageFromBirthdate(item.birthdate);
+  // Loading state: dim the icon when buffering before first play, so the user knows it's coming.
+  const playIconOpacity = isLoading && !isPlaying ? 0.6 : 1;
 
   return (
     <View style={{ flex: 1 }}>
@@ -474,7 +478,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
           {/* Center zone: title + play + waveform */}
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
             <View style={{ marginBottom: 32, paddingHorizontal: 24, maxWidth: 384 }}>
-              {profile.promptTitle ? (
+              {catchphrase ? (
                 <Text
                   style={{
                     fontFamily: FONT.serifBold,
@@ -486,7 +490,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
                   }}
                 >
                   {'\u201C'}
-                  {profile.promptTitle}
+                  {catchphrase}
                   {'\u201D'}
                 </Text>
               ) : (
@@ -523,7 +527,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
                   stroke="rgba(255,255,255,0.1)"
                   strokeWidth={3}
                 />
-                {elapsed > 0 && (
+                {positionMs > 0 && (
                   <Circle
                     cx={svgSize / 2}
                     cy={svgSize / 2}
@@ -538,7 +542,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
                 )}
               </Svg>
 
-              {!isPlaying && !hasListened && elapsed === 0 && (
+              {!isPlaying && !hasListened && positionMs === 0 && (
                 <View
                   pointerEvents="none"
                   style={{
@@ -563,6 +567,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
               >
                 <Pressable
                   onPress={handlePlayPress}
+                  disabled={playButtonDisabled}
                   style={{
                     width: PLAY_BTN_SIZE,
                     height: PLAY_BTN_SIZE,
@@ -573,6 +578,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
                     alignItems: 'center',
                     justifyContent: 'center',
                     overflow: 'hidden',
+                    opacity: playIconOpacity,
                   }}
                 >
                   {!hasRecordedVoice ? (
@@ -589,7 +595,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
             </View>
 
             <View style={{ width: '100%', paddingHorizontal: 12 }}>
-              <Waveform isPlaying={!!isPlaying} theme={theme} height={100} />
+              <Waveform isPlaying={isPlaying} theme={theme} height={100} />
             </View>
 
             <View
@@ -609,10 +615,10 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
                 }}
               >
                 {waveformProgress >= 1
-                  ? formatTime(audioDurationSec)
+                  ? formatTime(knownDurationSec)
                   : waveformProgress > 0
-                    ? `${formatTime(elapsed)} / ${formatTime(audioDurationSec)}`
-                    : formatTime(audioDurationSec)}
+                    ? `${formatTime(elapsedSec)} / ${formatTime(knownDurationSec)}`
+                    : formatTime(knownDurationSec)}
               </Text>
             </View>
           </View>
@@ -707,7 +713,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
               {/* Line 1: name + age | More button */}
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Text style={{ fontSize: 24, fontFamily: FONT.bold, color: 'white' }}>
-                  {profile.name}, {profile.age}
+                  {item.displayName}, {displayAge}
                 </Text>
                 <Pressable
                   onPress={() => setShowReportModal(true)}
@@ -720,10 +726,10 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
 
               {/* Line 2: emojis · city */}
               <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' }}>
-                {profile.emojis.map((emoji, idx) => (
+                {item.bioEmojis.map((emoji, idx) => (
                   <Text
                     key={idx}
-                    style={{ fontSize: 18, marginRight: idx < profile.emojis.length - 1 ? 4 : 0 }}
+                    style={{ fontSize: 18, marginRight: idx < item.bioEmojis.length - 1 ? 4 : 0 }}
                   >
                     {emoji}
                   </Text>
@@ -732,7 +738,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
                   ·
                 </Text>
                 <Text style={{ fontSize: 14, color: 'rgba(255,255,255,0.5)', fontFamily: FONT.medium }}>
-                  {profile.city}
+                  {item.city}
                 </Text>
               </View>
             </View>
@@ -756,7 +762,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
         </View>
         <Text style={{ fontSize: 20, fontFamily: FONT.bold, marginBottom: 8, color: COLORS.dark }}>{COPY.replyModal.title}</Text>
         <Text style={{ color: COLORS.textSecondary, marginBottom: 24 }}>
-          {COPY.replyModal.body(profile.name)}
+          {COPY.replyModal.body(item.displayName)}
         </Text>
         <Pressable onPress={() => setShowReplyModal(false)}>
           <LinearGradient
@@ -773,7 +779,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
 
       {/* ── Report Modal ────────────────────────────────────────────── */}
       <ModalOverlay visible={showReportModal} onClose={() => setShowReportModal(false)}>
-        <Text style={{ fontSize: 20, fontFamily: FONT.bold, marginBottom: 16, color: COLORS.dark }}>{COPY.reportModal.title(profile.name)}</Text>
+        <Text style={{ fontSize: 20, fontFamily: FONT.bold, marginBottom: 16, color: COLORS.dark }}>{COPY.reportModal.title(item.displayName)}</Text>
         <TextInput
           value={reportReason}
           onChangeText={setReportReason}
@@ -799,6 +805,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
           </Text>
         </View>
         <Pressable
+          // TODO(phase-6): wire real report submission to the reports table.
           onPress={() => { setShowReportModal(false); setReportReason(''); }}
           disabled={!reportReason.trim()}
           style={{ opacity: reportReason.trim() ? 1 : 0.4 }}

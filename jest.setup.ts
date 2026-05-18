@@ -33,51 +33,74 @@ const mockRecorderState = {
   metering: -50,
 };
 
-const mockPlayer = {
-  id: 'mock-player',
-  currentTime: 0,
-  duration: 0,
-  playing: false,
-  muted: false,
-  loop: false,
-  isLoaded: true,
-  volume: 1,
-  play: jest.fn(),
-  pause: jest.fn(),
-  seekTo: jest.fn(() => Promise.resolve()),
-  replace: jest.fn(),
-  remove: jest.fn(),
-  setVolume: jest.fn(),
-  setMuted: jest.fn(),
-  setLoop: jest.fn(),
-  setPlaybackRate: jest.fn(),
-  addListener: jest.fn(() => ({ remove: jest.fn() })),
-  setActiveForLockScreen: jest.fn(),
-  updateLockScreenMetadata: jest.fn(),
-  clearLockScreenControls: jest.fn(),
-  setAudioSamplingEnabled: jest.fn(),
-};
+// Build distinct player/status pairs so multi-instance consumers (e.g. the feed ring-buffer)
+// can assert per-slot behaviour while single-instance consumers keep using mockPlayers[0].
+function buildMockPlayer(id: string) {
+  return {
+    id,
+    currentTime: 0,
+    duration: 0,
+    playing: false,
+    muted: false,
+    loop: false,
+    isLoaded: true,
+    volume: 1,
+    play: jest.fn(),
+    pause: jest.fn(),
+    seekTo: jest.fn(() => Promise.resolve()),
+    replace: jest.fn(),
+    remove: jest.fn(),
+    setVolume: jest.fn(),
+    setMuted: jest.fn(),
+    setLoop: jest.fn(),
+    setPlaybackRate: jest.fn(),
+    addListener: jest.fn(() => ({ remove: jest.fn() })),
+    setActiveForLockScreen: jest.fn(),
+    updateLockScreenMetadata: jest.fn(),
+    clearLockScreenControls: jest.fn(),
+    setAudioSamplingEnabled: jest.fn(),
+  };
+}
 
-const mockPlayerStatus = {
-  id: 'mock-player',
-  currentTime: 0,
-  duration: 0,
-  playing: false,
-  mute: false,
-  loop: false,
-  isLoaded: true,
-  isBuffering: false,
-  didJustFinish: false,
-  playbackState: 'paused',
-  timeControlStatus: 'paused',
-  reasonForWaitingToPlay: '',
-  playbackRate: 1,
-  shouldCorrectPitch: true,
-};
+function buildMockPlayerStatus(id: string) {
+  return {
+    id,
+    currentTime: 0,
+    duration: 0,
+    playing: false,
+    mute: false,
+    loop: false,
+    isLoaded: true,
+    isBuffering: false,
+    didJustFinish: false,
+    playbackState: 'paused',
+    timeControlStatus: 'paused',
+    reasonForWaitingToPlay: '',
+    playbackRate: 1,
+    shouldCorrectPitch: true,
+  };
+}
+
+const mockPlayers = [
+  buildMockPlayer('mock-player-0'),
+  buildMockPlayer('mock-player-1'),
+  buildMockPlayer('mock-player-2'),
+];
+const mockPlayerStatuses = [
+  buildMockPlayerStatus('mock-player-0'),
+  buildMockPlayerStatus('mock-player-1'),
+  buildMockPlayerStatus('mock-player-2'),
+];
+
+// Legacy aliases used by existing single-instance tests (useVoicePlayer.test.tsx).
+const mockPlayer = mockPlayers[0];
+const mockPlayerStatus = mockPlayerStatuses[0];
 
 jest.mock('expo-audio', () => ({
   useAudioRecorder: jest.fn(() => mockRecorder),
   useAudioRecorderState: jest.fn(() => mockRecorderState),
+  // Default returns slot 0 so existing single-instance tests stay green.
+  // Multi-instance tests override this with a cycling implementation via jest.requireMock('expo-audio').
   useAudioPlayer: jest.fn(() => mockPlayer),
   useAudioPlayerStatus: jest.fn(() => mockPlayerStatus),
   setAudioModeAsync: jest.fn(() => Promise.resolve()),
@@ -106,6 +129,8 @@ jest.mock('expo-audio', () => ({
   recorderState: mockRecorderState,
   player: mockPlayer,
   playerStatus: mockPlayerStatus,
+  players: mockPlayers,
+  playerStatuses: mockPlayerStatuses,
 };
 
 // ---------------------------------------------------------------------------
@@ -198,6 +223,12 @@ jest.mock('expo-font', () => ({
 jest.mock('expo-linear-gradient', () => {
   const { View } = require('react-native');
   return { LinearGradient: View };
+});
+
+// Renders an inert View; tests drive value changes via the onValueChange prop directly.
+jest.mock('@react-native-community/slider', () => {
+  const { View } = require('react-native');
+  return { __esModule: true, default: View };
 });
 
 jest.mock('expo-router', () => ({

@@ -183,7 +183,7 @@ lovoice-admin/
 
 The `src/components/onboarding/*` are **prototype components**. They will be progressively refactored or deleted as phases progress. Treat them as visual reference, not as architecture.
 
-> **`src/types.ts` vs `src/types/database.ts`**: `src/types.ts` defines a **temporary mock `Profile` type** used by the local feed store (`useFeedState`) during Phases 0–4. It has fields like `name`, `age`, `emojis`, `isPlaying` that **do not exist in the Supabase `profiles` table**. This type is replaced in Phase 5 when the feed is wired to real data. Do not extend it or rely on it for server-related code. Server-side profile and voice types come from `src/types/database.ts` (generated from Supabase).
+> **Server-side types**: every type that describes server-stored data comes from `src/types/database.ts` (generated from Supabase via `supabase gen types typescript`). The feed feature exposes its own narrowed view types in `src/features/feed/types.ts` (`FeedItem`, `FeedItemTheme`, `FeedPage`) — they are derived from the `Database` type, not handwritten.
 
 ---
 

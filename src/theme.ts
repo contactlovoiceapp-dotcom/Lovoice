@@ -1,5 +1,14 @@
 /* Centralized design tokens — palette, mood gradients, typography, and spacing constants.
-   Single source of truth so every screen speaks the same visual language. */
+   Single source of truth so every screen speaks the same visual language.
+   ColorTheme is co-located here because it maps 1-to-1 with THEME_GRADIENTS keys. */
+
+/** Voice card colour theme; mirrors the `voices.theme` column values. */
+export enum ColorTheme {
+  Sunset = 'sunset',
+  Chill = 'chill',
+  Electric = 'electric',
+  Midnight = 'midnight',
+}
 
 /** Converts a `#rrggbb` hex color to `rgba(r,g,b,alpha)`. Throws on invalid input. */
 export function hexToRgba(hex: string, alpha: number): string {

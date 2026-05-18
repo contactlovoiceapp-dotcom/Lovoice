@@ -109,32 +109,54 @@ Cover these once on iOS and once on Android. Backend curl walkthrough lives at
 
 ---
 
-## Phase 5 — Discover feed (playback + autoplay + preload)
+## Phase 5 — Discover feed (playback + autoplay + preload) 🟢
 
 **Goal**: the TikTok-style feed loads real voices from Supabase and plays them with zero perceived latency.
 
-### Scope
+### Scope (shipped)
 
-1. Replace mocked `INITIAL_PROFILES` with a paginated query to `get_feed()` (security-definer SQL function from ARCHITECTURE §8).
-2. React Query `useInfiniteQuery` with cursor on `created_at`.
-3. Build the **3-instance ring buffer player** in `src/lib/feedPlayer.ts`. Preload `current+1` and `current+2` on `prepareAsync` using signed URLs.
-4. Update `ProfileCard` to consume the ring (no own `Audio.Sound`).
-5. Track played-% locally (used to gate `feed_seen` insertion). Emitting a `voice_played` PostHog event when ≥ 50% listened is **optional** — only wire it if Phase 10's PostHog block is shipped.
-6. On scroll, insert into `feed_seen` (debounced batch every 5 voices).
-7. Empty-feed state: re-suggest filter widening.
-8. Filters modal: gender, age range, max distance km. Persisted in Zustand + reflected in query params.
+1. Migration `20260518090000_get_feed_function.sql` introduces the `security definer` `get_feed(p_distance_m, p_limit, p_cursor_created_at)` SQL function (ARCHITECTURE §8) and a companion `reset_feed_seen()` RPC. The function reads the caller's `gender`, `looking_for` and `location` from `profiles` via `auth.uid()`, so the client only passes session-level filters.
+2. React Query `useInfiniteQuery` (`src/features/feed/api/feedQueries.ts`) drives pagination with a cursor on `created_at`. Page size capped at 50 server-side.
+3. **3-instance ring-buffer player** (`src/lib/feedPlayer.ts`) — slot mapping `itemIndex % 3`. Three `useAudioPlayer` instances mounted at fixed indices; signed URLs cached at module scope and refreshed 10 minutes before their 1 h TTL expires. Pure helper `computeRingSlots` extracted for testability.
+4. `ProfileCard` consumes a `{ snapshot, controls }` pair driven by the ring; the `setInterval` simulation is gone. `hasListened` is derived from `positionMs >= durationMs - 500`.
+5. **Seen tracking** debounced batcher (`src/features/feed/hooks/useFeedSeenBatcher.ts`): the screen enqueues a `voice_id` once playback crosses 50 %. Flushes at 5 candidates, every 30 s, on screen blur (`useFocusEffect`), and on unmount.
+6. **Autoplay** uses `useFeedPlayer.onCurrentEnded` (which edge-detects the slot's `didJustFinish`) to scroll-to-next when the autoplay toggle is on.
+7. **Empty-state** offers two CTAs: "Modifier mes filtres" (opens the filters modal) and "Recommencer mon feed" (confirmation modal → `reset_feed_seen` RPC). No automatic cooldown — the re-show is opt-in (ARCHITECTURE §8 "Empty-state recovery").
+8. **Filters modal** rewritten: age range (18–80) + max distance km (5–1000 with "Sans limite" switch). Apply / Reset buttons. Filters live in `useFeedState` (Zustand), session-only (no SecureStore persistence in V1). Age is filtered client-side post-query per ARCHITECTURE §8. **No `looking_for` filter** — orientation is a stable profile attribute, not a session preference.
+9. **Pull-to-refresh** on the FlatList re-fetches the first page (re-shuffle).
+10. **Pagination prefetch** when the active card is within 5 of the last fetched item — no manual "Load more" button.
 
-### Deliverables
+### Deliverables — shipped
 
-- Real feed scrolling with live audio from Storage.
-- Autoplay mode chains voices with no audible gap.
-- `feed_seen` populated.
+- Real feed scrolling with live audio from Storage (`useFeedItems`).
+- Autoplay mode chains voices using `expo-audio`'s `didJustFinish` event.
+- `feed_seen` populated via debounced batches; `reset_feed_seen` RPC available for the empty-state CTA.
+- 35 Jest suites / 252 tests green; no `any`, no `@ts-ignore`.
 
-### Acceptance
+### Acceptance criteria
 
-- First playback of any voice starts < 500 ms after tap on a 4G connection.
-- Scrolling 20 cards never throws an unhandled promise rejection.
-- Filters change updates the feed within 1 query.
+- First playback of any voice starts < 500 ms after tap on a 4G connection (relies on the next/next+1 preload).
+- Scrolling 20 cards never throws an unhandled promise rejection (try/catch around every `replace()` and `play()`/`pause()` call).
+- Filters change updates the feed within 1 query (the React Query key includes the filters object).
+
+### Mobile smoke test (run on a real device before tagging)
+
+Cover these once on iOS and once on Android. Backend isn't touched — the SQL migration must already be applied (`npx supabase db push`).
+
+1. **Cold-start feed** — fresh session → land on Discover → first voice loads and the play button is responsive within 1 s. Tap to play; audio comes out of the speaker even with the silent switch on (proves `playsInSilentMode: true`).
+2. **Smooth swipe + preload** — swipe up; the next card snaps into place and tapping play is instant (< 250 ms from tap to first sample). Swipe up again; same. Confirms the next/next+1 ring is preloaded.
+3. **Autoplay chain** — toggle the autoplay switch in the header. Tap play on the first voice. When it finishes, the feed must scroll to the next card on its own and start playing automatically. Repeat for 3 voices in a row to confirm `didJustFinish` fires once per playthrough.
+4. **Back-scroll** — after listening to two voices, swipe down to the previous one. It should reload from the start (acceptable trade-off — the slot was reused for the next preload).
+5. **Filters apply** — open the filters modal. Set age 25–35 and distance 50 km. Tap "Appliquer". The feed re-queries and the new filter pill is reflected in the header. Confirm the visible voices respect the age range (ages displayed on cards must all be in 25–35).
+6. **Filters reset** — re-open the filters modal, tap "Réinitialiser". The age range should snap back to 18–80, the distance to "Illimité", and the feed should re-query.
+7. **Distance unlimited toggle** — open the modal, flip the "Sans limite de distance" switch ON; the slider hides and the pill reads "Illimité". Apply → feed re-queries. Re-open, flip OFF; the slider reappears at the previously chosen value.
+8. **50 % seen** — play a voice past 50 % then swipe away to the next card before it ends. Wait 30 s on the next card, then look at `feed_seen` in Supabase Studio: a row for the partially-listened voice must be present.
+9. **Batch flush on blur** — play 2 voices past 50 %, then navigate to the Likes tab before the 30 s timer elapses. Check `feed_seen`: both rows must be present (the `useFocusEffect` flush fired).
+10. **End of feed** — exhaust the available voices (or seed Supabase with a small set). The empty state with "Sparkles" + "Modifier mes filtres" + "Recommencer mon feed" must render. Tap "Recommencer mon feed", confirm the modal, hit "Tout recommencer" → `feed_seen` must be cleared and the feed must re-populate.
+11. **Pull-to-refresh** — scroll to the top of the feed, pull down. The spinner appears and the feed re-shuffles within 1 query (`ORDER BY created_at DESC, random()` gives a fresh order even with the same data).
+12. **Network loss mid-listen** — start playing a voice on Wi-Fi, toggle airplane mode mid-playback. Audio should keep playing until the buffer drains; tapping play on a not-yet-preloaded card after the network is back must succeed (signed URL refresh).
+13. **Locked playback** — sign in with an account that has not recorded a voice yet. Tap play on any card → the locked modal appears with the "Enregistre ta voix" CTA. Tap it → routes to `/(auth)/onboarding/record`.
+14. **Background audio** — start playing a voice, lock the device. Audio must continue (proves `shouldPlayInBackground: true`).
 
 ---
 

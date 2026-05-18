@@ -21,7 +21,7 @@ import { useRouter } from 'expo-router';
 
 import { COPY } from '@/copy';
 import { COLORS, CTA_GRADIENT, FONT, ONBOARDING_GRADIENT, RADIUS, SHADOW, THEME_GRADIENTS } from '@/theme';
-import { ColorTheme } from '@/types';
+import { ColorTheme } from '@/theme';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { type CitySearchResult } from '@/features/profile/api/citySearch';
 import { useUpsertProfile } from '@/features/profile/api/profileMutations';
