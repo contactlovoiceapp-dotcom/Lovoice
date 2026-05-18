@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { Pressable, Switch, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Slider from '@react-native-community/slider';
 import { LinearGradient } from 'expo-linear-gradient';
 import { X } from 'lucide-react-native';
@@ -20,7 +21,12 @@ interface Props {
   onClose: () => void;
 }
 
+// BottomNav floats at insets.bottom + 12px gap + 64px pill height.
+// Add 16px breathing room so action buttons never sit flush against the nav.
+const BOTTOM_NAV_CLEARANCE = 64 + 12 + 16;
+
 const FiltersModal: React.FC<Props> = ({ onClose }) => {
+  const insets = useSafeAreaInsets();
   const filters = useFeedState((state) => state.filters);
   const setFilters = useFeedState((state) => state.setFilters);
   const resetFilters = useFeedState((state) => state.resetFilters);
@@ -82,7 +88,10 @@ const FiltersModal: React.FC<Props> = ({ onClose }) => {
           borderWidth: 1,
           borderColor: COLORS.border,
           backgroundColor: COLORS.surface,
-          padding: 24,
+          paddingTop: 24,
+          paddingHorizontal: 24,
+          // Push content above the floating BottomNav pill so it's always tappable.
+          paddingBottom: insets.bottom + BOTTOM_NAV_CLEARANCE,
         }}
       >
         {/* Header */}
@@ -97,12 +106,17 @@ const FiltersModal: React.FC<Props> = ({ onClose }) => {
           <Text style={{ fontFamily: FONT.bold, fontSize: 20, color: COLORS.dark }}>
             {COPY.filters.title}
           </Text>
+          {/* minWidth/minHeight guarantee the 44×44pt iOS / 48dp Android minimum touch target
+              while keeping the visible circle small. */}
           <Pressable
             onPress={onClose}
             style={{
+              minWidth: 44,
+              minHeight: 44,
               borderRadius: RADIUS.full,
               backgroundColor: 'rgba(45,17,54,0.05)',
-              padding: 8,
+              alignItems: 'center',
+              justifyContent: 'center',
             }}
             accessibilityRole="button"
             accessibilityLabel={COPY.a11y.closeFilters}
