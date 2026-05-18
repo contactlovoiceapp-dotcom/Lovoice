@@ -357,13 +357,11 @@ When enabled, `commit_upload` switches the default row status to `'pending'` and
 
 ### 4.4 Playback (client)
 
-1. Client fetches a voice row → calls `getSignedUrl(object_path, expiresIn=3600)`. Signed URLs are cached at the module level in `src/lib/feedPlayer.ts` and refreshed 10 minutes before their 1 h TTL expires.
-2. Holds **3 audio player instances** in a ring buffer for the feed: `current`, `next`, `next+1`. Slot mapping is `itemIndex % 3`, so back-scroll re-loads the previous URI on the slot that previously held it — an accepted trade-off in V1 to keep memory bounded.
-3. Preload `next` and `next+1` immediately after they enter the viewport (using `expo-audio`'s `useAudioPlayer` — there is no `prepareAsync` in `expo-audio`; preloading is achieved by initialising a player with the source URI before it is needed). The non-current slots are kept paused defensively; only `controls.play()` on the current slot triggers playback.
-4. On feed scroll, rotate the ring (cheap), play the new `current`.
-5. Audio session for playback: `playsInSilentMode: true`, `shouldPlayInBackground: true` (see `configureAudioSessionForPlayback` in `src/lib/audio.ts`).
-6. Handle interruptions (incoming call): pause and resume on interruption end.
-7. For voice messages in chat, use a single shared player (one playing at a time).
+1. Client fetches a voice row → calls `getSignedUrl(object_path, expiresIn=3600)`. Signed URLs are cached at the module level in `src/lib/feedPlayer.ts` and refreshed 10 minutes before their 1 h TTL expires. Signed URLs for the next two upcoming voices are prefetched in the background so the source swap is near-instant on swipe.
+2. The feed uses a **single `useAudioPlayer` instance** (`src/lib/feedPlayer.ts`). Its source is swapped via `player.replace(signedUrl)` each time the active card changes. A load token guards against out-of-order URL resolutions when the user swipes faster than the network — only the latest token's resolution is applied. The play button is hard-gated on `snapshot.isLoading` (true while the URL is being fetched or the source is being swapped) to prevent calling `play()` on an unready player. Note: `snapshot.isLoading` does **not** include `status.isBuffering` from expo-audio — including it would cause a deadlock where the button stays disabled after `replace()` because expo-audio only clears `isBuffering` once `play()` is called.
+3. Audio session for playback: `playsInSilentMode: true`, `shouldPlayInBackground: true` (see `configureAudioSessionForPlayback` in `src/lib/audio.ts`).
+4. Handle interruptions (incoming call): pause and resume on interruption end.
+5. For voice messages in chat, use a single shared player (one playing at a time).
 
 ---
 
