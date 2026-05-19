@@ -350,6 +350,357 @@ describe('useFeedPlayer — controls.stop()', () => {
   });
 });
 
+describe('useFeedPlayer — autoplayNext', () => {
+  it('does not auto-play when autoplayNext is false', async () => {
+    mockSupabaseSignedUrls();
+    const items = [makeItem({ voiceId: 'v0', storagePath: 'p0' })];
+
+    renderHook(() => useFeedPlayer({ items, currentIndex: 0, autoplayNext: false }));
+
+    await waitFor(() => {
+      expect(expoAudioMocks.player.replace).toHaveBeenCalledWith('https://signed.example/p0');
+    });
+
+    expect(expoAudioMocks.player.play).not.toHaveBeenCalled();
+  });
+
+  it('auto-plays the current voice as soon as its source finishes loading when autoplayNext is true', async () => {
+    mockSupabaseSignedUrls();
+    const item = makeItem({ voiceId: 'v0', storagePath: 'p0' });
+
+    renderHook(() => useFeedPlayer({ items: [item], currentIndex: 0, autoplayNext: true }));
+
+    // Replace fires when the URL resolves; play() must follow once the load
+    // effect commits setIsLoadingSource(false).
+    await waitFor(() => {
+      expect(expoAudioMocks.player.replace).toHaveBeenCalledWith('https://signed.example/p0');
+    });
+    await waitFor(() => {
+      expect(expoAudioMocks.player.play).toHaveBeenCalled();
+    });
+  });
+
+  it('auto-plays the current voice when autoplayNext is toggled on while the source is already loaded', async () => {
+    mockSupabaseSignedUrls();
+    const item = makeItem({ voiceId: 'v0', storagePath: 'p0' });
+
+    const { rerender } = renderHook(
+      ({ autoplayNext }: { autoplayNext: boolean }) =>
+        useFeedPlayer({ items: [item], currentIndex: 0, autoplayNext }),
+      { initialProps: { autoplayNext: false } },
+    );
+
+    await waitFor(() => {
+      expect(expoAudioMocks.player.replace).toHaveBeenCalled();
+    });
+    expect(expoAudioMocks.player.play).not.toHaveBeenCalled();
+
+    // Flipping autoplayNext to true with a loaded source must start playback.
+    act(() => {
+      rerender({ autoplayNext: true });
+    });
+
+    expect(expoAudioMocks.player.play).toHaveBeenCalledTimes(1);
+  });
+
+  it('auto-plays the next voice after a natural end + scroll advance', async () => {
+    mockSupabaseSignedUrls();
+    const items = [
+      makeItem({ voiceId: 'v0', storagePath: 'p0' }),
+      makeItem({ voiceId: 'v1', storagePath: 'p1' }),
+    ];
+
+    const { rerender } = renderHook(
+      ({ index, tick: _tick }: { index: number; tick: number }) =>
+        useFeedPlayer({ items, currentIndex: index, autoplayNext: true }),
+      { initialProps: { index: 0, tick: 0 } },
+    );
+
+    // v0 source loads → autoplay starts v0.
+    await waitFor(() => {
+      expect(expoAudioMocks.player.play).toHaveBeenCalledTimes(1);
+    });
+
+    expoAudioMocks.player.play.mockClear();
+
+    // v0 ends naturally — handleEnded (consumer) would scroll. Simulate that
+    // by setting didJustFinish=true then advancing the index while it stays true.
+    // expo-audio doesn't reset didJustFinish until the native player commits the
+    // new source — this stale window is exactly the race the autoplay guard
+    // (`if (currentDidJustFinish) return`) is designed to catch.
+    act(() => {
+      expoAudioMocks.playerStatus.didJustFinish = true;
+      rerender({ index: 0, tick: 1 });
+    });
+    act(() => {
+      rerender({ index: 1, tick: 2 });
+    });
+
+    // The signed URL fetch resolves and the source-loading effect calls replace().
+    await waitFor(() => {
+      expect(expoAudioMocks.player.replace).toHaveBeenCalledWith('https://signed.example/p1');
+    });
+
+    // While didJustFinish is still stale-true, autoplay must NOT have fired —
+    // calling play() during this window is a silent no-op on real expo-audio.
+    expect(expoAudioMocks.player.play).not.toHaveBeenCalled();
+
+    // Simulate the native side committing the replace: didJustFinish clears.
+    // This is the trigger the autoplay effect waits for to fire play() reliably.
+    act(() => {
+      expoAudioMocks.playerStatus.didJustFinish = false;
+      rerender({ index: 1, tick: 3 });
+    });
+
+    await waitFor(() => {
+      expect(expoAudioMocks.player.play).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('does not auto-play on the last item when there is no scroll', async () => {
+    mockSupabaseSignedUrls();
+    const items = [makeItem({ voiceId: 'v0', storagePath: 'p0' })];
+
+    const { rerender } = renderHook(
+      ({ tick: _tick }: { tick: number }) =>
+        useFeedPlayer({ items, currentIndex: 0, autoplayNext: true }),
+      { initialProps: { tick: 0 } },
+    );
+
+    await waitFor(() => {
+      expect(expoAudioMocks.player.play).toHaveBeenCalledTimes(1);
+    });
+
+    expoAudioMocks.player.play.mockClear();
+
+    // v0 ends but it's the last item — the consumer does not scroll, so neither
+    // currentIndex nor any autoplay dep changes. play() must not be called again.
+    act(() => {
+      expoAudioMocks.playerStatus.didJustFinish = true;
+      rerender({ tick: 1 });
+    });
+
+    expect(expoAudioMocks.player.play).not.toHaveBeenCalled();
+  });
+
+  it('does not call play() on a stale source between swipe and load completion', async () => {
+    // Hold the v1 URL resolution to inspect the in-flight state.
+    const resolvers: Record<string, (url: string) => void> = {};
+    const createSignedUrl = jest.fn(
+      (path: string) =>
+        new Promise<{ data: { signedUrl: string }; error: null }>((resolve) => {
+          resolvers[path] = (url) => resolve({ data: { signedUrl: url }, error: null });
+        }),
+    );
+    jest.mocked(getSupabaseClient).mockReturnValue({
+      storage: { from: () => ({ createSignedUrl }) },
+    } as unknown as ReturnType<typeof getSupabaseClient>);
+
+    const items = [
+      makeItem({ voiceId: 'v0', storagePath: 'p0' }),
+      makeItem({ voiceId: 'v1', storagePath: 'p1' }),
+    ];
+
+    const { rerender } = renderHook(
+      ({ index }: { index: number }) =>
+        useFeedPlayer({ items, currentIndex: index, autoplayNext: true }),
+      { initialProps: { index: 0 } },
+    );
+
+    await waitFor(() => expect(resolvers.p0).toBeDefined());
+    await act(async () => {
+      resolvers.p0('https://signed.example/p0');
+    });
+
+    // v0 plays via autoplay.
+    expect(expoAudioMocks.player.play).toHaveBeenCalledTimes(1);
+    expoAudioMocks.player.play.mockClear();
+
+    // Swipe to v1 — the source-loading effect will refire, but v1's URL is held.
+    act(() => {
+      rerender({ index: 1 });
+    });
+
+    // While the v1 load is in flight, autoplay must not call play() on the
+    // stale v0 source still held by the player.
+    expect(expoAudioMocks.player.play).not.toHaveBeenCalled();
+
+    // Once v1's URL resolves, play() is allowed.
+    await act(async () => {
+      resolvers.p1('https://signed.example/p1');
+    });
+
+    await waitFor(() => {
+      expect(expoAudioMocks.player.play).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('does not auto-play when autoplayNext flips off before the source finishes loading', async () => {
+    const resolvers: Record<string, (url: string) => void> = {};
+    const createSignedUrl = jest.fn(
+      (path: string) =>
+        new Promise<{ data: { signedUrl: string }; error: null }>((resolve) => {
+          resolvers[path] = (url) => resolve({ data: { signedUrl: url }, error: null });
+        }),
+    );
+    jest.mocked(getSupabaseClient).mockReturnValue({
+      storage: { from: () => ({ createSignedUrl }) },
+    } as unknown as ReturnType<typeof getSupabaseClient>);
+
+    const item = makeItem({ voiceId: 'v0', storagePath: 'p0' });
+
+    const { rerender } = renderHook(
+      ({ autoplayNext }: { autoplayNext: boolean }) =>
+        useFeedPlayer({ items: [item], currentIndex: 0, autoplayNext }),
+      { initialProps: { autoplayNext: true } },
+    );
+
+    await waitFor(() => expect(resolvers.p0).toBeDefined());
+
+    // Flip autoplay off before the source resolves.
+    act(() => {
+      rerender({ autoplayNext: false });
+    });
+
+    await act(async () => {
+      resolvers.p0('https://signed.example/p0');
+    });
+
+    expect(expoAudioMocks.player.play).not.toHaveBeenCalled();
+  });
+});
+
+describe('useFeedPlayer — stale snapshot gating', () => {
+  it('snapshot reports zero position/duration while the player holds a stale source during voice transition', async () => {
+    mockSupabaseSignedUrls();
+    const items = [
+      makeItem({ voiceId: 'v0', storagePath: 'p0' }),
+      makeItem({ voiceId: 'v1', storagePath: 'p1' }),
+    ];
+
+    const { result, rerender } = renderHook(
+      ({ index, tick: _tick }: { index: number; tick: number }) =>
+        useFeedPlayer({ items, currentIndex: index, autoplayNext: true }),
+      { initialProps: { index: 0, tick: 0 } },
+    );
+
+    // v0 loads and autoplay starts.
+    await waitFor(() => {
+      expect(expoAudioMocks.player.play).toHaveBeenCalled();
+    });
+
+    // Simulate v0 reaching its natural end.
+    act(() => {
+      expoAudioMocks.playerStatus.playing = false;
+      expoAudioMocks.playerStatus.currentTime = 30;
+      expoAudioMocks.playerStatus.duration = 30;
+      expoAudioMocks.playerStatus.didJustFinish = true;
+      rerender({ index: 0, tick: 1 });
+    });
+
+    expoAudioMocks.player.replace.mockClear();
+
+    // Scroll to v1 — the source-loading effect reloads.
+    // expo-audio status still reports v0's terminal state (stale window).
+    act(() => {
+      rerender({ index: 1, tick: 2 });
+    });
+
+    // Snapshot must be zeroed: the player hasn't committed v1's source yet.
+    expect(result.current.snapshot).toMatchObject({
+      isPlaying: false,
+      positionMs: 0,
+      durationMs: 0,
+    });
+
+    // v1's URL resolves and replace() is called.
+    await waitFor(() => {
+      expect(expoAudioMocks.player.replace).toHaveBeenCalledWith('https://signed.example/p1');
+    });
+
+    // Snapshot must STILL be zeroed — native hasn't committed the new source yet
+    // (didJustFinish is still stale-true from v0).
+    expect(result.current.snapshot).toMatchObject({
+      isPlaying: false,
+      positionMs: 0,
+      durationMs: 0,
+    });
+
+    // Native commits the replace: didJustFinish clears, fresh status for v1.
+    act(() => {
+      expoAudioMocks.playerStatus.didJustFinish = false;
+      expoAudioMocks.playerStatus.currentTime = 0;
+      expoAudioMocks.playerStatus.duration = 25;
+      rerender({ index: 1, tick: 3 });
+    });
+
+    // Now the snapshot should reflect the real v1 values.
+    await waitFor(() => {
+      expect(result.current.snapshot.durationMs).toBe(25_000);
+    });
+    expect(result.current.snapshot.positionMs).toBe(0);
+  });
+
+  it('does not zero the snapshot when the current voice legitimately finishes', async () => {
+    mockSupabaseSignedUrls();
+    const item = makeItem({ voiceId: 'v0', storagePath: 'p0' });
+
+    const { result, rerender } = renderHook(
+      ({ tick: _tick }: { tick: number }) =>
+        useFeedPlayer({ items: [item], currentIndex: 0 }),
+      { initialProps: { tick: 0 } },
+    );
+
+    // Wait for the source to load.
+    await waitFor(() => {
+      expect(expoAudioMocks.player.replace).toHaveBeenCalled();
+    });
+
+    // Simulate the voice playing to the end.
+    act(() => {
+      expoAudioMocks.playerStatus.playing = false;
+      expoAudioMocks.playerStatus.currentTime = 30;
+      expoAudioMocks.playerStatus.duration = 30;
+      expoAudioMocks.playerStatus.didJustFinish = true;
+      rerender({ tick: 1 });
+    });
+
+    // The snapshot must expose the real terminal values — hasListened relies on
+    // positionMs ≈ durationMs to show the replay icon on a legitimately finished voice.
+    expect(result.current.snapshot.positionMs).toBe(30_000);
+    expect(result.current.snapshot.durationMs).toBe(30_000);
+    expect(result.current.snapshot.isPlaying).toBe(false);
+  });
+
+  it('snapshot stays zeroed during the URL fetch phase of a new voice', async () => {
+    // Hold the v0 URL resolution to inspect the in-flight state.
+    const resolvers: Record<string, (url: string) => void> = {};
+    const createSignedUrl = jest.fn(
+      (path: string) =>
+        new Promise<{ data: { signedUrl: string }; error: null }>((resolve) => {
+          resolvers[path] = (url) => resolve({ data: { signedUrl: url }, error: null });
+        }),
+    );
+    jest.mocked(getSupabaseClient).mockReturnValue({
+      storage: { from: () => ({ createSignedUrl }) },
+    } as unknown as ReturnType<typeof getSupabaseClient>);
+
+    const item = makeItem({ voiceId: 'v0', storagePath: 'p0' });
+
+    const { result } = renderHook(() =>
+      useFeedPlayer({ items: [item], currentIndex: 0 }),
+    );
+
+    // Before the URL resolves, snapshot must be zeroed.
+    expect(result.current.snapshot).toMatchObject({
+      isPlaying: false,
+      positionMs: 0,
+      durationMs: 0,
+      isLoading: true,
+    });
+  });
+});
+
 describe('useFeedPlayer — onCurrentEnded', () => {
   it('fires exactly once on the false→true edge and re-arms only on play()', async () => {
     mockSupabaseSignedUrls();

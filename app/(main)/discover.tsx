@@ -177,7 +177,27 @@ export default function DiscoverScreen() {
     items,
     currentIndex: activeIndex,
     onCurrentEnded: handleEnded,
+    autoplayNext: autoplay,
   });
+
+  // User-facing controls: tapping play/pause is an explicit takeover, so we
+  // disable autoplay at the same time. The raw `controls` reference is kept for
+  // internal callers (swipe pause, focus-effect stop) where the user did not
+  // touch a playback button — those must not disable autoplay.
+  const userControls = useMemo<FeedPlayerControls>(
+    () => ({
+      play: () => {
+        setAutoplay(false);
+        controls.play();
+      },
+      pause: () => {
+        setAutoplay(false);
+        controls.pause();
+      },
+      stop: controls.stop,
+    }),
+    [controls, setAutoplay],
+  );
 
   // Stop audio (pause + reset to 0) and flush pending seen batch when the screen loses focus.
   // Use refs to avoid re-registering the effect on every scroll (controls identity changes on index change).
@@ -270,7 +290,7 @@ export default function DiscoverScreen() {
         <ProfileCard
           item={item}
           snapshot={index === activeIndex ? snapshot : INACTIVE_SNAPSHOT}
-          controls={index === activeIndex ? controls : INACTIVE_CONTROLS}
+          controls={index === activeIndex ? userControls : INACTIVE_CONTROLS}
           hasRecordedVoice={hasRecordedVoice}
           isLiked={false /* TODO(phase-6): wire useLiked(voiceId) */}
           onToggleLike={() => undefined /* TODO(phase-6): wire useToggleLike */}
@@ -278,7 +298,7 @@ export default function DiscoverScreen() {
         />
       </View>
     ),
-    [windowWidth, windowHeight, activeIndex, snapshot, controls, hasRecordedVoice, router],
+    [windowWidth, windowHeight, activeIndex, snapshot, userControls, hasRecordedVoice, router],
   );
 
   // --- Loading state (initial fetch, no cached pages yet) ---

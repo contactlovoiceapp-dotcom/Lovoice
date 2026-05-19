@@ -11,6 +11,17 @@ import { configureAudioSessionForPlayback } from '@/lib/audio';
 import { getSupabaseClient } from '@/lib/supabase';
 import type { FeedItem } from '@/features/feed/types';
 
+// Verbose tracing for the autoplay rollout. Filter with `[feedPlayer]` in Metro.
+// Compiled out of production builds via __DEV__. Remove after the feature is stable.
+function dbg(label: string, payload?: Record<string, unknown>): void {
+  if (!__DEV__) return;
+  if (payload) {
+    console.log(`[feedPlayer] ${label}`, payload);
+  } else {
+    console.log(`[feedPlayer] ${label}`);
+  }
+}
+
 // Signed URLs from Supabase Storage last 1 hour. Refresh 10 minutes early so a
 // slow listener never hits a stale URL mid-listen.
 const SIGNED_URL_TTL_SECONDS = 60 * 60;
@@ -93,6 +104,17 @@ export interface UseFeedPlayerArgs {
    * Receives the FeedItem.voiceId of the item that ended.
    */
   onCurrentEnded?: (voiceId: string) => void;
+  /**
+   * Continuous "the current voice should be playing right now" flag.
+   * When true, the hook actively starts playback as soon as the source for the
+   * current voice is loaded. This covers three product behaviours with a single
+   * mechanism: toggle-on starts the current track, end-of-track + scroll starts
+   * the next, and manual-swipe-while-on starts the swiped-to track. Turning it
+   * off does NOT pause the player — current playback continues naturally; only
+   * the auto-start mechanism is disarmed. Consumers that want a tap on a UI
+   * control to disable autoplay must wrap controls to also reset this flag.
+   */
+  autoplayNext?: boolean;
 }
 
 export interface UseFeedPlayerResult {
@@ -112,6 +134,7 @@ export function useFeedPlayer({
   items,
   currentIndex,
   onCurrentEnded,
+  autoplayNext = false,
 }: UseFeedPlayerArgs): UseFeedPlayerResult {
   const player = useAudioPlayer(null, { updateInterval: 100 });
   const status = useAudioPlayerStatus(player);
@@ -127,6 +150,19 @@ export function useFeedPlayer({
 
   const [isLoadingSource, setIsLoadingSource] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // True while the snapshot must not expose raw expo-audio values. Covers the
+  // full stale window: URL fetch + native source swap (player.replace() is sync
+  // in JS but async native-side — expo-audio keeps reporting the previous
+  // track's terminal state until the new source is committed). Prevents stale
+  // positionMs/durationMs from a prior voice leaking into the ProfileCard,
+  // which would briefly flash the RotateCcw (replay) icon on an unheard voice.
+  const [isPlayerStale, setIsPlayerStale] = useState(true);
+
+  // Mirror status into a ref so startPlayback can read end-of-track flags without
+  // making the callback identity unstable (status updates every 100 ms).
+  const statusRef = useRef(status);
+  statusRef.current = status;
 
   const currentItem =
     currentIndex >= 0 && currentIndex < items.length ? items[currentIndex] : null;
@@ -166,8 +202,11 @@ export function useFeedPlayer({
     }
 
     if (loadedVoiceIdRef.current === currentVoiceId) {
+      dbg('source-load: already holds', { voiceId: currentVoiceId });
       return;
     }
+
+    dbg('source-load: start', { voiceId: currentVoiceId, path: currentPath });
 
     try {
       player.pause();
@@ -177,16 +216,22 @@ export function useFeedPlayer({
 
     const token = ++loadTokenRef.current;
     setIsLoadingSource(true);
+    setIsPlayerStale(true);
     setError(null);
 
     ensureSignedUrl(currentPath)
       .then((url) => {
-        if (loadTokenRef.current !== token) return;
+        if (loadTokenRef.current !== token) {
+          dbg('source-load: stale token discarded', { voiceId: currentVoiceId });
+          return;
+        }
         try {
           player.replace(url);
           loadedVoiceIdRef.current = currentVoiceId;
-        } catch {
+          dbg('source-load: replaced', { voiceId: currentVoiceId });
+        } catch (err) {
           // expo-audio mid-recycle; ref stays stale so the next render retries.
+          dbg('source-load: replace threw', { error: String(err) });
         }
         setIsLoadingSource(false);
       })
@@ -215,6 +260,16 @@ export function useFeedPlayer({
     prevDidJustFinishRef.current = false;
   }, [currentVoiceId]);
 
+  // Refs that give the didJustFinish effect access to the latest values without
+  // putting them in its dependency array. That coupling caused a premature re-fire
+  // during the brief window after a card change where expo-audio still reports
+  // didJustFinish=true (player.replace() hasn't been called yet for the new voice).
+  // The effect must only re-run when the expo-audio status itself changes.
+  const currentVoiceIdRef = useRef(currentVoiceId);
+  currentVoiceIdRef.current = currentVoiceId;
+  const onCurrentEndedRef = useRef(onCurrentEnded);
+  onCurrentEndedRef.current = onCurrentEnded;
+
   // Edge-detect didJustFinish to fire onCurrentEnded exactly once per playthrough.
   const currentDidJustFinish = status.didJustFinish ?? false;
 
@@ -229,10 +284,98 @@ export function useFeedPlayer({
     }
     prevDidJustFinishRef.current = true;
     finishedHandledRef.current = true;
-    if (currentVoiceId) {
-      onCurrentEnded?.(currentVoiceId);
+    const voiceId = currentVoiceIdRef.current;
+    if (voiceId) {
+      dbg('end-of-track: firing onCurrentEnded', { voiceId });
+      onCurrentEndedRef.current?.(voiceId);
     }
-  }, [currentDidJustFinish, currentVoiceId, onCurrentEnded]);
+    // deps intentionally limited to currentDidJustFinish only — see comment above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentDidJustFinish]);
+
+  // Shared playback starter used by both controls.play (user tap) and the
+  // autoplay effect. Single source of truth for "what does play actually do":
+  // re-arm the didJustFinish edge detector, seek to 0 if the playhead is at end
+  // (replay scenario), then call player.play(). All native calls are wrapped
+  // because expo-audio can throw NativeSharedObjectNotFoundException during
+  // transient re-mount states.
+  const startPlayback = useCallback(() => {
+    finishedHandledRef.current = false;
+    prevDidJustFinishRef.current = false;
+
+    const s = statusRef.current;
+    const atEnd =
+      s.didJustFinish ||
+      (s.duration > 0 && (s.currentTime ?? 0) >= s.duration - 0.5);
+
+    dbg('startPlayback', {
+      atEnd,
+      didJustFinish: s.didJustFinish,
+      currentTime: s.currentTime,
+      duration: s.duration,
+      playing: s.playing,
+    });
+
+    if (atEnd) {
+      try {
+        player.seekTo(0);
+      } catch {
+        // Native player in a transient state — next call will retry.
+      }
+    }
+
+    try {
+      player.play();
+    } catch (err) {
+      dbg('startPlayback: play() threw', { error: String(err) });
+    }
+  }, [player]);
+
+  // Continuous-condition autoplay. Fires player.play() whenever ALL of these hold:
+  //   1. autoplayNext is true (the toggle is on)
+  //   2. our async URL fetch is done (isLoadingSource is false)
+  //   3. there is a current voice
+  //   4. the player holds that voice's source (loadedVoiceIdRef === currentVoiceId)
+  //   5. expo-audio's status.didJustFinish has flipped back to false
+  //
+  // (5) is the critical native-side signal. player.replace(url) returns
+  // synchronously in JS but the native player loads the new source asynchronously.
+  // During that brief window status keeps reporting the previous track's terminal
+  // state (didJustFinish=true, currentTime≈duration). Calling play() in that
+  // window is silently swallowed by expo-audio because the new source isn't
+  // committed yet. Once the native side commits the replace, status flips
+  // didJustFinish back to false — at that point play() actually starts the
+  // track. The same gate is harmless for the "toggle autoplay on a paused voice"
+  // case because didJustFinish is already false for a paused-mid-track player.
+  useEffect(() => {
+    if (!autoplayNext) {
+      dbg('autoplay: skip (disabled)');
+      return;
+    }
+    if (isLoadingSource) {
+      dbg('autoplay: skip (URL loading)', { currentVoiceId });
+      return;
+    }
+    if (!currentVoiceId) {
+      dbg('autoplay: skip (no current voice)');
+      return;
+    }
+    if (loadedVoiceIdRef.current !== currentVoiceId) {
+      dbg('autoplay: skip (player holds stale source)', {
+        loaded: loadedVoiceIdRef.current,
+        current: currentVoiceId,
+      });
+      return;
+    }
+    if (currentDidJustFinish) {
+      dbg('autoplay: skip (native replace not yet committed — didJustFinish stale)', {
+        currentVoiceId,
+      });
+      return;
+    }
+    dbg('autoplay: firing', { currentVoiceId });
+    startPlayback();
+  }, [autoplayNext, isLoadingSource, currentVoiceId, currentDidJustFinish, startPlayback]);
 
   // Pause on unmount.
   useEffect(() => {
@@ -250,25 +393,8 @@ export function useFeedPlayer({
     if (isLoadingSource || loadedVoiceIdRef.current === null) {
       return;
     }
-
-    finishedHandledRef.current = false;
-    prevDidJustFinishRef.current = false;
-
-    // After didJustFinish expo-audio leaves the playhead at the end; play() alone
-    // is a no-op. Seek back to 0 so a replay actually restarts the track.
-    if (
-      status.didJustFinish ||
-      (status.duration > 0 && (status.currentTime ?? 0) >= status.duration - 0.5)
-    ) {
-      try {
-        player.seekTo(0);
-      } catch {
-        // Native player in a transient state — next tap will retry.
-      }
-    }
-
-    player.play();
-  }, [player, status, isLoadingSource]);
+    startPlayback();
+  }, [isLoadingSource, startPlayback]);
 
   const pause = useCallback(() => {
     try {
@@ -287,16 +413,58 @@ export function useFeedPlayer({
     }
   }, [player]);
 
+  // Detect when the native player has committed the new source. The stale
+  // window ends when: (a) the async URL fetch is done, (b) replace() was
+  // called for the current voice, and (c) expo-audio's didJustFinish has
+  // cleared — the native source swap is complete and status reflects the new
+  // track. This effect intentionally reads loadedVoiceIdRef (set synchronously
+  // in the .then of the load effect) because the ref is always up-to-date by
+  // the time isLoadingSource flips to false in the same microtask.
+  useEffect(() => {
+    if (
+      !isLoadingSource &&
+      currentVoiceId !== null &&
+      loadedVoiceIdRef.current === currentVoiceId &&
+      !currentDidJustFinish
+    ) {
+      dbg('stale-window: cleared', { currentVoiceId });
+      setIsPlayerStale(false);
+    }
+  }, [isLoadingSource, currentVoiceId, currentDidJustFinish]);
+
+  // Depend on individual primitive fields rather than the `status` object so
+  // the memo reacts to value changes even when the object reference is stable
+  // (true in tests, and avoids gratuitous recomputation in production where
+  // expo-audio allocates a new status every 100 ms update tick).
+  const statusPlaying = status.playing ?? false;
+  const statusCurrentTime = status.currentTime ?? 0;
+  const statusDuration = status.duration ?? 0;
+
   const snapshot = useMemo<FeedPlayerSnapshot>(() => {
     if (!currentVoiceId) return EMPTY_SNAPSHOT;
+    // Two complementary guards, each covering a different part of the stale window:
+    //  · loadedVoiceIdRef — synchronous, catches the very first render where
+    //    currentVoiceId changed but the load effect hasn't run yet (effect lag).
+    //  · isPlayerStale   — state-based, catches the post-replace() window where
+    //    the ref already matches but expo-audio still reports the prior track's
+    //    terminal status (native source commit is async).
+    if (isPlayerStale || loadedVoiceIdRef.current !== currentVoiceId) {
+      return {
+        isPlaying: false,
+        positionMs: 0,
+        durationMs: 0,
+        isLoading: isLoadingSource,
+        error,
+      };
+    }
     return {
-      isPlaying: status.playing ?? false,
-      positionMs: Math.round((status.currentTime ?? 0) * 1000),
-      durationMs: Math.round((status.duration ?? 0) * 1000),
+      isPlaying: statusPlaying,
+      positionMs: Math.round(statusCurrentTime * 1000),
+      durationMs: Math.round(statusDuration * 1000),
       isLoading: isLoadingSource,
       error,
     };
-  }, [currentVoiceId, status, isLoadingSource, error]);
+  }, [currentVoiceId, isPlayerStale, statusPlaying, statusCurrentTime, statusDuration, isLoadingSource, error]);
 
   const controls = useMemo<FeedPlayerControls>(() => ({ play, pause, stop }), [play, pause, stop]);
 
