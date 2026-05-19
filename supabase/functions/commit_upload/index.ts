@@ -12,8 +12,8 @@ import type {
   MessageRow,
 } from '../_shared/types.ts';
 
-const MAX_DURATION_MS = 300_000;
-const MAX_FILE_BYTES = 6_000_000;
+const MAX_DURATION_MS = 90_000;
+const MAX_FILE_BYTES = 2_000_000;
 const MAX_TITLE_LENGTH = 60;
 const VALID_THEMES = new Set(['sunset', 'chill', 'electric', 'midnight']);
 

@@ -19,7 +19,7 @@ The product ships in **two deliverables**:
 ## 1. Product summary
 
 Lovoice is a **voice-first dating app** for French-speaking Europe (FR / BE / CH).
-Each user records a short **voice** (max 5 minutes) that introduces them.
+Each user records a short **voice** (max 1 min 30 s) that introduces them.
 Other users discover these voices through a **vertical TikTok-style feed**.
 
 There is **NO swipe-and-match mechanic**. The interactions are:
@@ -85,7 +85,7 @@ In V1 MVP, content safety relies on **reactive moderation** (block + report + ma
 
 ### Audio format
 - **AAC in `.m4a` container, mono, 32 kbps, 22050 Hz.** Always.
-- 5 min hard cap, enforced client-side AND server-side (Edge Function rejects > 6 MB or > 300_000 ms).
+- 1 min 30 s hard cap, enforced client-side AND server-side (Edge Function rejects > 2 MB or > 90_000 ms).
 
 ---
 

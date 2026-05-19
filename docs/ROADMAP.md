@@ -52,7 +52,7 @@ Reactive moderation (block + report + manual takedown by the operator) is part o
 ### Scope
 
 1. Install **`expo-audio`**. Configure `AVAudioSession` defaults in `src/lib/audio.ts`.
-2. Build `useVoiceRecorder` hook: start, stop, pause, resume, metering at 50 ms, hard cap at 300_000 ms.
+2. Build `useVoiceRecorder` hook: start, stop, pause, resume, metering at 50 ms, hard cap at 90_000 ms.
 3. Build `useVoicePlayer` hook (single-instance variant for preview).
 4. `app/(auth)/onboarding/record.tsx` (and a reachable `app/(main)/profile/record.tsx`): live waveform, timer, prompt picker (`prompts` table seeded), record / stop / replay / re-record.
 5. Implement Edge Function `request_upload` and `commit_upload` per ARCHITECTURE §4.2. Sign client-side using the helper from `@supabase/storage-js`. **In V1 MVP, `commit_upload` inserts the row with `status = 'approved'` and does NOT enqueue a moderation job** (the auto-moderation pipeline is Phase 9, scheduled for ~Q3 2026). A `// TODO(phase-9)` marker is left at the future enqueue site so Phase 9 is a localized addition, not a refactor.
@@ -68,7 +68,7 @@ Reactive moderation (block + report + manual takedown by the operator) is part o
 
 ### Acceptance
 
-- Recording auto-stops at 5:00.
+- Recording auto-stops at 1:30.
 - Files are 32 kbps mono AAC, ~240 KB/min ±10%.
 - Upload works on flaky network (manual test: airplane mode mid-upload → retry).
 
@@ -83,8 +83,8 @@ Cover these once on iOS and once on Android. Backend curl walkthrough lives at
    profile-setup screen lands with the active voice already populated.
 2. **Min duration** — start recording, tap stop at < 10 s; the CTA should stay
    "Encore N sec" and the mic stop should be a no-op until the threshold.
-3. **Auto-stop** — let the recorder run; at 5:00 it must stop on its own and
-   show the preview state. Timer must show `5:00 / 5:00` exactly.
+3. **Auto-stop** — let the recorder run; at 1:30 it must stop on its own and
+   show the preview state. Timer must show `1:30 / 1:30` exactly.
 4. **Permission denied** — deny mic permission once, observe the Settings icon
    on the mic button + the French permission-denied message in the hint card,
    tap to deep-link to system settings, grant, return → next mic tap records.
@@ -262,7 +262,7 @@ This phase produces a **separate Next.js repository** (suggested name `lovoice-a
 1. Conversation creation: when a user sends a first message in response to a voice, lazily create the `conversations` row (sorted user_a/user_b).
 2. `MessagesScreen` (inbox): list conversations with last message preview + unread badge. Realtime subscription on `notifications` for unread updates.
 3. `ConversationScreen` (`app/(main)/messages/[id].tsx`): paginated message list (cursor on `created_at` desc), Realtime subscription on `messages` filtered by conversation.
-4. Composer: text input + record button. Voice messages reuse `useVoiceRecorder` (max 5 min) and the same upload pipeline (`kind='message'`).
+4. Composer: text input + record button. Voice messages reuse `useVoiceRecorder` (max 1 min 30 s) and the same upload pipeline (`kind='message'`).
 5. Inline voice player per message (reuse `useVoicePlayer` single-instance — only one playing at a time, others auto-pause).
 6. Read receipts: on screen open, `update messages set read_at = now() where conversation_id = $1 and sender_id != auth.uid() and read_at is null`.
 7. Typing indicator via Realtime Broadcast (throttled 1/s).

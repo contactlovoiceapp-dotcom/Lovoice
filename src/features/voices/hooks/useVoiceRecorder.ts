@@ -86,7 +86,7 @@ export function useVoiceRecorder(): VoiceRecorderHook {
   // Mirror native duration and metering into React state while actively recording.
   useEffect(() => {
     if (state !== 'recording' && state !== 'paused') return;
-    // Clamp so the displayed timer never overshoots the 5:00 hard cap during the brief
+    // Clamp so the displayed timer never overshoots the 1:30 hard cap during the brief
     // window between the auto-stop trigger and the actual recorder.stop() resolving.
     setDurationMs(Math.min(recorderState.durationMillis, MAX_VOICE_DURATION_MS));
 

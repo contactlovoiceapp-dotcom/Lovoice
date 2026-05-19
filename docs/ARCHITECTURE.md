@@ -86,7 +86,7 @@ The voice introduction. A user can have multiple voices but only **one `is_activ
 | `user_id`           | `uuid` FK → `profiles(id)`                                                             |                                                                                                                                              |
 | `prompt_id`         | `uuid` FK → `prompts(id)`                                                              | nullable (free-form voice)                                                                                                                   |
 | `storage_path`      | `text`                                                                                 | `voices/{user_id}/{voice_id}.m4a`                                                                                                            |
-| `duration_ms`       | `integer` check (≤ 300_000)                                                            |                                                                                                                                              |
+| `duration_ms`       | `integer` check (≤ 90_000)                                                             |                                                                                                                                              |
 | `title`             | `text`                                                                                 | nullable; user-editable catchphrase shown on the voice card                                                                                  |
 | `transcript`        | `text`                                                                                 | nullable; filled by AssemblyAI when Phase 9 ships (~Q3 2026)                                                                                  |
 | `theme`             | `text`                                                                                 | UI color theme (`sunset`, `chill`, `electric`, `midnight`)                                                                                   |
@@ -300,7 +300,7 @@ create policy "admins_read_audio" on storage.objects
    }
    ```
 4. Sample metering at 50 ms for the live waveform.
-5. Hard cap at **300_000 ms**: auto-stop and disable record button.
+5. Hard cap at **90_000 ms**: auto-stop and disable record button.
 6. Save to `FileSystem.documentDirectory + 'pending/{uuid}.m4a'`.
 7. Allow re-record before commit. The temp file is deleted after successful upload or on reset/cancel.
 
@@ -314,10 +314,10 @@ create policy "admins_read_audio" on storage.objects
      "token": "..."
    }
    ```
-   Function rejects if `duration_ms > 300_000` or user is banned.
+   Function rejects if `duration_ms > 90_000` or user is banned.
 2. Client `PUT` the file directly to `signed_url` with `Content-Type: audio/mp4`.
 3. On success, client calls Edge Function `commit_upload({ kind, object_path, duration_ms, prompt_id?, conversation_id?, body_text? })` which:
-   - HEAD-checks the object exists and `Content-Length ≤ 6_000_000`,
+   - HEAD-checks the object exists and `Content-Length ≤ 2_000_000`,
    - inserts the `voices` or `messages` row.
    - **V1 MVP:** the row is inserted with `status = 'approved'` (default) and is immediately visible. No moderation job is enqueued.
    - **With auto-moderation enabled (post-MVP):** the row is inserted with `status = 'pending'` and a row is added to `moderation_jobs`, which the cron-triggered Edge Function picks up (see §4.3).

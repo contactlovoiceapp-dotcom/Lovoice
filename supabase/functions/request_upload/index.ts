@@ -5,7 +5,7 @@ import { requireAuth } from '../_shared/auth.ts';
 import { supabaseAdmin } from '../_shared/supabaseAdmin.ts';
 import type { RequestUploadResult } from '../_shared/types.ts';
 
-const MAX_DURATION_MS = 300_000;
+const MAX_DURATION_MS = 90_000;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 function isUUID(value: unknown): value is string {

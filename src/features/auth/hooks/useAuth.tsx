@@ -55,28 +55,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const profileRequestIdRef = useRef(0);
 
-  const loadProfile = useCallback(async (nextSession: Session | null) => {
+  const loadProfile = useCallback(async (nextSession: Session | null): Promise<boolean> => {
     const requestId = profileRequestIdRef.current + 1;
     profileRequestIdRef.current = requestId;
 
     if (!nextSession) {
       setProfile(null);
       setError(null);
-      return;
+      return true;
     }
 
     try {
       const nextProfile = await fetchProfile(nextSession.user.id);
 
       if (profileRequestIdRef.current !== requestId) {
-        return;
+        return false;
       }
 
       setProfile(nextProfile);
       setError(null);
+      return true;
     } catch (profileError: unknown) {
       if (profileRequestIdRef.current !== requestId) {
-        return;
+        return false;
       }
 
       setProfile(null);
@@ -85,6 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           ? profileError.message
           : 'Unable to load the authenticated profile.',
       );
+      return true;
     }
   }, []);
 
@@ -148,9 +150,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!isMounted) return;
 
         setSession(nextSession);
-        await loadProfile(nextSession);
+        const applied = await loadProfile(nextSession);
 
-        if (isMounted) {
+        // Only clear loading if this was the latest profile request.
+        // When onAuthStateChange fires twice in quick succession (e.g. INITIAL_SESSION
+        // then TOKEN_REFRESHED), the first flow's loadProfile is superseded — dropping
+        // isLoading here would expose a frame where session is set but profile is still
+        // null, causing a flash redirect to the onboarding name screen.
+        if (isMounted && applied) {
           setIsLoading(false);
         }
       })();

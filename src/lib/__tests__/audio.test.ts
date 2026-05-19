@@ -31,8 +31,8 @@ describe('VOICE_AUDIO_FORMAT', () => {
 });
 
 describe('audio constants', () => {
-  it('MAX_VOICE_DURATION_MS is 5 minutes in ms', () => {
-    expect(MAX_VOICE_DURATION_MS).toBe(300_000);
+  it('MAX_VOICE_DURATION_MS is 90 seconds in ms', () => {
+    expect(MAX_VOICE_DURATION_MS).toBe(90_000);
   });
 
   it('MIN_VOICE_DURATION_MS is 10 seconds in ms', () => {
@@ -40,7 +40,7 @@ describe('audio constants', () => {
   });
 
   it('MAX_VOICE_FILE_SIZE_BYTES matches server limit', () => {
-    expect(MAX_VOICE_FILE_SIZE_BYTES).toBe(6_000_000);
+    expect(MAX_VOICE_FILE_SIZE_BYTES).toBe(2_000_000);
   });
 
   it('METERING_INTERVAL_MS is 50ms', () => {
@@ -86,11 +86,11 @@ describe('estimateBitrateOk', () => {
     expect(estimateBitrateOk(1000, 0)).toBe(false);
   });
 
-  it('handles a 5-minute recording within expected range', () => {
-    const fiveMin = 300_000;
-    const expected = 4 * fiveMin; // 1_200_000 bytes = 1.2 MB
-    expect(estimateBitrateOk(expected, fiveMin)).toBe(true);
-    // A 5-min recording well under the 6 MB server limit.
+  it('handles a 90-second recording within expected range', () => {
+    const ninetySeconds = 90_000;
+    const expected = 4 * ninetySeconds; // 360_000 bytes = 360 KB
+    expect(estimateBitrateOk(expected, ninetySeconds)).toBe(true);
+    // A 90s recording well under the 2 MB server limit.
     expect(expected).toBeLessThan(MAX_VOICE_FILE_SIZE_BYTES);
   });
 });

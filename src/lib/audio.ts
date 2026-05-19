@@ -27,10 +27,11 @@ export const VOICE_AUDIO_FORMAT: RecordingOptions = {
   },
 };
 
-export const MAX_VOICE_DURATION_MS = 300_000;
+export const MAX_VOICE_DURATION_MS = 90_000;
 export const MIN_VOICE_DURATION_MS = 10_000;
-// Server rejects anything over 6 MB (ARCHITECTURE §4.2 commit_upload validation).
-export const MAX_VOICE_FILE_SIZE_BYTES = 6_000_000;
+// Server rejects anything over 2 MB (ARCHITECTURE §4.2 commit_upload validation).
+// 90s at 32kbps mono ≈ 360 KB; 2 MB gives ample margin for codec overhead.
+export const MAX_VOICE_FILE_SIZE_BYTES = 2_000_000;
 // 50ms balances waveform UI smoothness against CPU wake-up frequency on mobile.
 export const METERING_INTERVAL_MS = 50;
 
