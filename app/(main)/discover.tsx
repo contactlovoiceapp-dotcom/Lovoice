@@ -164,11 +164,15 @@ export default function DiscoverScreen() {
   const handleEnded = useCallback(
     (voiceId: string) => {
       seenBatcher.enqueue(voiceId);
-      if (autoplay && activeIndex < items.length - 1) {
-        requestAnimationFrame(() => {
+      if (!autoplay) return;
+      requestAnimationFrame(() => {
+        if (activeIndex < items.length - 1) {
           flatListRef.current?.scrollToIndex({ index: activeIndex + 1, animated: true });
-        });
-      }
+        } else {
+          // Last item — scroll to the end-of-feed footer card.
+          flatListRef.current?.scrollToEnd({ animated: true });
+        }
+      });
     },
     [autoplay, activeIndex, items.length, seenBatcher],
   );
@@ -488,7 +492,11 @@ export default function DiscoverScreen() {
                 disabled={resetFeedSeen.isPending}
                 onPress={() => {
                   resetFeedSeen.mutate(undefined, {
-                    onSuccess: () => setShowResetConfirm(false),
+                    onSuccess: () => {
+                      setShowResetConfirm(false);
+                      setActiveIndex(0);
+                      flatListRef.current?.scrollToIndex({ index: 0, animated: false });
+                    },
                   });
                 }}
               >
