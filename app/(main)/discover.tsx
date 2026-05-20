@@ -169,7 +169,6 @@ export default function DiscoverScreen() {
         if (activeIndex < items.length - 1) {
           flatListRef.current?.scrollToIndex({ index: activeIndex + 1, animated: true });
         } else {
-          // Last item — scroll to the end-of-feed footer card.
           flatListRef.current?.scrollToEnd({ animated: true });
         }
       });
@@ -301,6 +300,15 @@ export default function DiscoverScreen() {
     },
   ).current;
 
+  // Fires ONLY on user-initiated drag gestures (never on programmatic scrolls like
+  // autoplay's scrollToIndex). This is the single, reliable place to disable autoplay
+  // on manual swipes — no timing-sensitive ref flags needed.
+  const handleScrollBeginDrag = useCallback(() => {
+    if (autoplay) {
+      setAutoplay(false);
+    }
+  }, [autoplay, setAutoplay]);
+
   const activeTheme = items[activeIndex]?.theme ?? DEFAULT_THEME;
   const statusBarStyle = useMemo<'light' | 'dark'>(
     () => (isHexLight(THEME_GRADIENTS[activeTheme].colors[0]) ? 'dark' : 'light'),
@@ -389,6 +397,7 @@ export default function DiscoverScreen() {
           snapToAlignment="start"
           viewabilityConfig={viewabilityConfig}
           onViewableItemsChanged={onViewableItemsChanged}
+          onScrollBeginDrag={handleScrollBeginDrag}
           getItemLayout={(_, index) => ({
             length: windowHeight,
             offset: windowHeight * index,
