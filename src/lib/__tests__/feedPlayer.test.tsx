@@ -701,6 +701,79 @@ describe('useFeedPlayer — stale snapshot gating', () => {
   });
 });
 
+describe('useFeedPlayer — feed reset after autoplay', () => {
+  it('snapshot.isPlaying reflects status.playing after explicit play() when didJustFinish is stuck from a prior track ending', async () => {
+    mockSupabaseSignedUrls();
+    const itemA = makeItem({ voiceId: 'v0', storagePath: 'p0' });
+    const itemB = makeItem({ voiceId: 'v1', storagePath: 'p1' });
+
+    const { result, rerender } = renderHook(
+      ({ items, index, tick: _tick }: { items: FeedItem[]; index: number; tick: number }) =>
+        useFeedPlayer({ items, currentIndex: index }),
+      { initialProps: { items: [itemA], index: 0, tick: 0 } },
+    );
+
+    // Wait for v0 to load.
+    await waitFor(() => {
+      expect(expoAudioMocks.player.replace).toHaveBeenCalledWith('https://signed.example/p0');
+    });
+
+    // v0 ends naturally — expo-audio emits didJustFinish=true.
+    act(() => {
+      expoAudioMocks.playerStatus.didJustFinish = true;
+      expoAudioMocks.playerStatus.currentTime = 30;
+      expoAudioMocks.playerStatus.duration = 30;
+      rerender({ items: [itemA], index: 0, tick: 1 });
+    });
+
+    expoAudioMocks.player.replace.mockClear();
+    expoAudioMocks.player.play.mockClear();
+
+    // End-of-feed: index points past the list — null currentVoiceId.
+    // Source-load null branch pauses and clears loadedVoiceIdRef but does NOT
+    // change isPlayerStale, so it remains at its current value.
+    act(() => {
+      rerender({ items: [itemA], index: 1, tick: 2 });
+    });
+
+    // Feed reset: new items arrive, index back to 0 with a new voice ID.
+    // didJustFinish is still stuck-true (expo-audio never emits while paused).
+    act(() => {
+      rerender({ items: [itemB], index: 0, tick: 3 });
+    });
+
+    // Source-load fires for v1 — replace() is called.
+    await waitFor(() => {
+      expect(expoAudioMocks.player.replace).toHaveBeenCalledWith('https://signed.example/p1');
+    });
+
+    // At this point isPlayerStale=true and didJustFinish=true (stuck).
+    // The stale-window clearing path is blocked — this reproduces the bug.
+    expect(result.current.snapshot.isPlaying).toBe(false);
+
+    // User taps play. The fix clears isPlayerStale eagerly so snapshot
+    // can reflect status.playing as soon as expo-audio confirms playback.
+    act(() => {
+      result.current.controls.play();
+    });
+
+    expect(expoAudioMocks.player.play).toHaveBeenCalledTimes(1);
+
+    // Simulate expo-audio confirming playback started (the status update that
+    // the stale-window path was waiting for, which may never arrive while paused).
+    act(() => {
+      expoAudioMocks.playerStatus.playing = true;
+      expoAudioMocks.playerStatus.didJustFinish = false;
+      expoAudioMocks.playerStatus.currentTime = 0;
+      expoAudioMocks.playerStatus.duration = 30;
+      rerender({ items: [itemB], index: 0, tick: 4 });
+    });
+
+    // Snapshot must now reflect the real playing state — button shows pause.
+    expect(result.current.snapshot.isPlaying).toBe(true);
+  });
+});
+
 describe('useFeedPlayer — onCurrentEnded', () => {
   it('fires exactly once on the false→true edge and re-arms only on play()', async () => {
     mockSupabaseSignedUrls();
