@@ -329,6 +329,15 @@ export function useFeedPlayer({
     } catch (err) {
       dbg('startPlayback: play() threw', { error: String(err) });
     }
+
+    // Eagerly clear the stale window so snapshot.isPlaying reflects status.playing
+    // as soon as expo-audio confirms the player is running. This covers both user-
+    // initiated play AND autoplay. Without this, the stale window can stay locked
+    // when didJustFinish is stuck-true after a natural track finish followed by a
+    // feed reset: expo-audio never emits a status update while the player is paused,
+    // so currentDidJustFinish stays true and the normal stale-window clearing path
+    // (which gates on !currentDidJustFinish) is permanently blocked.
+    setIsPlayerStale(false);
   }, [player]);
 
   // Continuous-condition autoplay. Fires player.play() whenever ALL of these hold:
@@ -373,6 +382,19 @@ export function useFeedPlayer({
       });
       return;
     }
+    // Don't replay a voice that has already ended and whose ending was dispatched
+    // via onCurrentEnded. When the user enables autoplay while the replay icon is
+    // showing, the consumer is expected to advance the index — replaying the
+    // current card from the start would be jarring.
+    const s = statusRef.current;
+    const isAtEnd =
+      s.didJustFinish || (s.duration > 0 && (s.currentTime ?? 0) >= s.duration - 0.5);
+    if (isAtEnd && finishedHandledRef.current) {
+      dbg('autoplay: skip (voice already ended, onCurrentEnded was dispatched)', {
+        currentVoiceId,
+      });
+      return;
+    }
     dbg('autoplay: firing', { currentVoiceId });
     startPlayback();
   }, [autoplayNext, isLoadingSource, currentVoiceId, currentDidJustFinish, startPlayback]);
@@ -394,13 +416,6 @@ export function useFeedPlayer({
       return;
     }
     startPlayback();
-    // Eagerly clear the stale window so snapshot.isPlaying reflects status.playing
-    // as soon as expo-audio confirms the player is running. Without this, the stale
-    // window can stay locked when didJustFinish is stuck-true after a natural track
-    // finish followed by a feed reset: expo-audio never emits a status update while
-    // the player is paused, so currentDidJustFinish stays true and the normal
-    // stale-window clearing path is permanently blocked.
-    setIsPlayerStale(false);
   }, [isLoadingSource, startPlayback]);
 
   const pause = useCallback(() => {

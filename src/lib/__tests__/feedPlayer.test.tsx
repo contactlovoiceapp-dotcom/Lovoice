@@ -535,6 +535,47 @@ describe('useFeedPlayer — autoplayNext', () => {
     });
   });
 
+  it('does not replay a voice that already ended when autoplayNext is toggled on', async () => {
+    mockSupabaseSignedUrls();
+    const item = makeItem({ voiceId: 'v0', storagePath: 'p0' });
+    const onCurrentEnded = jest.fn();
+
+    const { rerender } = renderHook(
+      ({ autoplayNext, tick: _tick }: { autoplayNext: boolean; tick: number }) =>
+        useFeedPlayer({ items: [item], currentIndex: 0, autoplayNext, onCurrentEnded }),
+      { initialProps: { autoplayNext: false, tick: 0 } },
+    );
+
+    await waitFor(() => {
+      expect(expoAudioMocks.player.replace).toHaveBeenCalled();
+    });
+
+    // v0 ends naturally — onCurrentEnded fires and finishedHandledRef becomes true.
+    act(() => {
+      expoAudioMocks.playerStatus.didJustFinish = true;
+      expoAudioMocks.playerStatus.currentTime = 30;
+      expoAudioMocks.playerStatus.duration = 30;
+      rerender({ autoplayNext: false, tick: 1 });
+    });
+
+    expect(onCurrentEnded).toHaveBeenCalledTimes(1);
+
+    // didJustFinish clears (expo-audio resets after one cycle).
+    act(() => {
+      expoAudioMocks.playerStatus.didJustFinish = false;
+      rerender({ autoplayNext: false, tick: 2 });
+    });
+
+    // User enables autoplay. The voice is at the end (currentTime ≈ duration)
+    // and finishedHandledRef=true — autoplay must NOT replay it.
+    act(() => {
+      rerender({ autoplayNext: true, tick: 3 });
+    });
+
+    expect(expoAudioMocks.player.play).not.toHaveBeenCalled();
+  });
+
+
   it('does not auto-play when autoplayNext flips off before the source finishes loading', async () => {
     const resolvers: Record<string, (url: string) => void> = {};
     const createSignedUrl = jest.fn(
@@ -770,6 +811,72 @@ describe('useFeedPlayer — feed reset after autoplay', () => {
     });
 
     // Snapshot must now reflect the real playing state — button shows pause.
+    expect(result.current.snapshot.isPlaying).toBe(true);
+  });
+
+  it('snapshot.isPlaying reflects status.playing when autoplay starts after a feed reset (no manual play tap)', async () => {
+    mockSupabaseSignedUrls();
+    const itemA = makeItem({ voiceId: 'v0', storagePath: 'p0' });
+    const itemB = makeItem({ voiceId: 'v1', storagePath: 'p1' });
+
+    const { result, rerender } = renderHook(
+      ({ items, index, autoplayNext, tick: _tick }: { items: FeedItem[]; index: number; autoplayNext: boolean; tick: number }) =>
+        useFeedPlayer({ items, currentIndex: index, autoplayNext }),
+      { initialProps: { items: [itemA], index: 0, autoplayNext: true, tick: 0 } },
+    );
+
+    // v0 loads and autoplay fires.
+    await waitFor(() => {
+      expect(expoAudioMocks.player.play).toHaveBeenCalled();
+    });
+
+    // v0 ends naturally.
+    act(() => {
+      expoAudioMocks.playerStatus.didJustFinish = true;
+      expoAudioMocks.playerStatus.currentTime = 30;
+      expoAudioMocks.playerStatus.duration = 30;
+      expoAudioMocks.playerStatus.playing = false;
+      rerender({ items: [itemA], index: 0, autoplayNext: true, tick: 1 });
+    });
+
+    expoAudioMocks.player.replace.mockClear();
+    expoAudioMocks.player.play.mockClear();
+
+    // End-of-feed: index past list.
+    act(() => {
+      rerender({ items: [itemA], index: 1, autoplayNext: true, tick: 2 });
+    });
+
+    // Feed reset: new voice at index 0, autoplay still on.
+    act(() => {
+      rerender({ items: [itemB], index: 0, autoplayNext: true, tick: 3 });
+    });
+
+    // v1 source loads.
+    await waitFor(() => {
+      expect(expoAudioMocks.player.replace).toHaveBeenCalledWith('https://signed.example/p1');
+    });
+
+    // Simulate native committing the new source (didJustFinish clears).
+    act(() => {
+      expoAudioMocks.playerStatus.didJustFinish = false;
+      expoAudioMocks.playerStatus.currentTime = 0;
+      expoAudioMocks.playerStatus.duration = 25;
+      rerender({ items: [itemB], index: 0, autoplayNext: true, tick: 4 });
+    });
+
+    // Autoplay should have fired play().
+    await waitFor(() => {
+      expect(expoAudioMocks.player.play).toHaveBeenCalled();
+    });
+
+    // Simulate expo-audio confirming playback.
+    act(() => {
+      expoAudioMocks.playerStatus.playing = true;
+      rerender({ items: [itemB], index: 0, autoplayNext: true, tick: 5 });
+    });
+
+    // The snapshot MUST reflect playing — the button shows pause icon.
     expect(result.current.snapshot.isPlaying).toBe(true);
   });
 });

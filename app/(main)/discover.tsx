@@ -247,6 +247,25 @@ export default function DiscoverScreen() {
   }, [activeIndex, items.length, feedQuery]);
 
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 80 }).current;
+  // When autoplay is enabled while the current voice has already played through
+  // to the end, advance to the next card instead of replaying the finished one.
+  // The feedPlayer's autoplay effect guards against the replay on its side too,
+  // but this scroll ensures the UX responds immediately and naturally.
+  const handleToggleAutoplay = useCallback(() => {
+    const enabling = !autoplay;
+    setAutoplay(enabling);
+    if (enabling && activeIndex < items.length - 1) {
+      const isAtEnd =
+        snapshot.durationMs > 0 && snapshot.positionMs >= snapshot.durationMs - 500;
+      if (isAtEnd) {
+        requestAnimationFrame(() => {
+          flatListRef.current?.scrollToIndex({ index: activeIndex + 1, animated: true });
+        });
+      }
+    }
+  }, [autoplay, setAutoplay, activeIndex, items.length, snapshot.durationMs, snapshot.positionMs]);
+
+
   // Track the items count and active index in refs so the viewability callback (which must be
   // stable) can read them without needing to be recreated.
   const itemsCountRef = useRef(items.length);
@@ -354,7 +373,7 @@ export default function DiscoverScreen() {
 
       <DiscoverHeader
         autoplay={autoplay}
-        onToggleAutoplay={() => setAutoplay(!autoplay)}
+        onToggleAutoplay={handleToggleAutoplay}
         onOpenFilters={() => setShowFilters(true)}
       />
 
