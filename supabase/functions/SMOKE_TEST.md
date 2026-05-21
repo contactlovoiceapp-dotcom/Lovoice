@@ -230,3 +230,279 @@ SUPABASE_URL=http://127.0.0.1:54321
 SUPABASE_ANON_KEY=<from supabase status>
 SUPABASE_SERVICE_ROLE_KEY=<from supabase status>
 ```
+
+---
+
+## 6. Admin Edge Functions (Phase 6)
+
+> **Pre-req:** insert a row into `admin_users` for the test user, then obtain a JWT for that user the same way as §0.
+>
+> ```sql
+> INSERT INTO admin_users (id, email, display_name)
+> VALUES ('<auth.uid of test user>', 'op@lovoice.app', 'Op');
+> ```
+>
+> ```bash
+> ADMIN_JWT=$(curl -sS -X POST \
+>   "http://127.0.0.1:54321/auth/v1/token?grant_type=password" \
+>   -H "apikey: $SUPABASE_ANON_KEY" \
+>   -H "Content-Type: application/json" \
+>   -d '{"email": "op@lovoice.app", "password": "test-password"}' \
+>   | jq -r '.access_token')
+> ```
+
+### 6.1 `dismiss_report`
+
+**Happy path** (dismiss a pending report):
+
+```bash
+curl -sS -X POST \
+  "http://127.0.0.1:54321/functions/v1/dismiss_report" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "Content-Type: application/json" \
+  -d '{"report_id": "<uuid of a pending report>", "reason": "False positive"}' \
+  | jq .
+```
+
+**Expected:** 200 `{ "ok": true, "report_id": "..." }`
+
+**Non-admin JWT:**
+
+```bash
+curl -sS -X POST \
+  "http://127.0.0.1:54321/functions/v1/dismiss_report" \
+  -H "Authorization: Bearer $JWT" \
+  -H "Content-Type: application/json" \
+  -d '{"report_id": "00000000-0000-0000-0000-000000000000"}' \
+  | jq .
+```
+
+**Expected:** 403 `{ "error": "not_admin" }`
+
+**Unknown report_id:**
+
+```bash
+curl -sS -X POST \
+  "http://127.0.0.1:54321/functions/v1/dismiss_report" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "Content-Type: application/json" \
+  -d '{"report_id": "00000000-0000-0000-0000-000000000000"}' \
+  | jq .
+```
+
+**Expected:** 404 `{ "error": "report_not_found" }`
+
+**Idempotent (already dismissed):**
+
+```bash
+# Call the same dismiss again:
+curl -sS -X POST \
+  "http://127.0.0.1:54321/functions/v1/dismiss_report" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "Content-Type: application/json" \
+  -d '{"report_id": "<same report_id>"}' \
+  | jq .
+```
+
+**Expected:** 200 `{ "ok": true, "idempotent": true, "status": "dismissed" }`
+
+---
+
+### 6.2 `moderate`
+
+**Happy path (voice):**
+
+```bash
+curl -sS -X POST \
+  "http://127.0.0.1:54321/functions/v1/moderate" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "Content-Type: application/json" \
+  -d '{"target_kind": "voice", "target_id": "<voice uuid>", "reason": "Explicit content"}' \
+  | jq .
+```
+
+**Expected:** 200 `{ "ok": true, "target_id": "...", "reports_actioned": 1 }`
+
+**Happy path (message):**
+
+```bash
+curl -sS -X POST \
+  "http://127.0.0.1:54321/functions/v1/moderate" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "Content-Type: application/json" \
+  -d '{"target_kind": "message", "target_id": "<message uuid>", "reason": "Harassment"}' \
+  | jq .
+```
+
+**Expected:** 200 `{ "ok": true, "target_id": "...", "reports_actioned": 0 }`
+
+**Missing target:**
+
+```bash
+curl -sS -X POST \
+  "http://127.0.0.1:54321/functions/v1/moderate" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "Content-Type: application/json" \
+  -d '{"target_kind": "voice", "target_id": "00000000-0000-0000-0000-000000000000", "reason": "Test"}' \
+  | jq .
+```
+
+**Expected:** 404 `{ "error": "target_not_found" }`
+
+**Idempotent (already rejected):**
+
+```bash
+# Repeat the same moderate call on an already-rejected voice:
+curl -sS -X POST \
+  "http://127.0.0.1:54321/functions/v1/moderate" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "Content-Type: application/json" \
+  -d '{"target_kind": "voice", "target_id": "<same voice uuid>", "reason": "Explicit content"}' \
+  | jq .
+```
+
+**Expected:** 200 `{ "ok": true, "idempotent": true }`
+
+---
+
+### 6.3 `ban_user`
+
+**Happy path:**
+
+```bash
+curl -sS -X POST \
+  "http://127.0.0.1:54321/functions/v1/ban_user" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "Content-Type: application/json" \
+  -d '{"user_id": "<target user uuid>", "reason": "Repeated harassment"}' \
+  | jq .
+```
+
+**Expected:** 200 `{ "ok": true, "user_id": "..." }`
+
+**Banning an admin (safety guard):**
+
+```bash
+curl -sS -X POST \
+  "http://127.0.0.1:54321/functions/v1/ban_user" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "Content-Type: application/json" \
+  -d '{"user_id": "<admin user uuid>", "reason": "Test"}' \
+  | jq .
+```
+
+**Expected:** 403 `{ "error": "cannot_ban_admin" }`
+
+**Missing user:**
+
+```bash
+curl -sS -X POST \
+  "http://127.0.0.1:54321/functions/v1/ban_user" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "Content-Type: application/json" \
+  -d '{"user_id": "00000000-0000-0000-0000-000000000000", "reason": "Test"}' \
+  | jq .
+```
+
+**Expected:** 404 `{ "error": "user_not_found" }`
+
+**Idempotent (already banned):**
+
+```bash
+# Call ban_user again on the same user:
+curl -sS -X POST \
+  "http://127.0.0.1:54321/functions/v1/ban_user" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "Content-Type: application/json" \
+  -d '{"user_id": "<same user uuid>", "reason": "Repeated harassment"}' \
+  | jq .
+```
+
+**Expected:** 200 `{ "ok": true, "idempotent": true }`
+
+---
+
+### 6.4 `unban_user`
+
+**Happy path:**
+
+```bash
+curl -sS -X POST \
+  "http://127.0.0.1:54321/functions/v1/unban_user" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "Content-Type: application/json" \
+  -d '{"user_id": "<banned user uuid>"}' \
+  | jq .
+```
+
+**Expected:** 200 `{ "ok": true, "user_id": "..." }`
+
+**Missing user:**
+
+```bash
+curl -sS -X POST \
+  "http://127.0.0.1:54321/functions/v1/unban_user" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "Content-Type: application/json" \
+  -d '{"user_id": "00000000-0000-0000-0000-000000000000"}' \
+  | jq .
+```
+
+**Expected:** 404 `{ "error": "user_not_found" }`
+
+**Idempotent (not banned):**
+
+```bash
+curl -sS -X POST \
+  "http://127.0.0.1:54321/functions/v1/unban_user" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "Content-Type: application/json" \
+  -d '{"user_id": "<user who is not banned>"}' \
+  | jq .
+```
+
+**Expected:** 200 `{ "ok": true, "idempotent": true }`
+
+---
+
+### 6.5 `delete_account_admin`
+
+**Happy path (soft-delete):**
+
+```bash
+curl -sS -X POST \
+  "http://127.0.0.1:54321/functions/v1/delete_account_admin" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "Content-Type: application/json" \
+  -d '{"user_id": "<target user uuid>", "reason": "Spam account"}' \
+  | jq .
+```
+
+**Expected:** 200 `{ "ok": true, "user_id": "...", "hard_purge": false }`
+
+**Refuse on admin:**
+
+```bash
+curl -sS -X POST \
+  "http://127.0.0.1:54321/functions/v1/delete_account_admin" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "Content-Type: application/json" \
+  -d '{"user_id": "<admin user uuid>", "reason": "Test"}' \
+  | jq .
+```
+
+**Expected:** 403 `{ "error": "cannot_delete_admin" }`
+
+**Idempotent (already soft-deleted):**
+
+```bash
+# Call again on the same already-deleted user:
+curl -sS -X POST \
+  "http://127.0.0.1:54321/functions/v1/delete_account_admin" \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "Content-Type: application/json" \
+  -d '{"user_id": "<same user uuid>", "reason": "Spam account"}' \
+  | jq .
+```
+
+**Expected:** 200 `{ "ok": true, "idempotent": true }`
