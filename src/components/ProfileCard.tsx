@@ -1,13 +1,12 @@
 /* Full-screen immersive profile card — the heart of the Discover feed.
    Consumes a FeedItem + a feed player snapshot/controls pair; renders the audio
-   progress ring, waveform, identity row, and the three overlay modals (reply, report, locked). */
+   progress ring, waveform, identity row, and the overlay modals (reply, actions, report, block, locked). */
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Platform,
   Pressable,
   Text,
-  TextInput,
   View,
   useWindowDimensions,
 } from 'react-native';
@@ -32,8 +31,6 @@ import {
   MoreHorizontal,
   Pause,
   RotateCcw,
-  Send,
-  X,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 
@@ -44,6 +41,10 @@ import { ageFromBirthdate } from '../lib/age';
 import type { FeedItem } from '../features/feed/types';
 import type { FeedPlayerControls, FeedPlayerSnapshot } from '../lib/feedPlayer';
 import Waveform from './Waveform';
+import ModalOverlay from './ModalOverlay';
+import ActionsSheet from '../features/moderation/components/ActionsSheet';
+import ReportSheet from '../features/moderation/components/ReportSheet';
+import BlockConfirmModal from '../features/moderation/components/BlockConfirmModal';
 
 interface ProfileCardProps {
   item: FeedItem;
@@ -207,56 +208,6 @@ function PlayGlyph({ size = 34, color = 'white' }: { size?: number; color?: stri
   );
 }
 
-/* ─── Helpers ──────────────────────────────────────────────────────────────── */
-
-function ModalOverlay({
-  visible,
-  onClose,
-  children,
-  centered = false,
-}: {
-  visible: boolean;
-  onClose: () => void;
-  children: React.ReactNode;
-  centered?: boolean;
-}) {
-  if (!visible) return null;
-
-  return (
-    <View
-      style={{
-        position: 'absolute',
-        top: 0, left: 0, right: 0, bottom: 0,
-        zIndex: 50,
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 16,
-        backgroundColor: 'rgba(45, 17, 54, 0.45)',
-      }}
-    >
-      <View
-        style={{
-          backgroundColor: 'white',
-          borderRadius: RADIUS.modal,
-          padding: 24,
-          width: '100%',
-          maxWidth: 384,
-          position: 'relative',
-          alignItems: centered ? 'center' : undefined,
-        }}
-      >
-        <Pressable
-          onPress={onClose}
-          style={{ position: 'absolute', top: 16, right: 16, padding: 8, zIndex: 10 }}
-        >
-          <X size={22} color={COLORS.textTertiary} />
-        </Pressable>
-        {children}
-      </View>
-    </View>
-  );
-}
-
 /* ─── ProfileCard ──────────────────────────────────────────────────────────── */
 
 const ProfileCard: React.FC<ProfileCardProps> = ({
@@ -276,8 +227,9 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
 
   const [hasListened, setHasListened] = useState(false);
   const [showReplyModal, setShowReplyModal] = useState(false);
-  const [showReportModal, setShowReportModal] = useState(false);
-  const [reportReason, setReportReason] = useState('');
+  const [showActionsSheet, setShowActionsSheet] = useState(false);
+  const [showReportSheet, setShowReportSheet] = useState(false);
+  const [showBlockConfirm, setShowBlockConfirm] = useState(false);
   const [showLockedModal, setShowLockedModal] = useState(false);
 
   const { isPlaying, positionMs, durationMs, isLoading, error } = snapshot;
@@ -719,7 +671,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
                   {item.displayName}, {displayAge}
                 </Text>
                 <Pressable
-                  onPress={() => setShowReportModal(true)}
+                  onPress={() => setShowActionsSheet(true)}
                   hitSlop={12}
                   style={{ padding: 4 }}
                 >
@@ -780,46 +732,6 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
         </Pressable>
       </ModalOverlay>
 
-      {/* ── Report Modal ────────────────────────────────────────────── */}
-      <ModalOverlay visible={showReportModal} onClose={() => setShowReportModal(false)}>
-        <Text style={{ fontSize: 20, fontFamily: FONT.bold, marginBottom: 16, color: COLORS.dark }}>{COPY.reportModal.title(item.displayName)}</Text>
-        <TextInput
-          value={reportReason}
-          onChangeText={setReportReason}
-          placeholder={COPY.reportModal.placeholder}
-          placeholderTextColor={COLORS.textTertiary}
-          multiline
-          style={{
-            width: '100%',
-            backgroundColor: COLORS.borderLight,
-            borderWidth: 1,
-            borderColor: COLORS.border,
-            borderRadius: RADIUS.input,
-            padding: 16,
-            color: COLORS.dark,
-            marginBottom: 12,
-            minHeight: 100,
-            textAlignVertical: 'top',
-          }}
-        />
-        <View style={{ backgroundColor: 'rgba(239,68,68,0.1)', borderWidth: 1, borderColor: 'rgba(239,68,68,0.15)', borderRadius: 12, padding: 12, marginBottom: 24 }}>
-          <Text style={{ color: '#dc2626', fontSize: 12 }}>
-            {COPY.reportModal.warning}
-          </Text>
-        </View>
-        <Pressable
-          // TODO(phase-6): wire real report submission to the reports table.
-          onPress={() => { setShowReportModal(false); setReportReason(''); }}
-          disabled={!reportReason.trim()}
-          style={{ opacity: reportReason.trim() ? 1 : 0.4 }}
-        >
-          <View style={{ backgroundColor: '#ef4444', borderRadius: RADIUS.cta, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-            <Send size={18} color="white" />
-            <Text style={{ color: 'white', fontFamily: FONT.bold }}>{COPY.reportModal.submit}</Text>
-          </View>
-        </Pressable>
-      </ModalOverlay>
-
       {/* ── Locked Modal ────────────────────────────────────────────── */}
       <ModalOverlay visible={showLockedModal} onClose={() => setShowLockedModal(false)} centered>
         <View style={{ width: 80, height: 80, backgroundColor: COLORS.primaryMuted, borderRadius: 40, alignItems: 'center', justifyContent: 'center', marginBottom: 20 }}>
@@ -845,6 +757,28 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
           <Text style={{ color: COLORS.textTertiary, fontFamily: FONT.medium }}>{COPY.common.later}</Text>
         </Pressable>
       </ModalOverlay>
+
+      <ActionsSheet
+        visible={showActionsSheet}
+        displayName={item.displayName}
+        onReport={() => { setShowActionsSheet(false); setShowReportSheet(true); }}
+        onBlock={() => { setShowActionsSheet(false); setShowBlockConfirm(true); }}
+        onClose={() => setShowActionsSheet(false)}
+      />
+      <ReportSheet
+        visible={showReportSheet}
+        displayName={item.displayName}
+        targetKind="voice"
+        targetId={item.voiceId}
+        targetUserId={item.userId}
+        onClose={() => setShowReportSheet(false)}
+      />
+      <BlockConfirmModal
+        visible={showBlockConfirm}
+        displayName={item.displayName}
+        blockedUserId={item.userId}
+        onClose={() => setShowBlockConfirm(false)}
+      />
     </View>
   );
 };

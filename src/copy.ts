@@ -225,12 +225,38 @@ export const COPY = {
     cta: 'Enregistrer ma réponse',
   },
 
-  reportModal: {
+  actionsSheet: {
+    title: (name: string) => `Que veux-tu faire avec ${name} ?`,
+    report: 'Signaler ce profil',
+    block: 'Bloquer ce profil',
+  },
+
+  reportSheet: {
     title: (name: string) => `Signaler ${name}`,
-    placeholder: 'Pourquoi signales-tu ce profil ?',
-    warning:
-      'Le signalement supprimera ce profil de ton fil et enverra un mail à la modération.',
+    subtitle: 'Choisis une raison.',
+    reasons: {
+      harassment: 'Harcèlement',
+      hate: 'Discours haineux',
+      inappropriate: 'Contenu inapproprié',
+      spam: 'Spam ou arnaque',
+      other: 'Autre',
+    },
+    freeTextPlaceholder: 'Donne-nous plus de contexte (facultatif)…',
     submit: 'Envoyer le signalement',
+    submitting: 'Envoi…',
+    error: 'Échec du signalement. Réessaie dans un instant.',
+    successTitle: 'Signalement reçu',
+    successBody: "Merci de protéger la communauté Lovoice. Notre équipe l'examinera rapidement.",
+    successCta: 'Compris',
+  },
+
+  blockModal: {
+    title: (name: string) => `Bloquer ${name} ?`,
+    body: (name: string) =>
+      `${name} ne pourra plus voir ta voix ni te contacter. Tu ne verras plus ses voix dans Découvrir.`,
+    confirm: 'Bloquer',
+    blocking: 'Blocage…',
+    error: 'Échec du blocage. Réessaie dans un instant.',
   },
 
   lockedModal: {
