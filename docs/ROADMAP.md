@@ -169,7 +169,7 @@ Cover these once on iOS and once on Android. Backend isn't touched — the SQL m
 1. Implement `like(voice_id)` / `unlike(voice_id)` mutations.
 2. Heart button in `ProfileCard` with optimistic update.
 3. SQL trigger on `likes` insert → insert into `notifications` with `kind='like'` (feeds push delivery in Phase 8 and the "received" tab of the Likes screen).
-4. Block flow from a long-press on the card or from a profile detail sheet. Confirmation modal.
+4. Block flow from the 3 dots button to the right of the username (we should propose here signal user AND block user). Confirmation modal.
 5. Report flow: list of reasons (harassment, hate, inappropriate, spam, other) + free text. Inserts a `reports` row with `status = 'pending'`.
 6. Filtering: feed query already excludes blocked users (already in §8). Verify likes/messages are blocked too.
 7. **Moderation backend primitives** (consumed by Phase 6.bis — no UI in the mobile app):
