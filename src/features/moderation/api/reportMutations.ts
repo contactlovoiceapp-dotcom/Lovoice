@@ -3,7 +3,10 @@
 import { useMutation, type UseMutationResult } from '@tanstack/react-query';
 
 import { getSupabaseClient } from '@/lib/supabase';
+import type { Database } from '@/types/database';
 import type { ReportInput } from '../types';
+
+type ReportInsertRow = Database['public']['Tables']['reports']['Insert'];
 
 export function useReportContent(): UseMutationResult<void, Error, ReportInput> {
   return useMutation<void, Error, ReportInput>({
@@ -21,30 +24,21 @@ export function useReportContent(): UseMutationResult<void, Error, ReportInput> 
       const uid = userData.user.id;
       const trimmedText = freeText.trim() || null;
 
-      let row: Record<string, string | null>;
+      // Build the row per targetKind: the reports table CHECK requires at least
+      // one of target_user_id / target_voice_id / target_message_id to be non-null.
+      const baseRow: ReportInsertRow = {
+        reporter_id: uid,
+        reason,
+        free_text: trimmedText,
+      };
 
+      let row: ReportInsertRow;
       if (targetKind === 'voice') {
-        row = {
-          reporter_id: uid,
-          target_voice_id: targetId,
-          target_user_id: targetUserId,
-          reason,
-          free_text: trimmedText,
-        };
+        row = { ...baseRow, target_voice_id: targetId, target_user_id: targetUserId };
       } else if (targetKind === 'message') {
-        row = {
-          reporter_id: uid,
-          target_message_id: targetId,
-          reason,
-          free_text: trimmedText,
-        };
+        row = { ...baseRow, target_message_id: targetId };
       } else {
-        row = {
-          reporter_id: uid,
-          target_user_id: targetId,
-          reason,
-          free_text: trimmedText,
-        };
+        row = { ...baseRow, target_user_id: targetId };
       }
 
       const { error } = await supabase.from('reports').insert(row);

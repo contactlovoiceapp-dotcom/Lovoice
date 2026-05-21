@@ -160,7 +160,7 @@ Cover these once on iOS and once on Android. Backend isn't touched — the SQL m
 
 ---
 
-## Phase 6 — Likes, blocks, reports (+ moderation backend)
+## Phase 6 — Likes, blocks, reports (+ moderation backend) 🟢
 
 **Goal**: users can like a voice, block a user, report a voice or a user. Like events appear in the recipient's Likes screen (received tab). The server-side moderation primitives that the back-office (Phase 6.bis) will consume are in place.
 

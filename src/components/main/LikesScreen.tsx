@@ -9,7 +9,6 @@ import { COPY } from '../../copy';
 
 type LikesSubTab = 'received' | 'given';
 
-// TODO(phase-6): wire useLikes / useLikedVoices queries.
 interface LikesScreenProfile {
   id: string;
   displayName: string;
