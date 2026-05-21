@@ -23,6 +23,8 @@ import { useActiveVoice } from '../../src/features/voices/api/voiceQueries';
 import { useHideSplash } from '../../src/lib/useHideSplash';
 import { useFeedItems } from '../../src/features/feed/api/feedQueries';
 import { useResetFeedSeen } from '../../src/features/feed/api/feedMutations';
+import { useLikedVoiceIds } from '../../src/features/likes/api/likeQueries';
+import { useLikeVoice, useUnlikeVoice } from '../../src/features/likes/api/likeMutations';
 import { useFeedSeenBatcher } from '../../src/features/feed/hooks/useFeedSeenBatcher';
 import { useFeedPlayer } from '../../src/lib/feedPlayer';
 import { ageFromBirthdate } from '../../src/lib/age';
@@ -138,6 +140,11 @@ export default function DiscoverScreen() {
   const { autoplay, setAutoplay, filters } = useFeedState();
 
   const feedQuery = useFeedItems(filters);
+
+  const likedVoiceIdsQuery = useLikedVoiceIds(profile?.id ?? null);
+  const likeVoice = useLikeVoice();
+  const unlikeVoice = useUnlikeVoice();
+  const likedIds = useMemo(() => likedVoiceIdsQuery.data ?? new Set<string>(), [likedVoiceIdsQuery.data]);
 
   // Flatten pages then apply client-side age filter per ARCHITECTURE.md §8.
   // Age is post-query because the SQL RPC doesn't expose server-side age bounds directly.
@@ -316,20 +323,29 @@ export default function DiscoverScreen() {
   );
 
   const renderProfileCard = useCallback(
-    ({ item, index }: { item: FeedItem; index: number }) => (
-      <View style={{ width: windowWidth, height: windowHeight }}>
-        <ProfileCard
-          item={item}
-          snapshot={index === activeIndex ? snapshot : INACTIVE_SNAPSHOT}
-          controls={index === activeIndex ? userControls : INACTIVE_CONTROLS}
-          hasRecordedVoice={hasRecordedVoice}
-          isLiked={false /* TODO(phase-6): wire useLiked(voiceId) */}
-          onToggleLike={() => undefined /* TODO(phase-6): wire useToggleLike */}
-          onRecordVoice={() => router.push('/(auth)/onboarding/record')}
-        />
-      </View>
-    ),
-    [windowWidth, windowHeight, activeIndex, snapshot, userControls, hasRecordedVoice, router],
+    ({ item, index }: { item: FeedItem; index: number }) => {
+      const isLiked = likedIds.has(item.voiceId);
+      return (
+        <View style={{ width: windowWidth, height: windowHeight }}>
+          <ProfileCard
+            item={item}
+            snapshot={index === activeIndex ? snapshot : INACTIVE_SNAPSHOT}
+            controls={index === activeIndex ? userControls : INACTIVE_CONTROLS}
+            hasRecordedVoice={hasRecordedVoice}
+            isLiked={isLiked}
+            onToggleLike={() => {
+              if (isLiked) {
+                unlikeVoice.mutate({ voiceId: item.voiceId });
+              } else {
+                likeVoice.mutate({ voiceId: item.voiceId, ownerId: item.userId });
+              }
+            }}
+            onRecordVoice={() => router.push('/(auth)/onboarding/record')}
+          />
+        </View>
+      );
+    },
+    [windowWidth, windowHeight, activeIndex, snapshot, userControls, hasRecordedVoice, router, likedIds, likeVoice, unlikeVoice],
   );
 
   // --- Loading state (initial fetch, no cached pages yet) ---
