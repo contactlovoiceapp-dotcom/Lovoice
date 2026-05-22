@@ -78,9 +78,18 @@ export function useReceivedLikes(): UseQueryResult<ReceivedLike[], Error> {
         throw new Error('likes.supabase_unavailable');
       }
 
+      const { data: userData } = await supabase.auth.getUser();
+      const uid = userData.user?.id;
+      if (!uid) {
+        throw new Error('likes.session_missing');
+      }
+
+      // RLS exposes both given and received likes; exclude rows where the
+      // authenticated user is the liker so only genuinely received likes remain.
       const { data, error } = await supabase
         .from('likes')
         .select('id, voice_id, created_at, liker:profiles!likes_liker_id_fkey(id, display_name, birthdate, city, bio_emojis)')
+        .neq('liker_id', uid)
         .order('created_at', { ascending: false })
         .limit(100);
 

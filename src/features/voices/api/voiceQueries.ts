@@ -1,4 +1,4 @@
-/* React Query hooks for reading the user's voice and resolving signed playback URLs. */
+/* React Query hooks for reading voices (active voice, member preview, signed playback URLs). */
 
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 
@@ -11,6 +11,8 @@ const SIGNED_URL_REFRESH_BUFFER_SECONDS = 60;
 export const voiceQueryKeys = {
   all: ['voices'] as const,
   active: (userId: string) => ['voices', 'active', userId] as const,
+  memberPreview: (userId: string, preferredVoiceId: string | null) =>
+    ['voices', 'member-preview', userId, preferredVoiceId] as const,
   signedUrl: (storagePath: string) => ['voices', 'signed-url', storagePath] as const,
 };
 
@@ -35,6 +37,34 @@ async function fetchActiveVoice(userId: string): Promise<VoiceRow | null> {
   return data;
 }
 
+/** Loads a context voice when known (likes screen), otherwise falls back to the member's active voice. */
+async function fetchVoiceForMemberPreview(userId: string, preferredVoiceId: string | null): Promise<VoiceRow | null> {
+  const supabase = getSupabaseClient();
+
+  if (!supabase) {
+    throw new Error('voice.supabase_unavailable');
+  }
+
+  if (preferredVoiceId) {
+    const preferred = await supabase
+      .from('voices')
+      .select('*')
+      .eq('id', preferredVoiceId)
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (preferred.error) {
+      throw new Error(preferred.error.message);
+    }
+
+    if (preferred.data) {
+      return preferred.data;
+    }
+  }
+
+  return fetchActiveVoice(userId);
+}
+
 export function useActiveVoice(userId: string | null | undefined): UseQueryResult<VoiceRow | null> {
   return useQuery({
     queryKey: userId ? voiceQueryKeys.active(userId) : ['voices', 'active', 'anonymous'],
@@ -46,6 +76,24 @@ export function useActiveVoice(userId: string | null | undefined): UseQueryResul
     },
     enabled: !!userId,
     staleTime: 1000 * 60 * 5,
+  });
+}
+
+export function useMemberVoicePreview(
+  userId: string | null,
+  preferredVoiceId: string | null,
+  enabled: boolean,
+): UseQueryResult<VoiceRow | null> {
+  return useQuery({
+    queryKey: userId ? voiceQueryKeys.memberPreview(userId, preferredVoiceId) : ['voices', 'member-preview', 'none'],
+    queryFn: () => {
+      if (!userId) {
+        return null;
+      }
+      return fetchVoiceForMemberPreview(userId, preferredVoiceId);
+    },
+    enabled: enabled && !!userId,
+    staleTime: 1000 * 60,
   });
 }
 

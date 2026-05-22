@@ -109,8 +109,21 @@ describe('useLikedVoiceIds', () => {
 // useReceivedLikes
 // ---------------------------------------------------------------------------
 
+function buildReceivedLikesChain(mockData: unknown[]) {
+  const chain: Record<string, jest.Mock> = {};
+  chain.from = jest.fn().mockReturnValue(chain);
+  chain.select = jest.fn().mockReturnValue(chain);
+  chain.neq = jest.fn().mockReturnValue(chain);
+  chain.order = jest.fn().mockReturnValue(chain);
+  chain.limit = jest.fn().mockResolvedValue({ data: mockData, error: null });
+  chain.auth = {
+    getUser: jest.fn().mockResolvedValue({ data: { user: { id: 'self-uid' } } }),
+  } as unknown as jest.Mock;
+  return chain;
+}
+
 describe('useReceivedLikes', () => {
-  it('maps the nested liker join correctly', async () => {
+  it('maps the nested liker join correctly and filters out own likes via neq', async () => {
     const mockData = [
       {
         id: 'like-1',
@@ -126,11 +139,7 @@ describe('useReceivedLikes', () => {
       },
     ];
 
-    const chain: Record<string, jest.Mock> = {};
-    chain.from = jest.fn().mockReturnValue(chain);
-    chain.select = jest.fn().mockReturnValue(chain);
-    chain.order = jest.fn().mockReturnValue(chain);
-    chain.limit = jest.fn().mockResolvedValue({ data: mockData, error: null });
+    const chain = buildReceivedLikesChain(mockData);
 
     const { getSupabaseClient } = jest.requireMock('@/lib/supabase') as {
       getSupabaseClient: jest.Mock;
@@ -142,6 +151,7 @@ describe('useReceivedLikes', () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
+    expect(chain.neq).toHaveBeenCalledWith('liker_id', 'self-uid');
     expect(result.current.data).toHaveLength(1);
     expect(result.current.data?.[0]).toEqual({
       likeId: 'like-1',
@@ -179,11 +189,7 @@ describe('useReceivedLikes', () => {
       },
     ];
 
-    const chain: Record<string, jest.Mock> = {};
-    chain.from = jest.fn().mockReturnValue(chain);
-    chain.select = jest.fn().mockReturnValue(chain);
-    chain.order = jest.fn().mockReturnValue(chain);
-    chain.limit = jest.fn().mockResolvedValue({ data: mockData, error: null });
+    const chain = buildReceivedLikesChain(mockData);
 
     const { getSupabaseClient } = jest.requireMock('@/lib/supabase') as {
       getSupabaseClient: jest.Mock;

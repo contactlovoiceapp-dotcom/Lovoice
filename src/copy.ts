@@ -246,7 +246,8 @@ export const COPY = {
     submitting: 'Envoi…',
     error: 'Échec du signalement. Réessaie dans un instant.',
     successTitle: 'Signalement reçu',
-    successBody: "Merci de protéger la communauté Lovoice. Notre équipe l'examinera rapidement.",
+    successBody:
+      "Merci de protéger la communauté Lovoice. Ce profil est aussi bloqué : tu ne le verras plus dans Découvrir ni dans tes likes. Notre équipe examinera le signalement.",
     successCta: 'Compris',
   },
 
@@ -278,7 +279,8 @@ export const COPY = {
     receivedTab: 'Reçus',
     givenTab: 'Donnés',
     receivedBadge: 'A aimé ta voix',
-    receivedAction: 'Découvrir son profil',
+    tapCardHint: 'Voir le profil',
+    openProfileHint: 'Ouvre la fiche profil',
     givenEmptyTitle: 'Aucun like donné',
     givenEmptyBody: "Découvre de nouvelles Voix et like celles qui te plaisent !",
     receivedEmptyTitle: 'Aucun like reçu',
@@ -289,6 +291,11 @@ export const COPY = {
       'Retrouve tous tes likes ici.',
       'Réponds quand tu te sens inspiré·e — pas de pression.',
     ] as const,
+  },
+
+  memberProfilePreview: {
+    error: 'Impossible de charger ce profil.',
+    closeA11y: 'Fermer le profil',
   },
 
   likeToast: {

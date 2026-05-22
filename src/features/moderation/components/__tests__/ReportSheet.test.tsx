@@ -82,7 +82,8 @@ describe('ReportSheet', () => {
   });
 
   it('shows success state after successful submission', async () => {
-    const insertMock = jest.fn().mockResolvedValue({ error: null });
+    const insertReports = jest.fn().mockResolvedValue({ error: null });
+    const insertBlocks = jest.fn().mockResolvedValue({ error: null });
     const { getSupabaseClient } = jest.requireMock('@/lib/supabase') as {
       getSupabaseClient: jest.Mock;
     };
@@ -90,7 +91,11 @@ describe('ReportSheet', () => {
       auth: {
         getUser: jest.fn().mockResolvedValue({ data: { user: { id: 'me' } } }),
       },
-      from: jest.fn().mockReturnValue({ insert: insertMock }),
+      from: jest.fn((table: string) => {
+        if (table === 'reports') return { insert: insertReports };
+        if (table === 'blocks') return { insert: insertBlocks };
+        return { insert: jest.fn().mockResolvedValue({ error: null }) };
+      }),
     });
 
     const queryClient = makeQueryClient();

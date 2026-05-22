@@ -47,6 +47,12 @@ describe('voiceQueryKeys', () => {
   it('namespaces all keys under "voices"', () => {
     expect(voiceQueryKeys.all).toEqual(['voices']);
     expect(voiceQueryKeys.active('user-1')).toEqual(['voices', 'active', 'user-1']);
+    expect(voiceQueryKeys.memberPreview('user-1', 'voice-x')).toEqual([
+      'voices',
+      'member-preview',
+      'user-1',
+      'voice-x',
+    ]);
     expect(voiceQueryKeys.signedUrl('path')).toEqual(['voices', 'signed-url', 'path']);
   });
 });

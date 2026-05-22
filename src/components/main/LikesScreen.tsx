@@ -2,15 +2,20 @@
 
 import React, { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
-import { Heart, Sparkles, User } from 'lucide-react-native';
+import { Heart, Sparkles } from 'lucide-react-native';
 
 import { COLORS, FONT, RADIUS, SHADOW } from '../../theme';
 import { COPY } from '../../copy';
 
 type LikesSubTab = 'received' | 'given';
 
-interface LikesScreenProfile {
-  id: string;
+export interface LikesScreenProfile {
+  /** Stable row key (like id). */
+  rowKey: string;
+  /** Profile owner user id — opens member preview. */
+  userId: string;
+  /** Voice shown in preview when relevant (likes context). */
+  voiceId: string | null;
   displayName: string;
   age: number;
   city: string;
@@ -20,8 +25,7 @@ interface LikesScreenProfile {
 interface LikesScreenProps {
   likedProfiles: LikesScreenProfile[];
   receivedLikeProfiles: LikesScreenProfile[];
-  onUnlike: (id: string) => void;
-  onOpenReceivedLike: (id: string) => void;
+  onOpenProfile: (userId: string, voiceId: string | null) => void;
 }
 
 function EmptyState({
@@ -153,8 +157,7 @@ function ProfileMeta({ profile }: { profile: LikesScreenProfile }) {
 const LikesScreen: React.FC<LikesScreenProps> = ({
   likedProfiles,
   receivedLikeProfiles,
-  onUnlike,
-  onOpenReceivedLike,
+  onOpenProfile,
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<LikesSubTab>('received');
 
@@ -224,8 +227,11 @@ const LikesScreen: React.FC<LikesScreenProps> = ({
         receivedLikeProfiles.length > 0 ? (
           <View style={{ flexDirection: 'column', gap: 10 }}>
             {receivedLikeProfiles.map((profile) => (
-              <View
-                key={profile.id}
+              <Pressable
+                key={profile.rowKey}
+                accessibilityRole="button"
+                accessibilityHint={COPY.likesScreen.openProfileHint}
+                onPress={() => onOpenProfile(profile.userId, profile.voiceId)}
                 style={{
                   flexDirection: 'column',
                   gap: 12,
@@ -257,26 +263,10 @@ const LikesScreen: React.FC<LikesScreenProps> = ({
                   </View>
                   <ProfileMeta profile={profile} />
                 </View>
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={() => onOpenReceivedLike(profile.id)}
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 6,
-                    borderRadius: RADIUS.full,
-                    backgroundColor: COLORS.primary,
-                    paddingHorizontal: 12,
-                    paddingVertical: 9,
-                    alignSelf: 'flex-start',
-                  }}
-                >
-                  <User size={16} color={COLORS.surface} />
-                  <Text style={{ fontFamily: FONT.bold, fontSize: 13, color: COLORS.surface }}>
-                    {COPY.likesScreen.receivedAction}
-                  </Text>
-                </Pressable>
-              </View>
+                <Text style={{ fontFamily: FONT.medium, fontSize: 13, color: COLORS.primary }}>
+                  {COPY.likesScreen.tapCardHint}
+                </Text>
+              </Pressable>
             ))}
           </View>
         ) : (
@@ -289,8 +279,11 @@ const LikesScreen: React.FC<LikesScreenProps> = ({
       ) : likedProfiles.length > 0 ? (
         <View style={{ flexDirection: 'column', gap: 10 }}>
           {likedProfiles.map((profile) => (
-            <View
-              key={profile.id}
+            <Pressable
+              key={profile.rowKey}
+              accessibilityRole="button"
+              accessibilityHint={COPY.likesScreen.openProfileHint}
+              onPress={() => onOpenProfile(profile.userId, profile.voiceId)}
               style={{
                 flexDirection: 'row',
                 alignItems: 'center',
@@ -303,16 +296,24 @@ const LikesScreen: React.FC<LikesScreenProps> = ({
                 ...SHADOW.card,
               }}
             >
-              <View style={{ flex: 1 }}>
+              <View style={{ flex: 1, paddingRight: 12 }}>
                 <Text style={{ fontFamily: FONT.semibold, fontSize: 16, color: COLORS.dark }}>
                   {profile.displayName}, {profile.age}
                 </Text>
                 <ProfileMeta profile={profile} />
+                <Text style={{ fontFamily: FONT.medium, fontSize: 13, color: COLORS.primary, marginTop: 8 }}>
+                  {COPY.likesScreen.tapCardHint}
+                </Text>
               </View>
-              <Pressable onPress={() => onUnlike(profile.id)} hitSlop={10} style={{ padding: 8 }}>
+              <View
+                accessibilityElementsHidden
+                importantForAccessibility="no-hide-descendants"
+                pointerEvents="none"
+                style={{ opacity: 0.85 }}
+              >
                 <Heart size={22} color="#ef4444" fill="#ef4444" />
-              </Pressable>
-            </View>
+              </View>
+            </Pressable>
           ))}
         </View>
       ) : (
