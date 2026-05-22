@@ -9,10 +9,12 @@ import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 
 import { RADIUS } from '../theme';
 import { COPY } from '../copy';
+import { useUnseenLikesCount } from '../features/likes/hooks/useUnseenLikes';
 
 const ICON_SIZE = 22;
 const PILL_HEIGHT = 64;
 const ITEM_WIDTH = 56;
+const BADGE_SIZE = 9;
 
 const TAB_CONFIG: { key: string; label: string; icon: LucideIcon }[] = [
   { key: 'discover', label: COPY.nav.discover, icon: Compass },
@@ -25,11 +27,13 @@ function TabItem({
   label,
   icon: Icon,
   isActive,
+  showBadge,
   onPress,
 }: {
   label: string;
   icon: LucideIcon;
   isActive: boolean;
+  showBadge?: boolean;
   onPress: () => void;
 }) {
   return (
@@ -48,17 +52,35 @@ function TabItem({
         backgroundColor: isActive ? 'rgba(255,255,255,0.12)' : 'transparent',
       }}
     >
-      <Icon
-        size={ICON_SIZE}
-        strokeWidth={isActive ? 2.4 : 1.8}
-        color={isActive ? '#ffffff' : 'rgba(255,255,255,0.65)'}
-      />
+      <View>
+        <Icon
+          size={ICON_SIZE}
+          strokeWidth={isActive ? 2.4 : 1.8}
+          color={isActive ? '#ffffff' : 'rgba(255,255,255,0.65)'}
+        />
+        {showBadge && (
+          <View
+            style={{
+              position: 'absolute',
+              top: -2,
+              right: -3,
+              width: BADGE_SIZE,
+              height: BADGE_SIZE,
+              borderRadius: BADGE_SIZE / 2,
+              backgroundColor: '#ef4444',
+              borderWidth: 1.5,
+              borderColor: 'rgba(45,17,54,0.85)',
+            }}
+          />
+        )}
+      </View>
     </Pressable>
   );
 }
 
 const BottomNav: React.FC<BottomTabBarProps> = ({ state, navigation }) => {
   const insets = useSafeAreaInsets();
+  const unseenLikesCount = useUnseenLikesCount();
 
   return (
     <View
@@ -96,6 +118,7 @@ const BottomNav: React.FC<BottomTabBarProps> = ({ state, navigation }) => {
             label={tab.label}
             icon={tab.icon}
             isActive={state.index === index}
+            showBadge={tab.key === 'likes' && unseenLikesCount > 0}
             onPress={() => navigation.navigate(state.routes[index].name)}
           />
         ))}

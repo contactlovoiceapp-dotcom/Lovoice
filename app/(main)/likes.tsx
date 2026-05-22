@@ -3,22 +3,32 @@
 import React, { useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import MemberProfileModal from '@/features/profile/components/MemberProfileModal';
 import { COLORS } from '../../src/theme';
 import { ageFromBirthdate } from '../../src/lib/age';
 import { useReceivedLikes, useGivenLikes } from '../../src/features/likes/api/likeQueries';
+import { useMarkLikesSeen } from '../../src/features/likes/hooks/useUnseenLikes';
 import LikesScreen from '../../src/components/main/LikesScreen';
 
 export default function LikesRoute() {
   const insets = useSafeAreaInsets();
   const [memberPreview, setMemberPreview] = useState<{ userId: string; voiceId: string | null } | null>(null);
+  const markSeen = useMarkLikesSeen();
 
   const receivedQuery = useReceivedLikes();
   const givenQuery = useGivenLikes();
 
   const isLoading = receivedQuery.isLoading || givenQuery.isLoading;
+
+  // Mark received likes as seen whenever this tab gains focus.
+  useFocusEffect(
+    React.useCallback(() => {
+      markSeen();
+    }, [markSeen]),
+  );
 
   if (receivedQuery.isError) {
     console.warn('[LikesRoute] receivedLikes error:', receivedQuery.error);
