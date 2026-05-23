@@ -1,5 +1,4 @@
-/* Auto-generated Supabase types - DO NOT EDIT MANUALLY.
-   Regenerate with: supabase gen types typescript --linked > src/types/database.ts */
+// NOTE: regenerate with 'npx supabase gen types typescript --linked' whenever a migration ships.
 export type Json =
   | string
   | number
@@ -574,6 +573,44 @@ export type Database = {
       }
     }
     Views: {
+      pending_reports: {
+        Row: {
+          report_id: string
+          reason: string
+          free_text: string | null
+          report_created_at: string
+          target_kind: string
+          reporter_id: string
+          reporter_display_name: string
+          reporter_gender: string
+          reporter_birthdate: string
+          reporter_country: string
+          reporter_city: string
+          author_id: string | null
+          author_display_name: string | null
+          author_gender: string | null
+          author_birthdate: string | null
+          author_country: string | null
+          author_city: string | null
+          author_is_banned: boolean | null
+          voice_id: string | null
+          voice_storage_path: string | null
+          voice_duration_ms: number | null
+          voice_title: string | null
+          voice_status: string | null
+          voice_theme: string | null
+          voice_created_at: string | null
+          message_id: string | null
+          message_conversation_id: string | null
+          message_kind: string | null
+          message_body_text: string | null
+          message_voice_path: string | null
+          message_voice_duration_ms: number | null
+          message_status: string | null
+          message_created_at: string | null
+        }
+        Relationships: []
+      }
       geography_columns: {
         Row: {
           coord_dimension: number | null
@@ -888,6 +925,10 @@ export type Database = {
         Returns: Database["public"]["Tables"]["voices"]["Row"][]
       }
       is_admin: { Args: never; Returns: boolean }
+      is_admin_email: {
+        Args: { p_email: string }
+        Returns: boolean
+      }
       longtransactionsenabled: { Args: never; Returns: boolean }
       update_own_voice: {
         Args: {
@@ -897,12 +938,10 @@ export type Database = {
         }
         Returns: Database["public"]["Tables"]["voices"]["Row"][]
       }
-      // TODO(any-phase): regenerate via `npx supabase gen types typescript --linked` after pushing the delete_own_voice migration.
       delete_own_voice: {
         Args: { p_voice_id: string }
         Returns: number
       }
-      // TODO(any-phase): regenerate via `npx supabase gen types typescript --linked` after pushing the get_feed migration.
       get_feed: {
         Args: {
           p_distance_m?: number | null
