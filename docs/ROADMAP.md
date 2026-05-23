@@ -198,7 +198,7 @@ Cover these once on iOS and once on Android. Backend isn't touched — the SQL m
 
 ---
 
-## Phase 6.bis — Admin back-office (companion Next.js web app)
+## Phase 6.bis — Admin back-office (companion Next.js web app) 🟢
 
 **Goal**: the operator (non-technical) can triage reports, take down content, and ban users from a clean web interface — no SQL, no Supabase Studio.
 
