@@ -99,8 +99,18 @@ export function useReceivedLikes(): UseQueryResult<ReceivedLike[], Error> {
 
       const rows = (data ?? []) as unknown as RawReceivedLikeRow[];
 
+      // One card per liker: keep only the most recent like when someone liked
+      // multiple voices (rows are already sorted descending by created_at).
+      const seenLikerIds = new Set<string>();
+
       return rows
         .filter((row) => row.liker !== null)
+        .filter((row) => {
+          const liker = row.liker as NonNullable<RawReceivedLikeRow['liker']>;
+          if (seenLikerIds.has(liker.id)) return false;
+          seenLikerIds.add(liker.id);
+          return true;
+        })
         .map((row): ReceivedLike => {
           const liker = row.liker as NonNullable<RawReceivedLikeRow['liker']>;
           return {
@@ -130,6 +140,12 @@ export function useGivenLikes(): UseQueryResult<GivenLike[], Error> {
         throw new Error('likes.supabase_unavailable');
       }
 
+      const { data: userData } = await supabase.auth.getUser();
+      const uid = userData.user?.id;
+      if (!uid) {
+        throw new Error('likes.session_missing');
+      }
+
       const { data, error } = await supabase
         .from('likes')
         .select('id, voice_id, created_at, voice:voices!likes_voice_id_fkey(user_id, author:profiles!voices_user_id_fkey(id, display_name, birthdate, city, bio_emojis))')
@@ -144,6 +160,8 @@ export function useGivenLikes(): UseQueryResult<GivenLike[], Error> {
 
       return rows
         .filter((row) => row.voice !== null && row.voice.author !== null)
+        // Exclude self-likes: guard against stale DB rows where the user liked their own voice.
+        .filter((row) => (row.voice as NonNullable<RawGivenLikeRow['voice']>).user_id !== uid)
         .map((row): GivenLike => {
           const voice = row.voice as NonNullable<RawGivenLikeRow['voice']>;
           const author = voice.author as NonNullable<NonNullable<RawGivenLikeRow['voice']>['author']>;

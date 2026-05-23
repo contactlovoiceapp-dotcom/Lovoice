@@ -210,6 +210,20 @@ describe('useReceivedLikes', () => {
 // useGivenLikes
 // ---------------------------------------------------------------------------
 
+const SELF_UID = 'self-uid';
+
+function buildGivenLikesChain(mockData: unknown[]) {
+  const chain: Record<string, jest.Mock> = {};
+  chain.from = jest.fn().mockReturnValue(chain);
+  chain.select = jest.fn().mockReturnValue(chain);
+  chain.order = jest.fn().mockReturnValue(chain);
+  chain.limit = jest.fn().mockResolvedValue({ data: mockData, error: null });
+  chain.auth = {
+    getUser: jest.fn().mockResolvedValue({ data: { user: { id: SELF_UID } } }),
+  } as unknown as jest.Mock;
+  return chain;
+}
+
 describe('useGivenLikes', () => {
   it('maps the doubly-nested voice.author join correctly', async () => {
     const mockData = [
@@ -230,11 +244,7 @@ describe('useGivenLikes', () => {
       },
     ];
 
-    const chain: Record<string, jest.Mock> = {};
-    chain.from = jest.fn().mockReturnValue(chain);
-    chain.select = jest.fn().mockReturnValue(chain);
-    chain.order = jest.fn().mockReturnValue(chain);
-    chain.limit = jest.fn().mockResolvedValue({ data: mockData, error: null });
+    const chain = buildGivenLikesChain(mockData);
 
     const { getSupabaseClient } = jest.requireMock('@/lib/supabase') as {
       getSupabaseClient: jest.Mock;
@@ -295,11 +305,7 @@ describe('useGivenLikes', () => {
       },
     ];
 
-    const chain: Record<string, jest.Mock> = {};
-    chain.from = jest.fn().mockReturnValue(chain);
-    chain.select = jest.fn().mockReturnValue(chain);
-    chain.order = jest.fn().mockReturnValue(chain);
-    chain.limit = jest.fn().mockResolvedValue({ data: mockData, error: null });
+    const chain = buildGivenLikesChain(mockData);
 
     const { getSupabaseClient } = jest.requireMock('@/lib/supabase') as {
       getSupabaseClient: jest.Mock;
@@ -313,5 +319,55 @@ describe('useGivenLikes', () => {
 
     expect(result.current.data).toHaveLength(1);
     expect(result.current.data?.[0].likeId).toBe('like-g4');
+  });
+
+  it('excludes self-likes (voice owned by current user)', async () => {
+    const mockData = [
+      {
+        id: 'like-self',
+        voice_id: 'voice-own',
+        created_at: '2026-02-05T00:00:00Z',
+        voice: {
+          user_id: SELF_UID,
+          author: {
+            id: SELF_UID,
+            display_name: 'Moi',
+            birthdate: '1990-01-01',
+            city: 'Paris',
+            bio_emojis: [],
+          },
+        },
+      },
+      {
+        id: 'like-other',
+        voice_id: 'voice-other',
+        created_at: '2026-02-06T00:00:00Z',
+        voice: {
+          user_id: 'user-other',
+          author: {
+            id: 'user-other',
+            display_name: 'Eve',
+            birthdate: '1995-05-20',
+            city: 'Nice',
+            bio_emojis: ['☀️'],
+          },
+        },
+      },
+    ];
+
+    const chain = buildGivenLikesChain(mockData);
+
+    const { getSupabaseClient } = jest.requireMock('@/lib/supabase') as {
+      getSupabaseClient: jest.Mock;
+    };
+    getSupabaseClient.mockReturnValue(chain);
+
+    const queryClient = makeQueryClient();
+    const { result } = renderHook(useGivenLikes, { wrapper: makeWrapper(queryClient) });
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true));
+
+    expect(result.current.data).toHaveLength(1);
+    expect(result.current.data?.[0].likeId).toBe('like-other');
   });
 });
