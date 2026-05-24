@@ -134,26 +134,39 @@ export type Database = {
       conversations: {
         Row: {
           created_at: string
+          first_reply_at: string | null
           id: string
+          initiator_id: string
           last_message_at: string | null
           user_a: string
           user_b: string
         }
         Insert: {
           created_at?: string
+          first_reply_at?: string | null
           id?: string
+          initiator_id: string
           last_message_at?: string | null
           user_a: string
           user_b: string
         }
         Update: {
           created_at?: string
+          first_reply_at?: string | null
           id?: string
+          initiator_id?: string
           last_message_at?: string | null
           user_a?: string
           user_b?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "conversations_initiator_id_fkey"
+            columns: ["initiator_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "conversations_user_a_fkey"
             columns: ["user_a"]
@@ -901,6 +914,11 @@ export type Database = {
       delete_own_voice: {
         Args: { p_voice_id: string }
         Returns: number
+      }
+      // TODO(any-phase): regenerate via `npx supabase gen types typescript --linked` after pushing the phase 7 messaging migration.
+      start_conversation: {
+        Args: { p_other_user_id: string }
+        Returns: Database["public"]["Tables"]["conversations"]["Row"][]
       }
       // TODO(any-phase): regenerate via `npx supabase gen types typescript --linked` after pushing the get_feed migration.
       get_feed: {
