@@ -49,9 +49,9 @@ async function fetchFeedPage(
   }
 
   const { data, error } = await supabase.rpc('get_feed', {
-    p_distance_m: filters.maxDistanceMeters,
+    p_distance_m: filters.maxDistanceMeters ?? undefined,
     p_limit: PAGE_SIZE,
-    p_cursor_created_at: cursor,
+    p_cursor_created_at: cursor ?? undefined,
   });
 
   if (error) {

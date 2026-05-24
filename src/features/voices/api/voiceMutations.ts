@@ -129,8 +129,9 @@ export function useUpdateVoice(): UseMutationResult<VoiceRow, Error, UpdateVoice
 
       const { data, error } = await supabase.rpc('update_own_voice', {
         p_voice_id: input.voiceId,
-        p_title: input.title ?? null,
-        p_theme: input.theme ?? null,
+        // Supabase type generator omits DEFAULT NULL — cast to satisfy the strict signature.
+        p_title: (input.title ?? null) as string,
+        p_theme: (input.theme ?? null) as string,
       });
 
       if (error) {

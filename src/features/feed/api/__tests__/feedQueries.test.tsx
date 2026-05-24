@@ -71,9 +71,9 @@ describe('useFeedItems', () => {
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
     expect(rpc).toHaveBeenCalledWith('get_feed', {
-      p_distance_m: null,
+      p_distance_m: undefined,
       p_limit: 20,
-      p_cursor_created_at: null,
+      p_cursor_created_at: undefined,
     });
   });
 

@@ -1,4 +1,3 @@
-// NOTE: regenerate with 'npx supabase gen types typescript --linked' whenever a migration ships.
 export type Json =
   | string
   | number
@@ -118,8 +117,22 @@ export type Database = {
             foreignKeyName: "blocks_blocked_id_fkey"
             columns: ["blocked_id"]
             isOneToOne: false
+            referencedRelation: "pending_reports"
+            referencedColumns: ["reporter_id"]
+          },
+          {
+            foreignKeyName: "blocks_blocked_id_fkey"
+            columns: ["blocked_id"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "blocks_blocker_id_fkey"
+            columns: ["blocker_id"]
+            isOneToOne: false
+            referencedRelation: "pending_reports"
+            referencedColumns: ["reporter_id"]
           },
           {
             foreignKeyName: "blocks_blocker_id_fkey"
@@ -163,6 +176,13 @@ export type Database = {
             foreignKeyName: "conversations_initiator_id_fkey"
             columns: ["initiator_id"]
             isOneToOne: false
+            referencedRelation: "pending_reports"
+            referencedColumns: ["reporter_id"]
+          },
+          {
+            foreignKeyName: "conversations_initiator_id_fkey"
+            columns: ["initiator_id"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
@@ -170,8 +190,22 @@ export type Database = {
             foreignKeyName: "conversations_user_a_fkey"
             columns: ["user_a"]
             isOneToOne: false
+            referencedRelation: "pending_reports"
+            referencedColumns: ["reporter_id"]
+          },
+          {
+            foreignKeyName: "conversations_user_a_fkey"
+            columns: ["user_a"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_user_b_fkey"
+            columns: ["user_b"]
+            isOneToOne: false
+            referencedRelation: "pending_reports"
+            referencedColumns: ["reporter_id"]
           },
           {
             foreignKeyName: "conversations_user_b_fkey"
@@ -203,8 +237,22 @@ export type Database = {
             foreignKeyName: "feed_seen_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
+            referencedRelation: "pending_reports"
+            referencedColumns: ["reporter_id"]
+          },
+          {
+            foreignKeyName: "feed_seen_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "feed_seen_voice_id_fkey"
+            columns: ["voice_id"]
+            isOneToOne: false
+            referencedRelation: "pending_reports"
+            referencedColumns: ["voice_id"]
           },
           {
             foreignKeyName: "feed_seen_voice_id_fkey"
@@ -239,8 +287,22 @@ export type Database = {
             foreignKeyName: "likes_liker_id_fkey"
             columns: ["liker_id"]
             isOneToOne: false
+            referencedRelation: "pending_reports"
+            referencedColumns: ["reporter_id"]
+          },
+          {
+            foreignKeyName: "likes_liker_id_fkey"
+            columns: ["liker_id"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "likes_voice_id_fkey"
+            columns: ["voice_id"]
+            isOneToOne: false
+            referencedRelation: "pending_reports"
+            referencedColumns: ["voice_id"]
           },
           {
             foreignKeyName: "likes_voice_id_fkey"
@@ -300,6 +362,13 @@ export type Database = {
             foreignKeyName: "messages_sender_id_fkey"
             columns: ["sender_id"]
             isOneToOne: false
+            referencedRelation: "pending_reports"
+            referencedColumns: ["reporter_id"]
+          },
+          {
+            foreignKeyName: "messages_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
@@ -338,8 +407,22 @@ export type Database = {
             foreignKeyName: "notifications_actor_id_fkey"
             columns: ["actor_id"]
             isOneToOne: false
+            referencedRelation: "pending_reports"
+            referencedColumns: ["reporter_id"]
+          },
+          {
+            foreignKeyName: "notifications_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "pending_reports"
+            referencedColumns: ["reporter_id"]
           },
           {
             foreignKeyName: "notifications_user_id_fkey"
@@ -467,6 +550,13 @@ export type Database = {
             foreignKeyName: "reports_reporter_id_fkey"
             columns: ["reporter_id"]
             isOneToOne: false
+            referencedRelation: "pending_reports"
+            referencedColumns: ["reporter_id"]
+          },
+          {
+            foreignKeyName: "reports_reporter_id_fkey"
+            columns: ["reporter_id"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
@@ -485,11 +575,32 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "reports_target_message_id_fkey"
+            columns: ["target_message_id"]
+            isOneToOne: false
+            referencedRelation: "pending_reports"
+            referencedColumns: ["message_id"]
+          },
+          {
+            foreignKeyName: "reports_target_user_id_fkey"
+            columns: ["target_user_id"]
+            isOneToOne: false
+            referencedRelation: "pending_reports"
+            referencedColumns: ["reporter_id"]
+          },
+          {
             foreignKeyName: "reports_target_user_id_fkey"
             columns: ["target_user_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reports_target_voice_id_fkey"
+            columns: ["target_voice_id"]
+            isOneToOne: false
+            referencedRelation: "pending_reports"
+            referencedColumns: ["voice_id"]
           },
           {
             foreignKeyName: "reports_target_voice_id_fkey"
@@ -579,6 +690,13 @@ export type Database = {
             foreignKeyName: "voices_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
+            referencedRelation: "pending_reports"
+            referencedColumns: ["reporter_id"]
+          },
+          {
+            foreignKeyName: "voices_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
@@ -586,44 +704,6 @@ export type Database = {
       }
     }
     Views: {
-      pending_reports: {
-        Row: {
-          report_id: string
-          reason: string
-          free_text: string | null
-          report_created_at: string
-          target_kind: string
-          reporter_id: string
-          reporter_display_name: string
-          reporter_gender: string
-          reporter_birthdate: string
-          reporter_country: string
-          reporter_city: string
-          author_id: string | null
-          author_display_name: string | null
-          author_gender: string | null
-          author_birthdate: string | null
-          author_country: string | null
-          author_city: string | null
-          author_is_banned: boolean | null
-          voice_id: string | null
-          voice_storage_path: string | null
-          voice_duration_ms: number | null
-          voice_title: string | null
-          voice_status: string | null
-          voice_theme: string | null
-          voice_created_at: string | null
-          message_id: string | null
-          message_conversation_id: string | null
-          message_kind: string | null
-          message_body_text: string | null
-          message_voice_path: string | null
-          message_voice_duration_ms: number | null
-          message_status: string | null
-          message_created_at: string | null
-        }
-        Relationships: []
-      }
       geography_columns: {
         Row: {
           coord_dimension: number | null
@@ -665,6 +745,52 @@ export type Database = {
           type?: string | null
         }
         Relationships: []
+      }
+      pending_reports: {
+        Row: {
+          author_birthdate: string | null
+          author_city: string | null
+          author_country: string | null
+          author_display_name: string | null
+          author_gender: string | null
+          author_id: string | null
+          author_is_banned: boolean | null
+          free_text: string | null
+          message_body_text: string | null
+          message_conversation_id: string | null
+          message_created_at: string | null
+          message_id: string | null
+          message_kind: string | null
+          message_status: string | null
+          message_voice_duration_ms: number | null
+          message_voice_path: string | null
+          reason: string | null
+          report_created_at: string | null
+          report_id: string | null
+          reporter_birthdate: string | null
+          reporter_city: string | null
+          reporter_country: string | null
+          reporter_display_name: string | null
+          reporter_gender: string | null
+          reporter_id: string | null
+          target_kind: string | null
+          voice_created_at: string | null
+          voice_duration_ms: number | null
+          voice_id: string | null
+          voice_status: string | null
+          voice_storage_path: string | null
+          voice_theme: string | null
+          voice_title: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_conversation_id_fkey"
+            columns: ["message_conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Functions: {
@@ -795,6 +921,36 @@ export type Database = {
             }
             Returns: string
           }
+      commit_voice_upload: {
+        Args: {
+          p_duration_ms: number
+          p_prompt_id: string
+          p_storage_path: string
+          p_theme: string
+          p_title: string
+        }
+        Returns: {
+          created_at: string
+          duration_ms: number
+          id: string
+          is_active: boolean
+          moderation_reason: string | null
+          prompt_id: string | null
+          status: string
+          storage_path: string
+          theme: string | null
+          title: string | null
+          transcript: string | null
+          user_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "voices"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      delete_own_voice: { Args: { p_voice_id: string }; Returns: number }
       disablelongtransactions: { Args: never; Returns: string }
       dropgeometrycolumn:
         | {
@@ -926,64 +1082,31 @@ export type Database = {
         Returns: boolean
       }
       geomfromewkt: { Args: { "": string }; Returns: unknown }
-      gettransactionid: { Args: never; Returns: unknown }
-      commit_voice_upload: {
-        Args: {
-          p_storage_path: string
-          p_duration_ms: number
-          p_prompt_id: string | null
-          p_title: string | null
-          p_theme: string | null
-        }
-        Returns: Database["public"]["Tables"]["voices"]["Row"][]
-      }
-      is_admin: { Args: never; Returns: boolean }
-      is_admin_email: {
-        Args: { p_email: string }
-        Returns: boolean
-      }
-      longtransactionsenabled: { Args: never; Returns: boolean }
-      update_own_voice: {
-        Args: {
-          p_voice_id: string
-          p_title: string | null
-          p_theme: string | null
-        }
-        Returns: Database["public"]["Tables"]["voices"]["Row"][]
-      }
-      delete_own_voice: {
-        Args: { p_voice_id: string }
-        Returns: number
-      }
-      start_conversation: {
-        Args: { p_other_user_id: string }
-        Returns: Database["public"]["Tables"]["conversations"]["Row"][]
-      }
       get_feed: {
         Args: {
-          p_distance_m?: number | null
+          p_cursor_created_at?: string
+          p_distance_m?: number
           p_limit?: number
-          p_cursor_created_at?: string | null
         }
         Returns: {
-          voice_id: string
-          storage_path: string
-          duration_ms: number
-          theme: string | null
-          title: string | null
-          prompt_body: string | null
-          created_at: string
-          user_id: string
-          display_name: string
+          bio_emojis: string[]
           birthdate: string
           city: string
-          bio_emojis: string[]
+          created_at: string
+          display_name: string
+          duration_ms: number
+          prompt_body: string
+          storage_path: string
+          theme: string
+          title: string
+          user_id: string
+          voice_id: string
         }[]
       }
-      reset_feed_seen: {
-        Args: Record<string, never>
-        Returns: undefined
-      }
+      gettransactionid: { Args: never; Returns: unknown }
+      is_admin: { Args: never; Returns: boolean }
+      is_admin_email: { Args: { p_email: string }; Returns: boolean }
+      longtransactionsenabled: { Args: never; Returns: boolean }
       populate_geometry_columns:
         | { Args: { tbl_oid: unknown; use_typmod?: boolean }; Returns: number }
         | { Args: { use_typmod?: boolean }; Returns: string }
@@ -1024,6 +1147,7 @@ export type Database = {
       }
       postgis_version: { Args: never; Returns: string }
       postgis_wagyu_version: { Args: never; Returns: string }
+      reset_feed_seen: { Args: never; Returns: undefined }
       st_3dclosestpoint: {
         Args: { geom1: unknown; geom2: unknown }
         Returns: unknown
@@ -1605,7 +1729,48 @@ export type Database = {
         Args: { geom: unknown; move: number; wrap: number }
         Returns: unknown
       }
+      start_conversation: {
+        Args: { p_other_user_id: string }
+        Returns: {
+          created_at: string
+          first_reply_at: string | null
+          id: string
+          initiator_id: string
+          last_message_at: string | null
+          user_a: string
+          user_b: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "conversations"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       unlockrows: { Args: { "": string }; Returns: number }
+      update_own_voice: {
+        Args: { p_theme: string; p_title: string; p_voice_id: string }
+        Returns: {
+          created_at: string
+          duration_ms: number
+          id: string
+          is_active: boolean
+          moderation_reason: string | null
+          prompt_id: string | null
+          status: string
+          storage_path: string
+          theme: string | null
+          title: string | null
+          transcript: string | null
+          user_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "voices"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       updategeometrysrid: {
         Args: {
           catalogn_name: string
