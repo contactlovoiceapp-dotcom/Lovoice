@@ -231,7 +231,10 @@ export function useSendTextMessage(): UseMutationResult<
     },
 
     onSettled: async (_data, _err, vars) => {
-      await queryClient.invalidateQueries({ queryKey: chatQueryKeys.inbox });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: chatQueryKeys.inbox }),
+        queryClient.invalidateQueries({ queryKey: chatQueryKeys.feedConversations }),
+      ]);
     },
   });
 }
@@ -352,7 +355,10 @@ export function useSendVoiceMessage(): UseMutationResult<
     },
 
     onSettled: async (_data, _err, vars) => {
-      await queryClient.invalidateQueries({ queryKey: chatQueryKeys.inbox });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: chatQueryKeys.inbox }),
+        queryClient.invalidateQueries({ queryKey: chatQueryKeys.feedConversations }),
+      ]);
     },
   });
 }

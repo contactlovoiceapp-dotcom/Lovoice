@@ -15,6 +15,7 @@ import {
 export const chatQueryKeys = {
   all: ['chat'] as const,
   inbox: ['chat', 'inbox'] as const,
+  feedConversations: ['chat', 'feed-conversations'] as const,
   conversation: (id: string) => ['chat', 'conversation', id] as const,
   messages: (id: string) => ['chat', 'conversation', id, 'messages'] as const,
 };
@@ -158,6 +159,45 @@ export function useConversations(): UseQueryResult<InboxConversation[], Error> {
             lifecycle: deriveLifecycle(convRow, true),
           };
         });
+    },
+  });
+}
+
+interface FeedConversationRow {
+  id: string;
+  user_a: string;
+  user_b: string;
+}
+
+/** Maps other-user IDs to conversation IDs for feed cards (any thread with messages). */
+export type FeedConversationMap = Record<string, string>;
+
+export function useFeedConversationMap(): UseQueryResult<FeedConversationMap, Error> {
+  return useQuery<FeedConversationMap, Error>({
+    queryKey: chatQueryKeys.feedConversations,
+    staleTime: 1000 * 30,
+    queryFn: async (): Promise<FeedConversationMap> => {
+      const supabase = getSupabaseClient();
+      if (!supabase) throw new Error('chat.supabase_unavailable');
+
+      const { data: userData } = await supabase.auth.getUser();
+      const uid = userData.user?.id;
+      if (!uid) throw new Error('chat.session_missing');
+
+      const { data, error } = await supabase
+        .from('conversations')
+        .select('id, user_a, user_b')
+        .or(`user_a.eq.${uid},user_b.eq.${uid}`)
+        .not('last_message_at', 'is', null);
+
+      if (error) throw new Error(error.message);
+
+      const map: FeedConversationMap = {};
+      for (const row of (data ?? []) as FeedConversationRow[]) {
+        const otherUserId = row.user_a === uid ? row.user_b : row.user_a;
+        map[otherUserId] = row.id;
+      }
+      return map;
     },
   });
 }

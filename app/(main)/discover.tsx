@@ -5,8 +5,10 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Platform,
   Pressable,
   Text,
+  ToastAndroid,
   View,
   useWindowDimensions,
   type ViewToken,
@@ -28,7 +30,7 @@ import { useLikedVoiceIds } from '../../src/features/likes/api/likeQueries';
 import { useLikeVoice, useUnlikeVoice } from '../../src/features/likes/api/likeMutations';
 import { useFeedSeenBatcher } from '../../src/features/feed/hooks/useFeedSeenBatcher';
 import { useFeedPlayer } from '../../src/lib/feedPlayer';
-import { useStartConversation } from '../../src/features/chat/api/messageMutations';
+import { useFeedConversationMap } from '../../src/features/chat/api/conversationQueries';
 import { ageFromBirthdate } from '../../src/lib/age';
 import type { FeedItem, FeedItemTheme } from '../../src/features/feed/types';
 import type { FeedPlayerControls, FeedPlayerSnapshot } from '../../src/lib/feedPlayer';
@@ -147,8 +149,9 @@ export default function DiscoverScreen() {
   const likeVoice = useLikeVoice();
   const unlikeVoice = useUnlikeVoice();
   const likedIds = useMemo(() => likedVoiceIdsQuery.data ?? new Set<string>(), [likedVoiceIdsQuery.data]);
-  const startConversationMutation = useStartConversation();
-
+  const feedConversationMapQuery = useFeedConversationMap();
+  const feedConversationMap = feedConversationMapQuery.data ?? {};
+  const [optimisticConversationMap, setOptimisticConversationMap] = useState<Record<string, string>>({});
   // Flatten pages then apply client-side age filter per ARCHITECTURE.md §8.
   // Age is post-query because the SQL RPC doesn't expose server-side age bounds directly.
   const items: FeedItem[] = useMemo(() => {
@@ -219,19 +222,28 @@ export default function DiscoverScreen() {
   const seenBatcherRef = useRef(seenBatcher);
   seenBatcherRef.current = seenBatcher;
 
-  const handlePressReply = useCallback(
-    async (item: FeedItem) => {
-      // Stop feed audio before navigating away.
+  const handleReplySent = useCallback((userId: string, displayName: string, conversationId: string) => {
+    setOptimisticConversationMap((prev) => ({ ...prev, [userId]: conversationId }));
+    const msg = COPY.replyVoiceModal.sentToast(displayName);
+    if (Platform.OS === 'android') {
+      ToastAndroid.show(msg, ToastAndroid.SHORT);
+    } else {
+      Alert.alert(msg);
+    }
+  }, []);
+
+  const handleOpenConversation = useCallback(
+    (conversationId: string) => {
       userControls.stop?.();
-      try {
-        const conversation = await startConversationMutation.mutateAsync({ otherUserId: item.userId });
-        router.push(`/(main)/messages/${conversation.id}`);
-      } catch (err) {
-        console.error('discover.start_conversation_failed', err);
-        Alert.alert(COPY.chat.conversation.startConversationError);
-      }
+      router.push(`/(main)/messages/${conversationId}`);
     },
-    [userControls, startConversationMutation, router],
+    [userControls, router],
+  );
+
+  const resolveConversationId = useCallback(
+    (userId: string): string | null =>
+      optimisticConversationMap[userId] ?? feedConversationMap[userId] ?? null,
+    [feedConversationMap, optimisticConversationMap],
   );
 
   useFocusEffect(
@@ -343,6 +355,7 @@ export default function DiscoverScreen() {
   const renderProfileCard = useCallback(
     ({ item, index }: { item: FeedItem; index: number }) => {
       const isLiked = likedIds.has(item.voiceId);
+      const conversationId = resolveConversationId(item.userId);
       return (
         <View style={{ width: windowWidth, height: windowHeight }}>
           <ProfileCard
@@ -351,6 +364,8 @@ export default function DiscoverScreen() {
             controls={index === activeIndex ? userControls : INACTIVE_CONTROLS}
             hasRecordedVoice={hasRecordedVoice}
             isLiked={isLiked}
+            conversationId={conversationId}
+            onOpenConversation={handleOpenConversation}
             onToggleLike={() => {
               if (isLiked) {
                 unlikeVoice.mutate({ voiceId: item.voiceId });
@@ -359,12 +374,12 @@ export default function DiscoverScreen() {
               }
             }}
             onRecordVoice={() => router.push('/(auth)/onboarding/record')}
-            onPressReply={handlePressReply}
+            onReplySent={handleReplySent}
           />
         </View>
       );
     },
-    [windowWidth, windowHeight, activeIndex, snapshot, userControls, hasRecordedVoice, router, likedIds, likeVoice, unlikeVoice, handlePressReply],
+    [windowWidth, windowHeight, activeIndex, snapshot, userControls, hasRecordedVoice, router, likedIds, likeVoice, unlikeVoice, handleReplySent, handleOpenConversation, resolveConversationId],
   );
 
   // --- Loading state (initial fetch, no cached pages yet) ---

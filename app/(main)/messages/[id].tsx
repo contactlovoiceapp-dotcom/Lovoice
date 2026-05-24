@@ -62,7 +62,7 @@ export default function ConversationRoute() {
 
   const sendTextMutation = useSendTextMessage();
   const sendVoiceMutation = useSendVoiceMessage();
-  const markReadMutation = useMarkMessagesRead();
+  const { mutate: markMessagesRead } = useMarkMessagesRead();
 
   // Realtime-broadcast state: indicators from the other participant.
   const [otherIsTyping, setOtherIsTyping] = useState(false);
@@ -70,6 +70,7 @@ export default function ConversationRoute() {
 
   // Stable ref to the active Realtime channel so emit helpers can access it.
   const channelRef = useRef<RealtimeChannel | null>(null);
+  const channelReadyRef = useRef(false);
 
   // Typing throttle — created once per conversation mount.
   const typingThrottleRef = useRef(createThrottle(TYPING_THROTTLE_MS));
@@ -81,8 +82,12 @@ export default function ConversationRoute() {
   // Mark unread messages as read when the screen is focused.
   const markRead = useCallback(() => {
     if (!id || !currentUserId) return;
-    markReadMutation.mutate({ conversationId: id });
-  }, [id, currentUserId, markReadMutation]);
+    markMessagesRead({ conversationId: id });
+  }, [id, currentUserId, markMessagesRead]);
+
+  // Keep a ref so the Realtime effect does not depend on markRead identity.
+  const markReadRef = useRef(markRead);
+  markReadRef.current = markRead;
 
   useFocusEffect(
     useCallback(() => {
@@ -108,7 +113,7 @@ export default function ConversationRoute() {
         },
         () => {
           void queryClient.invalidateQueries({ queryKey: chatQueryKeys.messages(id) });
-          markRead();
+          markReadRef.current();
         },
       )
       .on(
@@ -149,35 +154,41 @@ export default function ConversationRoute() {
           setOtherIsRecording(false);
         }
       })
-      .subscribe();
+      .subscribe((status) => {
+        channelReadyRef.current = status === 'SUBSCRIBED';
+      });
 
     channelRef.current = channel;
 
     return () => {
-      // Emit cleanup broadcasts so the other user's indicators vanish immediately.
-      void channel.send({
-        type: 'broadcast',
-        event: 'typing',
-        payload: { userId: currentUserId, value: false, ts: Date.now() },
-      });
-      void channel.send({
-        type: 'broadcast',
-        event: 'recording',
-        payload: { userId: currentUserId, value: false, ts: Date.now() },
-      });
+      // Only emit cleanup when the channel was actually subscribed — otherwise send()
+      // falls back to REST and spams warnings if the effect re-runs in a tight loop.
+      if (channelReadyRef.current) {
+        void channel.send({
+          type: 'broadcast',
+          event: 'typing',
+          payload: { userId: currentUserId, value: false, ts: Date.now() },
+        });
+        void channel.send({
+          type: 'broadcast',
+          event: 'recording',
+          payload: { userId: currentUserId, value: false, ts: Date.now() },
+        });
+      }
+      channelReadyRef.current = false;
       void supabase.removeChannel(channel);
       channelRef.current = null;
 
       if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
       if (recordingTimerRef.current) clearTimeout(recordingTimerRef.current);
     };
-  }, [session, id, queryClient, markRead, currentUserId]);
+  }, [session, id, queryClient, currentUserId]);
 
   // Emit helpers — no-op when the channel isn't subscribed yet.
   const emitTyping = useCallback(
     (value: boolean) => {
       const channel = channelRef.current;
-      if (!channel) return;
+      if (!channel || !channelReadyRef.current) return;
       // Throttle value=true; always send value=false immediately.
       if (value && !typingThrottleRef.current.ping()) return;
       if (!value) typingThrottleRef.current.flush();
@@ -193,7 +204,7 @@ export default function ConversationRoute() {
   const emitRecording = useCallback(
     (value: boolean) => {
       const channel = channelRef.current;
-      if (!channel) return;
+      if (!channel || !channelReadyRef.current) return;
       void channel.send({
         type: 'broadcast',
         event: 'recording',

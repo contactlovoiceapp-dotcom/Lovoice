@@ -216,6 +216,26 @@ export const COPY = {
 
   actions: {
     reply: 'Répondre',
+    openConversation: 'Ouvrir la conversation',
+  },
+
+  replyVoiceModal: {
+    title: 'Un seul message.',
+    hint: (name: string) =>
+      `Envoie un vocal à ${name}. Un seul essai pour faire bonne impression.`,
+    tapToRecord: 'Appuie pour enregistrer',
+    tapToStop: 'Appuie pour terminer',
+    tooShort: 'Trop court — continue un peu.',
+    recordingError: 'Erreur d\'enregistrement. Réessaie.',
+    preview: {
+      reRecord: 'Réenregistrer',
+      send: 'Envoyer',
+      playA11y: 'Écouter le vocal',
+      pauseA11y: 'Pause',
+    },
+    sending: 'Envoi en cours…',
+    sentToast: (name: string) => `Vocal envoyé à ${name} ✓`,
+    sendError: 'Échec de l\'envoi. Réessaie.',
   },
 
   actionsSheet: {

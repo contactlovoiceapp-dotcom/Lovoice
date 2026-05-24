@@ -2,7 +2,7 @@
    Consumes a FeedItem + a feed player snapshot/controls pair; renders the audio
    progress ring, waveform, identity row, and the overlay modals (reply, actions, report, block, locked). */
 
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   Platform,
   Pressable,
@@ -27,6 +27,7 @@ import {
   ChevronDown,
   Heart,
   Lock,
+  MessageCircle,
   Mic,
   MoreHorizontal,
   Pause,
@@ -45,6 +46,7 @@ import ModalOverlay from './ModalOverlay';
 import ActionsSheet from '../features/moderation/components/ActionsSheet';
 import ReportSheet from '../features/moderation/components/ReportSheet';
 import BlockConfirmModal from '../features/moderation/components/BlockConfirmModal';
+import ReplyVoiceModal from '../features/chat/components/ReplyVoiceModal';
 
 interface ProfileCardProps {
   item: FeedItem;
@@ -58,8 +60,11 @@ interface ProfileCardProps {
   isLiked: boolean;
   onToggleLike: () => void;
   onRecordVoice?: () => void;
-  /** When provided, tapping "Répondre" calls this instead of showing the legacy placeholder modal. */
-  onPressReply?: (item: FeedItem) => void;
+  /** When set, the user already has a thread with this profile — CTA opens it. */
+  conversationId?: string | null;
+  onOpenConversation?: (conversationId: string) => void;
+  /** Called after a voice reply is successfully sent from the reply modal. */
+  onReplySent?: (userId: string, displayName: string, conversationId: string) => void;
 }
 
 const PLAY_BTN_SIZE = 96;
@@ -220,7 +225,9 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
   isLiked,
   onToggleLike,
   onRecordVoice,
-  onPressReply,
+  conversationId = null,
+  onOpenConversation,
+  onReplySent,
 }) => {
   const theme = item.theme;
   const { width: windowWidth } = useWindowDimensions();
@@ -233,6 +240,31 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
   const [showReportSheet, setShowReportSheet] = useState(false);
   const [showBlockConfirm, setShowBlockConfirm] = useState(false);
   const [showLockedModal, setShowLockedModal] = useState(false);
+  const [showReplyModal, setShowReplyModal] = useState(false);
+  const hasExistingConversation = conversationId != null;
+
+  const handleReplyPress = useCallback(() => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    controls.pause();
+
+    if (hasExistingConversation) {
+      onOpenConversation?.(conversationId);
+      return;
+    }
+
+    if (!hasRecordedVoice) {
+      setShowLockedModal(true);
+      return;
+    }
+
+    setShowReplyModal(true);
+  }, [
+    controls,
+    conversationId,
+    hasExistingConversation,
+    hasRecordedVoice,
+    onOpenConversation,
+  ]);
 
   const { isPlaying, positionMs, durationMs, isLoading, error } = snapshot;
   // The server-known duration is the ground truth until the player loads; preserves the
@@ -587,12 +619,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
               <Pressable
                 style={{ flex: 1 }}
-                onPress={() => {
-                  void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                  if (onPressReply) {
-                    onPressReply(item);
-                  }
-                }}
+                onPress={handleReplyPress}
                 onPressIn={() => { replyScale.value = withSpring(0.97, TAP_SPRING); }}
                 onPressOut={() => { replyScale.value = withSpring(1, TAP_SPRING); }}
               >
@@ -628,9 +655,13 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
                       ...SHADOW.button,
                     }}
                   >
-                    <Mic size={20} color="white" />
+                    {hasExistingConversation ? (
+                      <MessageCircle size={20} color="white" />
+                    ) : (
+                      <Mic size={20} color="white" />
+                    )}
                     <Text style={{ fontFamily: FONT.semibold, fontSize: 16, color: 'white' }}>
-                      {COPY.actions.reply}
+                      {hasExistingConversation ? COPY.actions.openConversation : COPY.actions.reply}
                     </Text>
                   </LinearGradient>
                 </Animated.View>
@@ -760,6 +791,15 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
         displayName={item.displayName}
         blockedUserId={item.userId}
         onClose={() => setShowBlockConfirm(false)}
+      />
+      <ReplyVoiceModal
+        visible={showReplyModal}
+        item={item}
+        onClose={() => setShowReplyModal(false)}
+        onSent={(name, sentConversationId) => {
+          setShowReplyModal(false);
+          onReplySent?.(item.userId, name, sentConversationId);
+        }}
       />
     </View>
   );

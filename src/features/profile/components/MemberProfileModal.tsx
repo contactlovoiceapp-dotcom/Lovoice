@@ -1,7 +1,7 @@
 /* Full-screen modal wrapping the immersive ProfileCard from Discover for the likes context. */
 
-import React, { useCallback, useEffect, useRef } from 'react';
-import { ActivityIndicator, Alert, Modal, Pressable, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Modal, Platform, Pressable, Text, ToastAndroid, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { X } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -15,7 +15,7 @@ import { useLikedVoiceIds } from '@/features/likes/api/likeQueries';
 import { useLikeVoice, useUnlikeVoice } from '@/features/likes/api/likeMutations';
 import { useMemberVoicePreview, useVoiceSignedUrl } from '@/features/voices/api/voiceQueries';
 import { useVoicePlayer } from '@/features/voices/hooks/useVoicePlayer';
-import { useStartConversation } from '@/features/chat/api/messageMutations';
+import { useFeedConversationMap } from '@/features/chat/api/conversationQueries';
 import ProfileCard from '@/components/ProfileCard';
 import type { FeedItem, FeedItemTheme } from '@/features/feed/types';
 import type { FeedPlayerControls, FeedPlayerSnapshot } from '@/lib/feedPlayer';
@@ -90,7 +90,9 @@ export default function MemberProfileModal({ visible, userId, voiceId, onClose }
   const likedIds = likedIdsQuery.data ?? new Set<string>();
   const likeVoice = useLikeVoice();
   const unlikeVoice = useUnlikeVoice();
-  const startConversationMutation = useStartConversation();
+  const feedConversationMapQuery = useFeedConversationMap();
+  const feedConversationMap = feedConversationMapQuery.data ?? {};
+  const [optimisticConversationMap, setOptimisticConversationMap] = useState<Record<string, string>>({});
 
   const voicePlayerRef = useRef(voicePlayer);
   voicePlayerRef.current = voicePlayer;
@@ -142,6 +144,9 @@ export default function MemberProfileModal({ visible, userId, voiceId, onClose }
   };
 
   const isLiked = feedItem ? likedIds.has(feedItem.voiceId) : false;
+  const conversationId = feedItem
+    ? optimisticConversationMap[feedItem.userId] ?? feedConversationMap[feedItem.userId] ?? null
+    : null;
 
   const handleToggleLike = useCallback(() => {
     if (!feedItem) return;
@@ -152,19 +157,23 @@ export default function MemberProfileModal({ visible, userId, voiceId, onClose }
     }
   }, [feedItem, isLiked, likeVoice, unlikeVoice]);
 
-  const handlePressReply = useCallback(
-    async (item: FeedItem) => {
+  const handleReplySent = useCallback((replyUserId: string, displayName: string, conversationId: string) => {
+    setOptimisticConversationMap((prev) => ({ ...prev, [replyUserId]: conversationId }));
+    const msg = COPY.replyVoiceModal.sentToast(displayName);
+    if (Platform.OS === 'android') {
+      ToastAndroid.show(msg, ToastAndroid.SHORT);
+    } else {
+      Alert.alert(msg);
+    }
+  }, []);
+
+  const handleOpenConversation = useCallback(
+    (conversationId: string) => {
       voicePlayerRef.current.stop();
-      try {
-        const conversation = await startConversationMutation.mutateAsync({ otherUserId: item.userId });
-        onClose();
-        router.push(`/(main)/messages/${conversation.id}`);
-      } catch (err) {
-        console.error('member_profile_modal.start_conversation_failed', err);
-        Alert.alert(COPY.chat.conversation.startConversationError);
-      }
+      onClose();
+      router.push(`/(main)/messages/${conversationId}`);
     },
-    [startConversationMutation, onClose],
+    [onClose],
   );
 
   return (
@@ -195,7 +204,9 @@ export default function MemberProfileModal({ visible, userId, voiceId, onClose }
               isLiked={isLiked}
               onToggleLike={handleToggleLike}
               hasRecordedVoice
-              onPressReply={handlePressReply}
+              conversationId={conversationId}
+              onOpenConversation={handleOpenConversation}
+              onReplySent={handleReplySent}
             />
 
             <Pressable
