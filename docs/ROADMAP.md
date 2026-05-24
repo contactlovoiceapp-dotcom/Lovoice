@@ -198,7 +198,7 @@ Cover these once on iOS and once on Android. Backend isn't touched — the SQL m
 
 ---
 
-## Phase 6.bis — Admin back-office (companion Next.js web app)
+## Phase 6.bis — Admin back-office (companion Next.js web app) 🟢
 
 **Goal**: the operator (non-technical) can triage reports, take down content, and ban users from a clean web interface — no SQL, no Supabase Studio.
 
@@ -226,12 +226,12 @@ This phase produces a **separate Next.js repository** (suggested name `lovoice-a
    - Buttons call the corresponding Edge Function (`dismiss_report`, `moderate`, `ban_user`). Confirmation modal on `moderate` and `ban_user`.
    - Toast on success/error. React Query invalidation on the reports list after each action.
    - Auto-refresh every 30s.
-5. **`/users/[id]` page**: profile detail (display fields, current voice with player, last 10 messages of theirs, last 10 reports against them). Buttons: **Bannir** / **Lever le ban** (according to current state) / **Supprimer le compte**.
+5. **`/users/[id]` page**: profile detail (display fields, current voice with player, last 10 messages of theirs, last 10 reports against them). Buttons: **Bannir** / **Lever le ban** (according to current state). The full account-deletion UI is intentionally deferred to Phase 10 because `delete_account_admin` currently performs a soft-delete only (sets `is_banned` + `deleted_at` + revokes the session — see `supabase/functions/delete_account_admin/index.ts`); exposing it as "Supprimer le compte" before the hard-purge ships would mislead the operator. Phase 10's user-initiated `delete_account` will replace the soft-delete body and the back-office will then surface the action.
 6. **`/banned` page**: list of `profiles` where `is_banned = true`, with reason and an Unban button.
 7. **`/audit` page**: paginated read-only view of `audit_log`, filterable by `actor_id`, `action`, `target_kind`. Last 90 days only.
 8. **Provisioning script**: `scripts/seed-admin.sql` documented in the back-office README — a one-shot insert into `admin_users` (run by the developer the first time, then by the operator herself for any new admin).
-9. **UX polish**: French copy throughout, dark mode toggle, accessible labels, mobile-responsive layout (the operator might consult on her phone occasionally).
-10. **Smoke test plan** (manual, documented in the back-office README): login flow, take down a test report, ban a test user, unban, delete a test account, check `audit_log`.
+9. **UX polish**: French copy throughout, accessible labels, mobile-responsive layout (the operator might consult on her phone occasionally).
+10. **Smoke test plan** (manual, documented in the back-office README): login flow, take down a test report, ban a test user, unban, check `audit_log`.
 
 ### Deliverables
 

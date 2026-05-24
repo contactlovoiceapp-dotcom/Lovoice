@@ -220,6 +220,18 @@ npx supabase db push   # apply migrations
 npx supabase functions serve <name>  # run Edge Function locally
 ```
 
+### Admin provisioning
+
+To grant back-office access to a new operator, run `scripts/seed-admin.sql`
+against the Supabase project's Postgres database (never via `supabase db push`):
+
+```bash
+psql "$SUPABASE_DB_URL" -f scripts/seed-admin.sql
+```
+
+The target person must already have an `auth.users` row. See the script header
+for full prerequisites and the revocation one-liner.
+
 > **Dev build vs Expo Go:** this project uses `expo-dev-client`. You **cannot** use the standard Expo Go app.
 > The dev build (`npx expo run:ios`) must be installed once on the target device/simulator.
 > After that, `npx expo start` + pressing `i` is enough for day-to-day development — no recompile needed.
