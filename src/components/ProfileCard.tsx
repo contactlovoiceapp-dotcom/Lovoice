@@ -64,7 +64,7 @@ interface ProfileCardProps {
   conversationId?: string | null;
   onOpenConversation?: (conversationId: string) => void;
   /** Called after a voice reply is successfully sent from the reply modal. */
-  onReplySent?: (userId: string, displayName: string, conversationId: string) => void;
+  onReplySent?: (displayName: string) => void;
 }
 
 const PLAY_BTN_SIZE = 96;
@@ -796,9 +796,9 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
         visible={showReplyModal}
         item={item}
         onClose={() => setShowReplyModal(false)}
-        onSent={(name, sentConversationId) => {
+        onSent={(name) => {
           setShowReplyModal(false);
-          onReplySent?.(item.userId, name, sentConversationId);
+          onReplySent?.(name);
         }}
       />
     </View>

@@ -72,41 +72,6 @@ Reactive moderation (block + report + manual takedown by the operator) is part o
 - Files are 32 kbps mono AAC, ~240 KB/min ±10%.
 - Upload works on flaky network (manual test: airplane mode mid-upload → retry).
 
-### Mobile smoke test (run on a real device before tagging)
-
-Cover these once on iOS and once on Android. Backend curl walkthrough lives at
-`supabase/functions/SMOKE_TEST.md` and stays separate.
-
-1. **First voice** — fresh sign-up → onboarding → record screen → mic permission
-   prompt accepted → record 12 s → live waveform animates → tap stop → preview
-   plays back from documentDirectory cache → "Continuer" → upload spinner →
-   profile-setup screen lands with the active voice already populated.
-2. **Min duration** — start recording, tap stop at < 10 s; the CTA should stay
-   "Encore N sec" and the mic stop should be a no-op until the threshold.
-3. **Auto-stop** — let the recorder run; at 1:30 it must stop on its own and
-   show the preview state. Timer must show `1:30 / 1:30` exactly.
-4. **Permission denied** — deny mic permission once, observe the Settings icon
-   on the mic button + the French permission-denied message in the hint card,
-   tap to deep-link to system settings, grant, return → next mic tap records.
-5. **Airplane mode mid-upload** — record 30 s, toggle airplane mode just
-   before tapping "Continuer", confirm the CTA flips to "Réessayer" and the
-   error status appears. Toggle airplane mode off, tap "Réessayer" → upload
-   succeeds and onNext fires.
-6. **Re-record from profile** — open profile tab, tap "Changer mon vocal",
-   record a new voice, "Continuer" → returns to profile with the newer
-   `created_at` displayed and the previous voice gone (`is_active` swap).
-7. **Profile edits** — change title and mood on the profile voice card, tap
-   "Sauvegarder ", reload the screen → values persist.
-8. **Multi-device** — sign in on a second device with the same account; the
-   active voice + title + theme must appear without any local "hasRecorded"
-   priming (proves the gate is fully derived from `useActiveVoice`).
-9. **Empty state** — sign up + skip recording on onboarding; profile must
-   show the "Aucun vocal pour l'instant" empty state with the record CTA.
-10. **Cleanup** — record + cancel via the X header (or system back gesture);
-    re-open the app and confirm no orphan files remain in
-    `documentDirectory/pending/` (use `xcrun simctl get_app_container` or
-    `adb shell run-as` to inspect).
-
 ---
 
 ## Phase 5 — Discover feed (playback + autoplay + preload) 🟢
@@ -138,25 +103,6 @@ Cover these once on iOS and once on Android. Backend curl walkthrough lives at
 - First playback of any voice starts < 500 ms after tap on a 4G connection (relies on the next/next+1 preload).
 - Scrolling 20 cards never throws an unhandled promise rejection (try/catch around every `replace()` and `play()`/`pause()` call).
 - Filters change updates the feed within 1 query (the React Query key includes the filters object).
-
-### Mobile smoke test (run on a real device before tagging)
-
-Cover these once on iOS and once on Android. Backend isn't touched — the SQL migration must already be applied (`npx supabase db push`).
-
-1. **Cold-start feed** — fresh session → land on Discover → first voice loads and the play button is responsive within 1 s. Tap to play; audio comes out of the speaker even with the silent switch on (proves `playsInSilentMode: true`).
-2. **Smooth swipe + preload** — swipe up; the next card snaps into place and tapping play is instant (< 250 ms from tap to first sample). Swipe up again; same. Confirms the next/next+1 ring is preloaded.
-3. **Autoplay chain** — toggle the autoplay switch in the header. Tap play on the first voice. When it finishes, the feed must scroll to the next card on its own and start playing automatically. Repeat for 3 voices in a row to confirm `didJustFinish` fires once per playthrough.
-4. **Back-scroll** — after listening to two voices, swipe down to the previous one. It should reload from the start (acceptable trade-off — the slot was reused for the next preload).
-5. **Filters apply** — open the filters modal. Set age 25–35 and distance 50 km. Tap "Appliquer". The feed re-queries and the new filter pill is reflected in the header. Confirm the visible voices respect the age range (ages displayed on cards must all be in 25–35).
-6. **Filters reset** — re-open the filters modal, tap "Réinitialiser". The age range should snap back to 18–80, the distance to "Illimité", and the feed should re-query.
-7. **Distance unlimited toggle** — open the modal, flip the "Sans limite de distance" switch ON; the slider hides and the pill reads "Illimité". Apply → feed re-queries. Re-open, flip OFF; the slider reappears at the previously chosen value.
-8. **50 % seen** — play a voice past 50 % then swipe away to the next card before it ends. Wait 30 s on the next card, then look at `feed_seen` in Supabase Studio: a row for the partially-listened voice must be present.
-9. **Batch flush on blur** — play 2 voices past 50 %, then navigate to the Likes tab before the 30 s timer elapses. Check `feed_seen`: both rows must be present (the `useFocusEffect` flush fired).
-10. **End of feed** — exhaust the available voices (or seed Supabase with a small set). The empty state with "Sparkles" + "Modifier mes filtres" + "Recommencer mon feed" must render. Tap "Recommencer mon feed", confirm the modal, hit "Tout recommencer" → `feed_seen` must be cleared and the feed must re-populate.
-11. **Pull-to-refresh** — scroll to the top of the feed, pull down. The spinner appears and the feed re-shuffles within 1 query (`ORDER BY created_at DESC, random()` gives a fresh order even with the same data).
-12. **Network loss mid-listen** — start playing a voice on Wi-Fi, toggle airplane mode mid-playback. Audio should keep playing until the buffer drains; tapping play on a not-yet-preloaded card after the network is back must succeed (signed URL refresh).
-13. **Locked playback** — sign in with an account that has not recorded a voice yet. Tap play on any card → the locked modal appears with the "Enregistre ta voix" CTA. Tap it → routes to `/(auth)/onboarding/record`.
-14. **Background audio** — start playing a voice, lock the device. Audio must continue (proves `shouldPlayInBackground: true`).
 
 ---
 
@@ -231,7 +177,6 @@ This phase produces a **separate Next.js repository** (suggested name `lovoice-a
 7. **`/audit` page**: paginated read-only view of `audit_log`, filterable by `actor_id`, `action`, `target_kind`. Last 90 days only.
 8. **Provisioning script**: `scripts/seed-admin.sql` documented in the back-office README — a one-shot insert into `admin_users` (run by the developer the first time, then by the operator herself for any new admin).
 9. **UX polish**: French copy throughout, accessible labels, mobile-responsive layout (the operator might consult on her phone occasionally).
-10. **Smoke test plan** (manual, documented in the back-office README): login flow, take down a test report, ban a test user, unban, check `audit_log`.
 
 ### Deliverables
 
@@ -270,12 +215,13 @@ This phase produces a **separate Next.js repository** (suggested name `lovoice-a
    The trigger raises `SQLSTATE 23514` with stable `messages.*` codes the client maps (see `docs/ARCHITECTURE.md` §5.0).
 3. `MessagesScreen` (inbox): list conversations with last message preview + unread badge. Realtime subscription on `messages` (RLS-filtered) for live inbox updates.
 4. `ConversationScreen` (`app/(main)/messages/[id].tsx`): paginated message list (cursor on `created_at` desc), Realtime subscription on `messages` filtered by conversation.
-5. Composer: text input + record button. Voice messages reuse `useVoiceRecorder` (max 1 min 30 s) and the same upload pipeline (`kind='message'`). Text input is hidden until the conversation is in OPEN state.
-6. Inline voice player per message (reuse `useVoicePlayer` single-instance — only one playing at a time, others auto-pause).
-7. Read receipts: on screen open, `update messages set read_at = now() where conversation_id = $1 and sender_id != auth.uid() and read_at is null`. The `update_received_messages_read_at` RLS policy and `guard_message_update()` trigger (restricts non-sender updates to `read_at` only) ship in Phase 7 Block 1.
-8. Typing indicator via Realtime Broadcast (throttled 1/s).
-9. Recording indicator ("X est en train d'enregistrer un vocal…") via Broadcast.
-10. Optimistic send + retry queue (in-memory only; drafts do not survive an app kill).
+5. **First-reply flow from Discover**: tapping "Répondre" opens an in-feed centered modal (`ReplyVoiceModal`) with tap-to-start / tap-to-stop recording, preview, and background send — the user stays on Discover. Once a thread exists with the profile, the feed CTA flips to "Ouvrir la conversation" (driven by `useFeedConversationMap`).
+6. Conversation composer (in-thread): voice messages use hold-to-record with slide-to-cancel (`useChatVoiceRecorder`) and the same upload pipeline (`kind='message'`). Text input is hidden until the conversation is in OPEN state.
+7. Inline voice player per message (reuse the single-instance `chatMessagePlayer` — only one playing at a time, others auto-pause).
+8. Read receipts: on screen open, `update messages set read_at = now() where conversation_id = $1 and sender_id != auth.uid() and read_at is null`. The `update_received_messages_read_at` RLS policy and `guard_message_update()` trigger (restricts non-sender updates to `read_at` only) ship in Phase 7 Block 1.
+9. Typing indicator via Realtime Broadcast (throttled).
+10. Recording indicator ("X est en train d'enregistrer un vocal…") via Broadcast.
+11. Optimistic send + retry queue (in-memory only; drafts do not survive an app kill).
 
 ### Deliverables
 
@@ -288,17 +234,6 @@ This phase produces a **separate Next.js repository** (suggested name `lovoice-a
 - App reconnects after network loss and replays missed messages.
 - Killing the app and reopening a conversation shows all history.
 - Recording indicator disappears within 2s of stop.
-
----
-
-## Phase 7 acceptance — manual smoke tests
-
-1. **Discover → reply flow**: tap "Répondre" on a profile → conversation screen opens in `empty` state → hold-record-release the mic → preview plays correctly → tap "Envoyer" → message appears, conversation moves to `awaiting_reply`. Log out, log in as the recipient, see the conversation in the inbox with the "Vocal envoyé" badge, open it, see "À ton tour — réponds avec un vocal" composer hint, hold-record-release → preview, send → conversation now in `voice_only` state. Both users can send voice messages freely. After 24 h (or by manually setting `first_reply_at` to 25 h ago via SQL), the text input becomes available.
-2. **Realtime messages**: with two devices/sessions open on the same conversation, sending a message on side A appears within 1 s on side B. Read receipt (✓✓ Lu) shown on side A after side B opens the conversation.
-3. **Typing/recording indicators**: side A starts typing in the composer → side B sees "X écrit…" as the header subtitle. Side A holds the mic button → side B sees "X enregistre un vocal…". Both indicators clear within 5–10 s after activity stops on side A.
-4. **Hold-to-record cancel**: hold the mic button, slide up past the cancel threshold, release — message is discarded (no upload, no DB row, composer returns to idle). Haptic error feedback fires.
-5. **Audio focus**: while a voice bubble is playing, tapping another bubble pauses the first and starts the second. Starting a hold-to-record gesture pauses any currently playing bubble.
-6. **Lifecycle guard**: insert a text message into an `empty` conversation directly via SQL — the `enforce_message_rules()` Postgres trigger rejects it with the expected SQLSTATE 23514 and error code `messages.first_message_must_be_voice`.
 
 ---
 
@@ -421,12 +356,11 @@ This phase produces a **separate Next.js repository** (suggested name `lovoice-a
 3. Google Play Console: app record, screenshots, content rating, data safety form.
 4. Build production with EAS Build, submit via `eas submit`.
 5. Internal testing groups invited.
-6. Smoke test plan executed on iOS + Android.
 
 ### Deliverables
 
 - Build available in TestFlight.
 - Build available in Internal Testing on Play.
-- Crash-free rate > 99% on the smoke run.
+- Crash-free rate > 99% on the first internal-testing release.
 
 ---

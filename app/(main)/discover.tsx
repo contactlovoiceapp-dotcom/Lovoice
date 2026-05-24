@@ -3,12 +3,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
-  Platform,
   Pressable,
   Text,
-  ToastAndroid,
   View,
   useWindowDimensions,
   type ViewToken,
@@ -31,6 +28,7 @@ import { useLikeVoice, useUnlikeVoice } from '../../src/features/likes/api/likeM
 import { useFeedSeenBatcher } from '../../src/features/feed/hooks/useFeedSeenBatcher';
 import { useFeedPlayer } from '../../src/lib/feedPlayer';
 import { useFeedConversationMap } from '../../src/features/chat/api/conversationQueries';
+import { showToast } from '../../src/lib/toast';
 import { ageFromBirthdate } from '../../src/lib/age';
 import type { FeedItem, FeedItemTheme } from '../../src/features/feed/types';
 import type { FeedPlayerControls, FeedPlayerSnapshot } from '../../src/lib/feedPlayer';
@@ -150,8 +148,11 @@ export default function DiscoverScreen() {
   const unlikeVoice = useUnlikeVoice();
   const likedIds = useMemo(() => likedVoiceIdsQuery.data ?? new Set<string>(), [likedVoiceIdsQuery.data]);
   const feedConversationMapQuery = useFeedConversationMap();
-  const feedConversationMap = feedConversationMapQuery.data ?? {};
-  const [optimisticConversationMap, setOptimisticConversationMap] = useState<Record<string, string>>({});
+  const feedConversationMap = useMemo(
+    () => feedConversationMapQuery.data ?? {},
+    [feedConversationMapQuery.data],
+  );
+
   // Flatten pages then apply client-side age filter per ARCHITECTURE.md §8.
   // Age is post-query because the SQL RPC doesn't expose server-side age bounds directly.
   const items: FeedItem[] = useMemo(() => {
@@ -222,14 +223,8 @@ export default function DiscoverScreen() {
   const seenBatcherRef = useRef(seenBatcher);
   seenBatcherRef.current = seenBatcher;
 
-  const handleReplySent = useCallback((userId: string, displayName: string, conversationId: string) => {
-    setOptimisticConversationMap((prev) => ({ ...prev, [userId]: conversationId }));
-    const msg = COPY.replyVoiceModal.sentToast(displayName);
-    if (Platform.OS === 'android') {
-      ToastAndroid.show(msg, ToastAndroid.SHORT);
-    } else {
-      Alert.alert(msg);
-    }
+  const handleReplySent = useCallback((displayName: string) => {
+    showToast(COPY.replyVoiceModal.sentToast(displayName));
   }, []);
 
   const handleOpenConversation = useCallback(
@@ -238,12 +233,6 @@ export default function DiscoverScreen() {
       router.push(`/(main)/messages/${conversationId}`);
     },
     [userControls, router],
-  );
-
-  const resolveConversationId = useCallback(
-    (userId: string): string | null =>
-      optimisticConversationMap[userId] ?? feedConversationMap[userId] ?? null,
-    [feedConversationMap, optimisticConversationMap],
   );
 
   useFocusEffect(
@@ -355,7 +344,7 @@ export default function DiscoverScreen() {
   const renderProfileCard = useCallback(
     ({ item, index }: { item: FeedItem; index: number }) => {
       const isLiked = likedIds.has(item.voiceId);
-      const conversationId = resolveConversationId(item.userId);
+      const conversationId = feedConversationMap[item.userId] ?? null;
       return (
         <View style={{ width: windowWidth, height: windowHeight }}>
           <ProfileCard
@@ -379,7 +368,7 @@ export default function DiscoverScreen() {
         </View>
       );
     },
-    [windowWidth, windowHeight, activeIndex, snapshot, userControls, hasRecordedVoice, router, likedIds, likeVoice, unlikeVoice, handleReplySent, handleOpenConversation, resolveConversationId],
+    [windowWidth, windowHeight, activeIndex, snapshot, userControls, hasRecordedVoice, router, likedIds, likeVoice, unlikeVoice, handleReplySent, handleOpenConversation, feedConversationMap],
   );
 
   // --- Loading state (initial fetch, no cached pages yet) ---

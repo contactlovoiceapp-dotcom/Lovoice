@@ -4,6 +4,7 @@ import React, { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Mic, Pause, Play, RotateCcw, Send, Square } from 'lucide-react-native';
+import { useQueryClient } from '@tanstack/react-query';
 
 import { COLORS, CTA_GRADIENT, FONT, RADIUS, SHADOW } from '@/theme';
 import { COPY } from '@/copy';
@@ -12,6 +13,7 @@ import { formatTime } from '@/lib/formatTime';
 import { useVoiceRecorder } from '@/features/voices/hooks/useVoiceRecorder';
 import { useVoicePlayer } from '@/features/voices/hooks/useVoicePlayer';
 import { useStartConversation, useSendVoiceMessage } from '../api/messageMutations';
+import { chatQueryKeys, type FeedConversationMap } from '../api/conversationQueries';
 import ModalOverlay from '@/components/ModalOverlay';
 import type { FeedItem } from '@/features/feed/types';
 
@@ -36,7 +38,8 @@ interface ReplyVoiceModalProps {
   visible: boolean;
   item: FeedItem | null;
   onClose: () => void;
-  onSent: (displayName: string, conversationId: string) => void;
+  /** Fired once the voice has been uploaded; parent shows a confirmation toast. */
+  onSent: (displayName: string) => void;
 }
 
 export default function ReplyVoiceModal({
@@ -45,6 +48,7 @@ export default function ReplyVoiceModal({
   onClose,
   onSent,
 }: ReplyVoiceModalProps) {
+  const queryClient = useQueryClient();
   const recorder = useVoiceRecorder();
   const player = useVoicePlayer({ uri: recorder.result?.uri ?? null });
   const startConversation = useStartConversation();
@@ -94,14 +98,22 @@ export default function ReplyVoiceModal({
         uri: recorder.result.uri,
         durationMs: recorder.result.durationMs,
       });
+
+      // Seed the feed-conversations cache so feed CTAs flip to
+      // "Ouvrir la conversation" instantly, before the invalidation refetch lands.
+      queryClient.setQueryData<FeedConversationMap>(
+        chatQueryKeys.feedConversations,
+        (prev) => ({ ...(prev ?? {}), [item.userId]: conversation.id }),
+      );
+
       await recorder.reset();
       setIsSending(false);
-      onSent(item.displayName, conversation.id);
+      onSent(item.displayName);
     } catch {
       setIsSending(false);
       setSendError(COPY.replyVoiceModal.sendError);
     }
-  }, [item, recorder, startConversation, sendVoiceMessage, onSent]);
+  }, [item, recorder, startConversation, sendVoiceMessage, onSent, queryClient]);
 
   const handleClose = useCallback(async () => {
     player.stop();
@@ -285,7 +297,7 @@ export default function ReplyVoiceModal({
               style={{
                 width: '100%',
                 height: 52,
-                borderRadius: 26,
+                borderRadius: RADIUS.cta,
                 overflow: 'hidden',
                 opacity: isSending ? 0.7 : 1,
               }}
