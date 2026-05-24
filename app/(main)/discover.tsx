@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Pressable,
   Text,
@@ -27,6 +28,7 @@ import { useLikedVoiceIds } from '../../src/features/likes/api/likeQueries';
 import { useLikeVoice, useUnlikeVoice } from '../../src/features/likes/api/likeMutations';
 import { useFeedSeenBatcher } from '../../src/features/feed/hooks/useFeedSeenBatcher';
 import { useFeedPlayer } from '../../src/lib/feedPlayer';
+import { useStartConversation } from '../../src/features/chat/api/messageMutations';
 import { ageFromBirthdate } from '../../src/lib/age';
 import type { FeedItem, FeedItemTheme } from '../../src/features/feed/types';
 import type { FeedPlayerControls, FeedPlayerSnapshot } from '../../src/lib/feedPlayer';
@@ -145,6 +147,7 @@ export default function DiscoverScreen() {
   const likeVoice = useLikeVoice();
   const unlikeVoice = useUnlikeVoice();
   const likedIds = useMemo(() => likedVoiceIdsQuery.data ?? new Set<string>(), [likedVoiceIdsQuery.data]);
+  const startConversationMutation = useStartConversation();
 
   // Flatten pages then apply client-side age filter per ARCHITECTURE.md §8.
   // Age is post-query because the SQL RPC doesn't expose server-side age bounds directly.
@@ -215,6 +218,21 @@ export default function DiscoverScreen() {
   controlsRef.current = controls;
   const seenBatcherRef = useRef(seenBatcher);
   seenBatcherRef.current = seenBatcher;
+
+  const handlePressReply = useCallback(
+    async (item: FeedItem) => {
+      // Stop feed audio before navigating away.
+      userControls.stop?.();
+      try {
+        const conversation = await startConversationMutation.mutateAsync({ otherUserId: item.userId });
+        router.push(`/(main)/messages/${conversation.id}`);
+      } catch (err) {
+        console.error('discover.start_conversation_failed', err);
+        Alert.alert(COPY.chat.conversation.startConversationError);
+      }
+    },
+    [userControls, startConversationMutation, router],
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -341,11 +359,12 @@ export default function DiscoverScreen() {
               }
             }}
             onRecordVoice={() => router.push('/(auth)/onboarding/record')}
+            onPressReply={handlePressReply}
           />
         </View>
       );
     },
-    [windowWidth, windowHeight, activeIndex, snapshot, userControls, hasRecordedVoice, router, likedIds, likeVoice, unlikeVoice],
+    [windowWidth, windowHeight, activeIndex, snapshot, userControls, hasRecordedVoice, router, likedIds, likeVoice, unlikeVoice, handlePressReply],
   );
 
   // --- Loading state (initial fetch, no cached pages yet) ---

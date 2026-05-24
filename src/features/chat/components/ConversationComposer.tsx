@@ -30,6 +30,8 @@ interface ConversationComposerProps {
   onSendVoice: (uri: string, durationMs: number) => Promise<void>;
   isSending: boolean;
   isSendingVoice: boolean;
+  /** Fired on every text change with the raw (untrimmed) value. Used by the route to emit typing broadcasts. */
+  onTextChange?: (text: string) => void;
   /** Hook for Block 7.6 — typing/recording broadcasts. */
   onRecordingStateChange?: (isRecording: boolean) => void;
 }
@@ -75,6 +77,7 @@ export default function ConversationComposer({
   onSendVoice,
   isSending,
   isSendingVoice,
+  onTextChange,
   onRecordingStateChange,
 }: ConversationComposerProps) {
   const insets = useSafeAreaInsets();
@@ -444,7 +447,10 @@ export default function ConversationComposer({
 
         <TextInput
           value={text}
-          onChangeText={setText}
+          onChangeText={(value) => {
+            setText(value);
+            onTextChange?.(value);
+          }}
           placeholder={COPY.chat.conversation.inputPlaceholder}
           placeholderTextColor={COLORS.textTertiary}
           multiline

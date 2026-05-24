@@ -1,11 +1,12 @@
 /* Conversation route — wires Realtime subscriptions, queries, and mutations into ConversationScreen. */
 
-import React, { useCallback, useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQueryClient, type InfiniteData } from '@tanstack/react-query';
+import type { RealtimeChannel } from '@supabase/supabase-js';
 
 import { COLORS } from '../../../src/theme';
 import { useAuth } from '../../../src/features/auth/hooks/useAuth';
@@ -21,7 +22,21 @@ import {
 } from '../../../src/features/chat/api/messageMutations';
 import type { ChatMessage } from '../../../src/features/chat/types';
 import { getSupabaseClient } from '../../../src/lib/supabase';
+import { createThrottle } from '../../../src/features/chat/lib/throttle';
 import ConversationScreen from '../../../src/components/main/ConversationScreen';
+
+// How long (ms) with no typing event before the indicator auto-clears.
+const TYPING_CLEAR_DELAY_MS = 5_000;
+// Safety-net auto-clear for recording indicator (the sender always emits false, but guard anyway).
+const RECORDING_CLEAR_DELAY_MS = 10_000;
+// Throttle window for typing=true broadcasts.
+const TYPING_THROTTLE_MS = 3_000;
+
+interface BroadcastPayload {
+  userId: string;
+  value: boolean;
+  ts: number;
+}
 
 export default function ConversationRoute() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -49,6 +64,20 @@ export default function ConversationRoute() {
   const sendVoiceMutation = useSendVoiceMessage();
   const markReadMutation = useMarkMessagesRead();
 
+  // Realtime-broadcast state: indicators from the other participant.
+  const [otherIsTyping, setOtherIsTyping] = useState(false);
+  const [otherIsRecording, setOtherIsRecording] = useState(false);
+
+  // Stable ref to the active Realtime channel so emit helpers can access it.
+  const channelRef = useRef<RealtimeChannel | null>(null);
+
+  // Typing throttle — created once per conversation mount.
+  const typingThrottleRef = useRef(createThrottle(TYPING_THROTTLE_MS));
+
+  // Auto-clear timers.
+  const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const recordingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // Mark unread messages as read when the screen is focused.
   const markRead = useCallback(() => {
     if (!id || !currentUserId) return;
@@ -61,7 +90,8 @@ export default function ConversationRoute() {
     }, [markRead]),
   );
 
-  // Subscribe to Realtime: new messages (INSERT) and read receipt updates (UPDATE).
+  // Subscribe to Realtime: postgres_changes (new messages + read receipt updates) +
+  // broadcast events (typing / recording indicators from the other participant).
   useEffect(() => {
     const supabase = getSupabaseClient();
     if (!supabase || !session || !id) return;
@@ -93,19 +123,94 @@ export default function ConversationRoute() {
           void queryClient.invalidateQueries({ queryKey: chatQueryKeys.messages(id) });
         },
       )
+      .on('broadcast', { event: 'typing' }, ({ payload }: { payload: BroadcastPayload }) => {
+        // Ignore events from the current user (they can echo back on multi-device setups).
+        if (payload.userId === currentUserId) return;
+
+        if (payload.value) {
+          setOtherIsTyping(true);
+          // Reset the auto-clear timer on each incoming event.
+          if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+          typingTimerRef.current = setTimeout(() => setOtherIsTyping(false), TYPING_CLEAR_DELAY_MS);
+        } else {
+          if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+          setOtherIsTyping(false);
+        }
+      })
+      .on('broadcast', { event: 'recording' }, ({ payload }: { payload: BroadcastPayload }) => {
+        if (payload.userId === currentUserId) return;
+
+        if (payload.value) {
+          setOtherIsRecording(true);
+          if (recordingTimerRef.current) clearTimeout(recordingTimerRef.current);
+          recordingTimerRef.current = setTimeout(() => setOtherIsRecording(false), RECORDING_CLEAR_DELAY_MS);
+        } else {
+          if (recordingTimerRef.current) clearTimeout(recordingTimerRef.current);
+          setOtherIsRecording(false);
+        }
+      })
       .subscribe();
 
+    channelRef.current = channel;
+
     return () => {
+      // Emit cleanup broadcasts so the other user's indicators vanish immediately.
+      void channel.send({
+        type: 'broadcast',
+        event: 'typing',
+        payload: { userId: currentUserId, value: false, ts: Date.now() },
+      });
+      void channel.send({
+        type: 'broadcast',
+        event: 'recording',
+        payload: { userId: currentUserId, value: false, ts: Date.now() },
+      });
       void supabase.removeChannel(channel);
+      channelRef.current = null;
+
+      if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
+      if (recordingTimerRef.current) clearTimeout(recordingTimerRef.current);
     };
-  }, [session, id, queryClient, markRead]);
+  }, [session, id, queryClient, markRead, currentUserId]);
+
+  // Emit helpers — no-op when the channel isn't subscribed yet.
+  const emitTyping = useCallback(
+    (value: boolean) => {
+      const channel = channelRef.current;
+      if (!channel) return;
+      // Throttle value=true; always send value=false immediately.
+      if (value && !typingThrottleRef.current.ping()) return;
+      if (!value) typingThrottleRef.current.flush();
+      void channel.send({
+        type: 'broadcast',
+        event: 'typing',
+        payload: { userId: currentUserId, value, ts: Date.now() },
+      });
+    },
+    [currentUserId],
+  );
+
+  const emitRecording = useCallback(
+    (value: boolean) => {
+      const channel = channelRef.current;
+      if (!channel) return;
+      void channel.send({
+        type: 'broadcast',
+        event: 'recording',
+        payload: { userId: currentUserId, value, ts: Date.now() },
+      });
+    },
+    [currentUserId],
+  );
 
   const handleSendText = useCallback(
     async (body: string) => {
       if (!id) return;
+      // Clear typing indicator on send.
+      emitTyping(false);
       await sendTextMutation.mutateAsync({ conversationId: id, bodyText: body });
     },
-    [id, sendTextMutation],
+    [id, sendTextMutation, emitTyping],
   );
 
   const handleSendVoice = useCallback(
@@ -138,6 +243,13 @@ export default function ConversationRoute() {
     void queryClient.invalidateQueries({ queryKey: chatQueryKeys.conversation(id) });
   }, [id, queryClient]);
 
+  const handleTextChange = useCallback(
+    (text: string) => {
+      emitTyping(text.trim().length > 0);
+    },
+    [emitTyping],
+  );
+
   return (
     <View style={{ flex: 1, backgroundColor: COLORS.background }}>
       <StatusBar style="dark" />
@@ -162,6 +274,10 @@ export default function ConversationRoute() {
           currentUserId={currentUserId}
           isSending={sendTextMutation.isPending}
           isSendingVoice={sendVoiceMutation.isPending}
+          otherIsTyping={otherIsTyping}
+          otherIsRecording={otherIsRecording}
+          onRecordingStateChange={emitRecording}
+          onTextChange={handleTextChange}
         />
       </KeyboardAvoidingView>
     </View>

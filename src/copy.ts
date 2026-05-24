@@ -218,13 +218,6 @@ export const COPY = {
     reply: 'Répondre',
   },
 
-  replyModal: {
-    title: 'Un seul message.',
-    body: (name: string) =>
-      `Envoie un vocal à ${name}. ${name} l'écoute et décide de te répondre, ou non. Un seul message, pour que chacun reste libre.`,
-    cta: 'Enregistrer ma réponse',
-  },
-
   actionsSheet: {
     title: (name: string) => `Que veux-tu faire avec ${name} ?`,
     report: 'Signaler ce profil',
@@ -316,6 +309,9 @@ export const COPY = {
         pauseA11y: 'Pause du message vocal',
         duration: (mmss: string) => `Durée : ${mmss}`,
       },
+      otherIsTyping: (name: string) => `${name} écrit…`,
+      otherIsRecording: (name: string) => `${name} enregistre un vocal…`,
+      startConversationError: 'Impossible de démarrer la conversation. Réessaie.',
     },
   },
 

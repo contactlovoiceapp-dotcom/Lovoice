@@ -15,6 +15,7 @@ function renderComposer(overrides: {
   onSendVoice?: (uri: string, durationMs: number) => Promise<void>;
   isSending?: boolean;
   isSendingVoice?: boolean;
+  onTextChange?: (text: string) => void;
 } = {}) {
   const defaults = {
     lifecycle: { state: 'open' as const },
@@ -112,5 +113,16 @@ describe('ConversationComposer', () => {
     });
 
     expect(getByTestId('voice-button')).toBeTruthy();
+  });
+
+  it('calls onTextChange when the user types in open state', async () => {
+    const onTextChange = jest.fn();
+    const { getByTestId } = renderComposer({ onTextChange });
+
+    fireEvent.changeText(getByTestId('composer-input'), 'Salut');
+
+    await waitFor(() => {
+      expect(onTextChange).toHaveBeenCalledWith('Salut');
+    });
   });
 });

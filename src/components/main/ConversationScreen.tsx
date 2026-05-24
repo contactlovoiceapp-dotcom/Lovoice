@@ -31,6 +31,10 @@ export interface ConversationScreenProps {
   currentUserId: string;
   isSending: boolean;
   isSendingVoice: boolean;
+  otherIsTyping: boolean;
+  otherIsRecording: boolean;
+  onRecordingStateChange: (isRecording: boolean) => void;
+  onTextChange: (text: string) => void;
 }
 
 // The voice-only countdown lives in the screen body (VoiceOnlyCountdown) and ticks every 30s,
@@ -63,6 +67,10 @@ export default function ConversationScreen({
   currentUserId,
   isSending,
   isSendingVoice,
+  otherIsTyping,
+  otherIsRecording,
+  onRecordingStateChange,
+  onTextChange,
 }: ConversationScreenProps) {
   const [actionsVisible, setActionsVisible] = useState(false);
   const [reportVisible, setReportVisible] = useState(false);
@@ -81,7 +89,13 @@ export default function ConversationScreen({
     setBlockVisible(true);
   }, []);
 
-  const headerSubtitle = deriveHeaderSubtitle(details);
+  const otherName = details?.otherDisplayName ?? '';
+  const fallbackSubtitle = deriveHeaderSubtitle(details);
+  const headerSubtitle = otherIsRecording
+    ? COPY.chat.conversation.otherIsRecording(otherName)
+    : otherIsTyping
+      ? COPY.chat.conversation.otherIsTyping(otherName)
+      : fallbackSubtitle;
   const avatarEmoji = details?.otherEmojis[0] ?? '💬';
 
   if (isLoadingDetails && !details) {
@@ -151,6 +165,8 @@ export default function ConversationScreen({
         onSendVoice={onSendVoice}
         isSending={isSending}
         isSendingVoice={isSendingVoice}
+        onRecordingStateChange={onRecordingStateChange}
+        onTextChange={onTextChange}
       />
 
       {details && (

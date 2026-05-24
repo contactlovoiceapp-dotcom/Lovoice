@@ -253,7 +253,7 @@ This phase produces a **separate Next.js repository** (suggested name `lovoice-a
 
 ---
 
-## Phase 7 — Messaging (text + voice, Realtime)
+## Phase 7 — Messaging (text + voice, Realtime) 🟢
 
 **Goal**: full chat with text and voice messages, real-time updates, read receipts.
 
@@ -288,6 +288,17 @@ This phase produces a **separate Next.js repository** (suggested name `lovoice-a
 - App reconnects after network loss and replays missed messages.
 - Killing the app and reopening a conversation shows all history.
 - Recording indicator disappears within 2s of stop.
+
+---
+
+## Phase 7 acceptance — manual smoke tests
+
+1. **Discover → reply flow**: tap "Répondre" on a profile → conversation screen opens in `empty` state → hold-record-release the mic → preview plays correctly → tap "Envoyer" → message appears, conversation moves to `awaiting_reply`. Log out, log in as the recipient, see the conversation in the inbox with the "Vocal envoyé" badge, open it, see "À ton tour — réponds avec un vocal" composer hint, hold-record-release → preview, send → conversation now in `voice_only` state. Both users can send voice messages freely. After 24 h (or by manually setting `first_reply_at` to 25 h ago via SQL), the text input becomes available.
+2. **Realtime messages**: with two devices/sessions open on the same conversation, sending a message on side A appears within 1 s on side B. Read receipt (✓✓ Lu) shown on side A after side B opens the conversation.
+3. **Typing/recording indicators**: side A starts typing in the composer → side B sees "X écrit…" as the header subtitle. Side A holds the mic button → side B sees "X enregistre un vocal…". Both indicators clear within 5–10 s after activity stops on side A.
+4. **Hold-to-record cancel**: hold the mic button, slide up past the cancel threshold, release — message is discarded (no upload, no DB row, composer returns to idle). Haptic error feedback fires.
+5. **Audio focus**: while a voice bubble is playing, tapping another bubble pauses the first and starts the second. Starting a hold-to-record gesture pauses any currently playing bubble.
+6. **Lifecycle guard**: insert a text message into an `empty` conversation directly via SQL — the `enforce_message_rules()` Postgres trigger rejects it with the expected SQLSTATE 23514 and error code `messages.first_message_must_be_voice`.
 
 ---
 

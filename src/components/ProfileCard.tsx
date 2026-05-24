@@ -58,6 +58,8 @@ interface ProfileCardProps {
   isLiked: boolean;
   onToggleLike: () => void;
   onRecordVoice?: () => void;
+  /** When provided, tapping "Répondre" calls this instead of showing the legacy placeholder modal. */
+  onPressReply?: (item: FeedItem) => void;
 }
 
 const PLAY_BTN_SIZE = 96;
@@ -218,6 +220,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
   isLiked,
   onToggleLike,
   onRecordVoice,
+  onPressReply,
 }) => {
   const theme = item.theme;
   const { width: windowWidth } = useWindowDimensions();
@@ -226,7 +229,6 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
   const bottomNavHeight = 52 + insets.bottom + 12 + 16;
 
   const [hasListened, setHasListened] = useState(false);
-  const [showReplyModal, setShowReplyModal] = useState(false);
   const [showActionsSheet, setShowActionsSheet] = useState(false);
   const [showReportSheet, setShowReportSheet] = useState(false);
   const [showBlockConfirm, setShowBlockConfirm] = useState(false);
@@ -587,7 +589,9 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
                 style={{ flex: 1 }}
                 onPress={() => {
                   void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                  setShowReplyModal(true);
+                  if (onPressReply) {
+                    onPressReply(item);
+                  }
                 }}
                 onPressIn={() => { replyScale.value = withSpring(0.97, TAP_SPRING); }}
                 onPressOut={() => { replyScale.value = withSpring(1, TAP_SPRING); }}
@@ -709,28 +713,6 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
           </View>
         </View>
       </LinearGradient>
-
-      {/* ── Reply Modal ─────────────────────────────────────────────── */}
-      <ModalOverlay visible={showReplyModal} onClose={() => setShowReplyModal(false)}>
-        <View style={{ width: 48, height: 48, backgroundColor: COLORS.primaryMuted, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
-          <Mic size={24} color={COLORS.primary} />
-        </View>
-        <Text style={{ fontSize: 20, fontFamily: FONT.bold, marginBottom: 8, color: COLORS.dark }}>{COPY.replyModal.title}</Text>
-        <Text style={{ color: COLORS.textSecondary, marginBottom: 24 }}>
-          {COPY.replyModal.body(item.displayName)}
-        </Text>
-        <Pressable onPress={() => setShowReplyModal(false)}>
-          <LinearGradient
-            colors={[...themeData.ctaGradient]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={{ borderRadius: RADIUS.cta, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}
-          >
-            <Mic size={18} color="white" />
-            <Text style={{ color: 'white', fontFamily: FONT.bold }}>{COPY.replyModal.cta}</Text>
-          </LinearGradient>
-        </Pressable>
-      </ModalOverlay>
 
       {/* ── Locked Modal ────────────────────────────────────────────── */}
       <ModalOverlay visible={showLockedModal} onClose={() => setShowLockedModal(false)} centered>
