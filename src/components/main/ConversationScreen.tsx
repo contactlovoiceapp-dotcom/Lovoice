@@ -24,12 +24,13 @@ export interface ConversationScreenProps {
   hasOlderMessages: boolean;
   isFetchingOlder: boolean;
   onSendText: (body: string) => Promise<void>;
-  onPressVoice: () => void;
+  onSendVoice: (uri: string, durationMs: number) => Promise<void>;
   onRetrySend: (clientId: string) => void;
   onClose: () => void;
   onCountdownExpired: () => void;
   currentUserId: string;
   isSending: boolean;
+  isSendingVoice: boolean;
 }
 
 // The voice-only countdown lives in the screen body (VoiceOnlyCountdown) and ticks every 30s,
@@ -55,12 +56,13 @@ export default function ConversationScreen({
   hasOlderMessages,
   isFetchingOlder,
   onSendText,
-  onPressVoice,
+  onSendVoice,
   onRetrySend,
   onClose,
   onCountdownExpired,
   currentUserId,
   isSending,
+  isSendingVoice,
 }: ConversationScreenProps) {
   const [actionsVisible, setActionsVisible] = useState(false);
   const [reportVisible, setReportVisible] = useState(false);
@@ -146,8 +148,9 @@ export default function ConversationScreen({
         iAmInitiator={details?.iAmInitiator ?? false}
         otherDisplayName={details?.otherDisplayName ?? ''}
         onSendText={onSendText}
-        onPressVoice={onPressVoice}
+        onSendVoice={onSendVoice}
         isSending={isSending}
+        isSendingVoice={isSendingVoice}
       />
 
       {details && (

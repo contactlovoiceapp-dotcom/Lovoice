@@ -300,6 +300,22 @@ export const COPY = {
       inputPlaceholder: 'Écris ton message…',
       sendingLabel: 'Envoi…',
       failedLabel: 'Échec — toucher pour réessayer',
+      recordingHint: 'Glisse vers le haut pour annuler',
+      recordingCancelHint: 'Relâche pour annuler',
+      recordingTooShort: 'Maintiens plus longtemps pour enregistrer.',
+      recordingError: 'Échec de l\'enregistrement. Réessaie.',
+      preview: {
+        reRecord: 'Réenregistrer',
+        send: 'Envoyer',
+        discard: 'Annuler',
+        playA11y: 'Lecture du vocal',
+        pauseA11y: 'Pause du vocal',
+      },
+      voiceMessage: {
+        playA11y: 'Lecture du message vocal',
+        pauseA11y: 'Pause du message vocal',
+        duration: (mmss: string) => `Durée : ${mmss}`,
+      },
     },
   },
 

@@ -81,11 +81,12 @@ describe('MessageBubble', () => {
 
   it('renders a voice placeholder for voice messages', () => {
     const msg = makeMsg({ kind: 'voice', bodyText: null, voiceDurationMs: 12000 });
-    const { getByText } = render(
+    const { getByTestId, getByText } = render(
       <MessageBubble message={msg} isMine showTimestamp />,
     );
 
-    expect(getByText('🎤 Vocal · 0:12')).toBeTruthy();
+    expect(getByTestId('voice-play-button')).toBeTruthy();
+    expect(getByText('0:12')).toBeTruthy();
   });
 
   it('hides status indicators when showTimestamp is false', () => {

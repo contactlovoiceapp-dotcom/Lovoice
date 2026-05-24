@@ -12,16 +12,18 @@ function renderComposer(overrides: {
   iAmInitiator?: boolean;
   otherDisplayName?: string;
   onSendText?: (body: string) => Promise<void>;
-  onPressVoice?: () => void;
+  onSendVoice?: (uri: string, durationMs: number) => Promise<void>;
   isSending?: boolean;
+  isSendingVoice?: boolean;
 } = {}) {
   const defaults = {
     lifecycle: { state: 'open' as const },
     iAmInitiator: true,
     otherDisplayName: 'Marie',
     onSendText: jest.fn(() => Promise.resolve()),
-    onPressVoice: jest.fn(),
+    onSendVoice: jest.fn(() => Promise.resolve()),
     isSending: false,
+    isSendingVoice: false,
     ...overrides,
   };
 
@@ -92,5 +94,23 @@ describe('ConversationComposer', () => {
     });
 
     expect(getByText(COPY.chat.conversation.composerHintEmptyDefensive)).toBeTruthy();
+  });
+
+  it('renders a voice button in voice_only state', () => {
+    const { getByTestId, getByText } = renderComposer({
+      lifecycle: { state: 'voice_only', firstReplyAt: '2026-05-24T10:00:00Z', voiceOnlyUntil: '2026-05-25T10:00:00Z' },
+    });
+
+    expect(getByTestId('voice-button')).toBeTruthy();
+    expect(getByText(COPY.chat.conversation.composerHintVoiceOnly)).toBeTruthy();
+  });
+
+  it('renders a voice button for initiator in empty state', () => {
+    const { getByTestId } = renderComposer({
+      lifecycle: { state: 'empty' },
+      iAmInitiator: true,
+    });
+
+    expect(getByTestId('voice-button')).toBeTruthy();
   });
 });

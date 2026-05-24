@@ -16,6 +16,7 @@ import {
 import { useConversationMessages } from '../../../src/features/chat/api/messageQueries';
 import {
   useSendTextMessage,
+  useSendVoiceMessage,
   useMarkMessagesRead,
 } from '../../../src/features/chat/api/messageMutations';
 import type { ChatMessage } from '../../../src/features/chat/types';
@@ -45,6 +46,7 @@ export default function ConversationRoute() {
   );
 
   const sendTextMutation = useSendTextMessage();
+  const sendVoiceMutation = useSendVoiceMessage();
   const markReadMutation = useMarkMessagesRead();
 
   // Mark unread messages as read when the screen is focused.
@@ -106,9 +108,13 @@ export default function ConversationRoute() {
     [id, sendTextMutation],
   );
 
-  const handlePressVoice = useCallback(() => {
-    // Block 7.5 will wire the voice recording flow here.
-  }, []);
+  const handleSendVoice = useCallback(
+    async (uri: string, durationMs: number) => {
+      if (!id) return;
+      await sendVoiceMutation.mutateAsync({ conversationId: id, uri, durationMs });
+    },
+    [id, sendVoiceMutation],
+  );
 
   const handleRetrySend = useCallback(
     (clientId: string) => {
@@ -149,12 +155,13 @@ export default function ConversationRoute() {
           hasOlderMessages={hasNextPage ?? false}
           isFetchingOlder={isFetchingNextPage}
           onSendText={handleSendText}
-          onPressVoice={handlePressVoice}
+          onSendVoice={handleSendVoice}
           onRetrySend={handleRetrySend}
           onClose={handleClose}
           onCountdownExpired={handleCountdownExpired}
           currentUserId={currentUserId}
           isSending={sendTextMutation.isPending}
+          isSendingVoice={sendVoiceMutation.isPending}
         />
       </KeyboardAvoidingView>
     </View>
