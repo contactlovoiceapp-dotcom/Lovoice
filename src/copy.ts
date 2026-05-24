@@ -256,12 +256,13 @@ export const COPY = {
       title: 'Messages',
       emptyTitle: 'Pas encore de messages',
       emptyBody: 'Réponds à un vocal pour démarrer une conversation.',
-      relativeTimeNow: 'à l\'instant',
       voicePreview: (mmss: string) => `🎤 Vocal · ${mmss}`,
       awaitingBadge: 'Vocal envoyé',
       voiceOnlyBadge: 'Mode vocal',
-      openBadge: '',
       unreadAria: (n: number) => `${n} message${n > 1 ? 's' : ''} non lu${n > 1 ? 's' : ''}`,
+      errorTitle: 'Impossible de charger les conversations.',
+      retry: 'Réessayer',
+      openConversationHint: 'Ouvre la conversation',
     },
     conversation: {
       voiceOnlyCountdown: (h: number, m: number) =>
@@ -337,19 +338,6 @@ export const COPY = {
   likeToast: {
     firstLike: (name: string) =>
       `Ajouté à tes Likes — ${name} recevra une notification.`,
-  },
-
-  messagesScreen: {
-    title: 'Messages',
-    searchPlaceholder: 'Rechercher...',
-    emptyTitle: 'Pas encore de messages',
-    emptyBody: 'Ta prochaine conversation commence ici.',
-    icebreakersTitle: 'Icebreakers',
-    icebreakers: [
-      "\u201CJ\u2019ai adoré ton énergie sur ton vocal !\u201D",
-      "\u201CTa pire honte m\u2019a fait mourir de rire 😂\u201D",
-      "\u201CC\u2019est quoi le dernier son que tu as écouté ?\u201D",
-    ] as const,
   },
 
   filters: {

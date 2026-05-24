@@ -6,7 +6,8 @@ import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
 import BottomNav from '../../src/components/BottomNav';
 
 // Subroutes (under any tab) that need to take the full screen and hide the floating nav pill.
-const FULLSCREEN_SUBROUTES = new Set<string>(['record']);
+// 'record' = profile/record.tsx, '[id]' = messages/[id].tsx (full-screen conversation view).
+const FULLSCREEN_SUBROUTES = new Set<string>(['record', '[id]']);
 
 export default function MainLayout() {
   return (
