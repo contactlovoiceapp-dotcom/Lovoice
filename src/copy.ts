@@ -267,8 +267,12 @@ export const COPY = {
     conversation: {
       voiceOnlyCountdown: (h: number, m: number) =>
         `Mode chat débloqué dans ${h}h${m.toString().padStart(2, '0')}`,
+      voiceOnlyCountdownPrefix: 'Mode chat dans',
       composerHintAwaiting: (name: string) => `En attente de la réponse de ${name}…`,
       composerHintInitial: 'Envoie un vocal — tu n\'as qu\'une chance.',
+      composerHintRecipientReply: 'À ton tour — réponds avec un vocal.',
+      composerHintEmptyDefensive: 'Cette conversation n\'est pas disponible.',
+      composerHintVoiceOnly: 'Mode vocal — envoie un vocal.',
       sendError: {
         first_message_must_be_voice: 'Le premier message doit être un vocal.',
         reply_must_be_voice: 'Réponds avec un vocal pour démarrer la conversation.',
@@ -283,6 +287,17 @@ export const COPY = {
         network: 'Échec de l\'envoi. Réessaie dans un instant.',
         unknown: 'Une erreur est survenue. Réessaie dans un instant.',
       },
+      status: {
+        sending: 'Envoi…',
+        sent: '✓ Envoyé',
+        read: '✓✓ Lu',
+        failedTap: 'Échec — toucher pour réessayer',
+      },
+      moreActions: 'Plus d\'options',
+      back: 'Retour',
+      sendCta: 'Envoyer',
+      voiceCtaLabel: 'Enregistrer un vocal',
+      inputPlaceholder: 'Écris ton message…',
       sendingLabel: 'Envoi…',
       failedLabel: 'Échec — toucher pour réessayer',
     },

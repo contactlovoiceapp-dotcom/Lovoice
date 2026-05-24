@@ -116,6 +116,65 @@ export function formatLastMessagePreview(
   return text.length > 80 ? `${text.slice(0, 80)}…` : text;
 }
 
+// ---------------------------------------------------------------------------
+// Grouping helper — combines consecutive same-sender messages into "bursts"
+// so only the last message in a burst shows its timestamp.
+// ---------------------------------------------------------------------------
+
+export interface BurstMessage {
+  message: ChatMessage;
+  showTimestamp: boolean;
+}
+
+const BURST_THRESHOLD_MS = 60_000;
+
+export function groupMessagesIntoBursts(messages: ChatMessage[]): BurstMessage[] {
+  if (messages.length === 0) return [];
+
+  const result: BurstMessage[] = messages.map((msg) => ({ message: msg, showTimestamp: true }));
+
+  for (let i = 0; i < result.length - 1; i++) {
+    const current = result[i].message;
+    const next = result[i + 1].message;
+    const sameAuthor = current.senderId === next.senderId;
+    const timeDelta = Math.abs(
+      new Date(next.createdAt).getTime() - new Date(current.createdAt).getTime(),
+    );
+    if (sameAuthor && timeDelta <= BURST_THRESHOLD_MS) {
+      result[i].showTimestamp = false;
+    }
+  }
+
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// Voice-only countdown helper — deterministic, tested standalone.
+// ---------------------------------------------------------------------------
+
+export interface VoiceOnlyCountdownResult {
+  hours: number;
+  minutes: number;
+  expired: boolean;
+}
+
+export function formatVoiceOnlyCountdown(
+  voiceOnlyUntil: string,
+  now: Date,
+): VoiceOnlyCountdownResult {
+  const target = new Date(voiceOnlyUntil).getTime();
+  const diff = target - now.getTime();
+
+  if (diff <= 0) return { hours: 0, minutes: 0, expired: true };
+
+  const totalMinutes = Math.floor(diff / 60_000);
+  return {
+    hours: Math.floor(totalMinutes / 60),
+    minutes: totalMinutes % 60,
+    expired: false,
+  };
+}
+
 // Maps frozen trigger SQLSTATE 23514 error codes to COPY.chat.conversation.sendError keys.
 const MESSAGE_ERROR_MAP: Record<string, string> = {
   'messages.conversation_not_found':    'conversation_not_found',
