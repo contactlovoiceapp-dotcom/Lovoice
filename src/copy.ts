@@ -251,6 +251,42 @@ export const COPY = {
     successCta: 'Compris',
   },
 
+  chat: {
+    inbox: {
+      title: 'Messages',
+      emptyTitle: 'Pas encore de messages',
+      emptyBody: 'Réponds à un vocal pour démarrer une conversation.',
+      relativeTimeNow: 'à l\'instant',
+      voicePreview: (mmss: string) => `🎤 Vocal · ${mmss}`,
+      awaitingBadge: 'Vocal envoyé',
+      voiceOnlyBadge: 'Mode vocal',
+      openBadge: '',
+      unreadAria: (n: number) => `${n} message${n > 1 ? 's' : ''} non lu${n > 1 ? 's' : ''}`,
+    },
+    conversation: {
+      voiceOnlyCountdown: (h: number, m: number) =>
+        `Mode chat débloqué dans ${h}h${m.toString().padStart(2, '0')}`,
+      composerHintAwaiting: (name: string) => `En attente de la réponse de ${name}…`,
+      composerHintInitial: 'Envoie un vocal — tu n\'as qu\'une chance.',
+      sendError: {
+        first_message_must_be_voice: 'Le premier message doit être un vocal.',
+        reply_must_be_voice: 'Réponds avec un vocal pour démarrer la conversation.',
+        not_initiator: 'Tu ne peux pas écrire en premier dans cette conversation.',
+        awaiting_reply: (name: string) => `${name} doit répondre avant que tu puisses renvoyer un message.`,
+        text_locked_24h: 'Tu pourras écrire 24 h après la première réponse.',
+        blocked: 'Cette conversation n\'est plus disponible.',
+        conversation_not_found: 'Cette conversation est introuvable.',
+        not_a_participant: 'Tu ne fais pas partie de cette conversation.',
+        update_forbidden: 'Action non autorisée.',
+        empty_body: 'Écris quelque chose avant d\'envoyer.',
+        network: 'Échec de l\'envoi. Réessaie dans un instant.',
+        unknown: 'Une erreur est survenue. Réessaie dans un instant.',
+      },
+      sendingLabel: 'Envoi…',
+      failedLabel: 'Échec — toucher pour réessayer',
+    },
+  },
+
   blockModal: {
     title: (name: string) => `Bloquer ${name} ?`,
     body: (name: string) =>
