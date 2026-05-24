@@ -112,15 +112,17 @@ A user likes a voice. Unique on `(liker_id, voice_id)`.
 
 ### 2.5 `conversations`
 
-Created lazily on the first reply (text or voice) to a voice.
+Created via the `start_conversation(p_other_user_id)` RPC before the first message is sent.
 
-| column            | type                          | notes                                                |
-| ----------------- | ----------------------------- | ---------------------------------------------------- |
-| `id`              | `uuid` PK                     |                                                      |
-| `user_a`          | `uuid`                        | always `least(user_a, user_b)` to enforce uniqueness |
-| `user_b`          | `uuid`                        |                                                      |
-| `last_message_at` | `timestamptz`                 |                                                      |
-| `created_at`      | `timestamptz` default `now()` |                                                      |
+| column            | type                          | notes                                                                              |
+| ----------------- | ----------------------------- | ---------------------------------------------------------------------------------- |
+| `id`              | `uuid` PK                     |                                                                                    |
+| `user_a`          | `uuid`                        | always `least(user_a, user_b)` to enforce uniqueness                               |
+| `user_b`          | `uuid`                        |                                                                                    |
+| `initiator_id`    | `uuid` NOT NULL FK → `profiles` | denormalised sender of the very first message; set at conversation creation        |
+| `first_reply_at`  | `timestamptz` NULL            | set by trigger when the non-initiator sends their first message; drives 24h lock   |
+| `last_message_at` | `timestamptz`                 |                                                                                    |
+| `created_at`      | `timestamptz` default `now()` |                                                                                    |
 
 Unique on `(user_a, user_b)`.
 
@@ -367,6 +369,31 @@ When enabled, `commit_upload` switches the default row status to `'pending'` and
 
 ## 5. Realtime messaging
 
+### 5.0 Conversation lifecycle
+
+A conversation between initiator A and recipient B passes through four states:
+
+| State | Conditions | Allowed messages |
+|---|---|---|
+| **EMPTY** | 0 messages in the conversation | Only A can send. Must be `kind='voice'`. |
+| **AWAITING_REPLY** | ≥ 1 message; `first_reply_at IS NULL` | Only B can send. Must be `kind='voice'`. |
+| **VOICE_ONLY** | `first_reply_at IS NOT NULL` AND `now() - first_reply_at < 24h` | Either user can send. Must be `kind='voice'`. |
+| **OPEN** | `first_reply_at IS NOT NULL` AND `now() - first_reply_at ≥ 24h` | Either user can send. `kind='voice'` or `kind='text'`. |
+
+State transitions are enforced **server-side** by the `enforce_message_rules()` BEFORE INSERT trigger on `messages`. The trigger raises `SQLSTATE 23514` with these frozen message codes the client must map:
+
+- `messages.conversation_not_found`
+- `messages.not_a_participant`
+- `messages.blocked`
+- `messages.not_initiator`
+- `messages.first_message_must_be_voice`
+- `messages.awaiting_reply`
+- `messages.reply_must_be_voice`
+- `messages.text_locked_24h`
+- `messages.update_forbidden`
+
+The `first_reply_at` timestamp is written automatically by the `update_conversation_on_message()` AFTER INSERT trigger the moment the non-initiator sends their first message. It is never set by the client.
+
 ### 5.1 Subscriptions
 
 - For each open conversation: subscribe to Postgres Changes
@@ -387,12 +414,13 @@ When enabled, `commit_upload` switches the default row status to `'pending'` and
     .on("broadcast", { event: "recording" }, handler)
     .subscribe();
   ```
-- For the inbox list: subscribe to `INSERT` on `notifications` filtered by `user_id`.
+- For the inbox list: subscribe to `INSERT` on `messages` (RLS-filtered) — replaces the earlier `notifications` plan, since the inbox needs message previews anyway. Both `messages` and `conversations` tables are added to the `supabase_realtime` publication in the Phase 7 migration.
 
 ### 5.2 Optimistic UI
 
 - On send: insert the message in the local React Query cache with `status: 'sending'`. On server confirmation, replace.
 - Failed sends are kept locally and retried on reconnect (manual retry button after 3 failures).
+- Retry queue is in-memory only in V1; drafts do not survive an app kill.
 
 ### 5.3 Read receipts
 

@@ -259,15 +259,23 @@ This phase produces a **separate Next.js repository** (suggested name `lovoice-a
 
 ### Scope
 
-1. Conversation creation: when a user sends a first message in response to a voice, lazily create the `conversations` row (sorted user_a/user_b).
-2. `MessagesScreen` (inbox): list conversations with last message preview + unread badge. Realtime subscription on `notifications` for unread updates.
-3. `ConversationScreen` (`app/(main)/messages/[id].tsx`): paginated message list (cursor on `created_at` desc), Realtime subscription on `messages` filtered by conversation.
-4. Composer: text input + record button. Voice messages reuse `useVoiceRecorder` (max 1 min 30 s) and the same upload pipeline (`kind='message'`).
-5. Inline voice player per message (reuse `useVoicePlayer` single-instance — only one playing at a time, others auto-pause).
-6. Read receipts: on screen open, `update messages set read_at = now() where conversation_id = $1 and sender_id != auth.uid() and read_at is null`.
-7. Typing indicator via Realtime Broadcast (throttled 1/s).
-8. Recording indicator ("X est en train d'enregistrer un vocal…") via Broadcast.
-9. Optimistic send + retry queue.
+1. **Conversation creation** via the `start_conversation(p_other_user_id)` SECURITY DEFINER RPC. Idempotent: returns the existing row if the pair already has a conversation. Rejects banned/deleted users and blocked pairs. The `conversations` table gains two new columns shipped in Phase 7 Block 1:
+   - `initiator_id uuid NOT NULL` — denormalised sender of the very first message.
+   - `first_reply_at timestamptz NULL` — set automatically by trigger when the non-initiator sends their first message; drives the 24h voice-only lock.
+2. **Four-state conversation lifecycle** enforced server-side by the `enforce_message_rules()` BEFORE INSERT trigger:
+   - **EMPTY** (0 messages): only the initiator can send; must be `kind='voice'`.
+   - **AWAITING_REPLY** (≥ 1 message, `first_reply_at IS NULL`): only the recipient can send; must be `kind='voice'`.
+   - **VOICE_ONLY** (`first_reply_at` set, < 24 h elapsed): either user can send; must be `kind='voice'`.
+   - **OPEN** (`first_reply_at` set, ≥ 24 h elapsed): either user can send `kind='voice'` or `kind='text'`.
+   The trigger raises `SQLSTATE 23514` with stable `messages.*` codes the client maps (see `docs/ARCHITECTURE.md` §5.0).
+3. `MessagesScreen` (inbox): list conversations with last message preview + unread badge. Realtime subscription on `messages` (RLS-filtered) for live inbox updates.
+4. `ConversationScreen` (`app/(main)/messages/[id].tsx`): paginated message list (cursor on `created_at` desc), Realtime subscription on `messages` filtered by conversation.
+5. Composer: text input + record button. Voice messages reuse `useVoiceRecorder` (max 1 min 30 s) and the same upload pipeline (`kind='message'`). Text input is hidden until the conversation is in OPEN state.
+6. Inline voice player per message (reuse `useVoicePlayer` single-instance — only one playing at a time, others auto-pause).
+7. Read receipts: on screen open, `update messages set read_at = now() where conversation_id = $1 and sender_id != auth.uid() and read_at is null`. The `update_received_messages_read_at` RLS policy and `guard_message_update()` trigger (restricts non-sender updates to `read_at` only) ship in Phase 7 Block 1.
+8. Typing indicator via Realtime Broadcast (throttled 1/s).
+9. Recording indicator ("X est en train d'enregistrer un vocal…") via Broadcast.
+10. Optimistic send + retry queue (in-memory only; drafts do not survive an app kill).
 
 ### Deliverables
 
