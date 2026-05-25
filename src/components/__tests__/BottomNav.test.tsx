@@ -12,6 +12,10 @@ jest.mock('../../features/likes/hooks/useUnseenLikes', () => ({
   useUnseenLikesCount: jest.fn().mockReturnValue(0),
 }));
 
+jest.mock('../../features/chat/hooks/useUnreadMessagesCount', () => ({
+  useUnreadMessagesCount: jest.fn().mockReturnValue(0),
+}));
+
 const SAFE_AREA_METRICS = {
   frame: { x: 0, y: 0, width: 390, height: 844 },
   insets: { top: 47, left: 0, right: 0, bottom: 34 },
@@ -122,5 +126,20 @@ describe('BottomNav', () => {
     expect(likesTab).toBeTruthy();
 
     useUnseenLikesCount.mockReturnValue(0);
+  });
+
+  it('shows a badge on Messages tab when useUnreadMessagesCount returns > 0', () => {
+    const { useUnreadMessagesCount } = jest.requireMock('../../features/chat/hooks/useUnreadMessagesCount') as {
+      useUnreadMessagesCount: jest.Mock;
+    };
+    useUnreadMessagesCount.mockReturnValue(2);
+
+    const { getByLabelText } = renderWithProviders(
+      <BottomNav {...createTabBarProps(0)} />,
+    );
+
+    expect(getByLabelText(COPY.nav.messages)).toBeTruthy();
+
+    useUnreadMessagesCount.mockReturnValue(0);
   });
 });

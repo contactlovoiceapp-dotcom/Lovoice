@@ -10,6 +10,7 @@ import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { RADIUS } from '../theme';
 import { COPY } from '../copy';
 import { useUnseenLikesCount } from '../features/likes/hooks/useUnseenLikes';
+import { useUnreadMessagesCount } from '../features/chat/hooks/useUnreadMessagesCount';
 
 const ICON_SIZE = 22;
 const PILL_HEIGHT = 64;
@@ -81,6 +82,7 @@ function TabItem({
 const BottomNav: React.FC<BottomTabBarProps> = ({ state, navigation }) => {
   const insets = useSafeAreaInsets();
   const unseenLikesCount = useUnseenLikesCount();
+  const unreadMessagesCount = useUnreadMessagesCount();
 
   return (
     <View
@@ -118,7 +120,10 @@ const BottomNav: React.FC<BottomTabBarProps> = ({ state, navigation }) => {
             label={tab.label}
             icon={tab.icon}
             isActive={state.index === index}
-            showBadge={tab.key === 'likes' && unseenLikesCount > 0}
+            showBadge={
+              (tab.key === 'likes' && unseenLikesCount > 0) ||
+              (tab.key === 'messages' && unreadMessagesCount > 0)
+            }
             onPress={() => navigation.navigate(state.routes[index].name)}
           />
         ))}
