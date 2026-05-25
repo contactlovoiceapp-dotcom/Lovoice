@@ -234,6 +234,9 @@ export function useSendTextMessage(): UseMutationResult<
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: chatQueryKeys.inbox }),
         queryClient.invalidateQueries({ queryKey: chatQueryKeys.feedConversations }),
+        // Refresh conversation details so lifecycle state reflects DB-side changes
+        // (e.g. first_reply_at being set by the trigger when the recipient replies).
+        queryClient.invalidateQueries({ queryKey: chatQueryKeys.conversation(vars.conversationId) }),
       ]);
     },
   });
@@ -358,6 +361,8 @@ export function useSendVoiceMessage(): UseMutationResult<
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: chatQueryKeys.inbox }),
         queryClient.invalidateQueries({ queryKey: chatQueryKeys.feedConversations }),
+        // Same as text: refresh lifecycle after sending (trigger may update first_reply_at).
+        queryClient.invalidateQueries({ queryKey: chatQueryKeys.conversation(vars.conversationId) }),
       ]);
     },
   });

@@ -113,6 +113,7 @@ export default function ConversationRoute() {
         },
         () => {
           void queryClient.invalidateQueries({ queryKey: chatQueryKeys.messages(id) });
+          void queryClient.invalidateQueries({ queryKey: chatQueryKeys.conversation(id) });
           markReadRef.current();
         },
       )
