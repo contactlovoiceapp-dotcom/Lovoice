@@ -14,6 +14,7 @@ import VoiceOnlyCountdown from '@/features/chat/components/VoiceOnlyCountdown';
 import ActionsSheet from '@/features/moderation/components/ActionsSheet';
 import ReportSheet from '@/features/moderation/components/ReportSheet';
 import BlockConfirmModal from '@/features/moderation/components/BlockConfirmModal';
+import MemberProfileModal from '@/features/profile/components/MemberProfileModal';
 
 export interface ConversationScreenProps {
   details: ConversationDetails | undefined;
@@ -75,6 +76,7 @@ export default function ConversationScreen({
   const [actionsVisible, setActionsVisible] = useState(false);
   const [reportVisible, setReportVisible] = useState(false);
   const [blockVisible, setBlockVisible] = useState(false);
+  const [profileVisible, setProfileVisible] = useState(false);
 
   const burstMessages = useMemo(() => groupMessagesIntoBursts(messages), [messages]);
 
@@ -114,6 +116,7 @@ export default function ConversationScreen({
         avatarEmoji={avatarEmoji}
         onClose={onClose}
         onPressMore={handlePressMore}
+        onPressProfile={() => setProfileVisible(true)}
       />
 
       {details?.lifecycle.state === 'voice_only' && (
@@ -196,6 +199,16 @@ export default function ConversationScreen({
           />
         </>
       )}
+
+      {/* onOpenConversation closes the modal instead of pushing a duplicate route —
+          the user is already inside this conversation. */}
+      <MemberProfileModal
+        visible={profileVisible}
+        userId={details?.otherUserId ?? null}
+        voiceId={details?.otherActiveVoiceId ?? null}
+        onClose={() => setProfileVisible(false)}
+        onOpenConversation={() => setProfileVisible(false)}
+      />
     </View>
   );
 }

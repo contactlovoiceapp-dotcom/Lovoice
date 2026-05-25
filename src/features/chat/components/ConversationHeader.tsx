@@ -13,6 +13,7 @@ interface ConversationHeaderProps {
   avatarEmoji: string;
   onClose: () => void;
   onPressMore: () => void;
+  onPressProfile: () => void;
 }
 
 export default function ConversationHeader({
@@ -21,6 +22,7 @@ export default function ConversationHeader({
   avatarEmoji,
   onClose,
   onPressMore,
+  onPressProfile,
 }: ConversationHeaderProps) {
   return (
     <View
@@ -43,36 +45,44 @@ export default function ConversationHeader({
         <ChevronLeft size={24} color={COLORS.dark} />
       </Pressable>
 
-      <View
-        style={{
-          width: 32,
-          height: 32,
-          borderRadius: 16,
-          backgroundColor: COLORS.primaryMuted,
-          alignItems: 'center',
-          justifyContent: 'center',
-          marginRight: 8,
-        }}
+      {/* Tapping the avatar or name opens the profile */}
+      <Pressable
+        onPress={onPressProfile}
+        accessibilityRole="button"
+        accessibilityLabel={displayName}
+        style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}
       >
-        <Text style={{ fontSize: 16 }}>{avatarEmoji}</Text>
-      </View>
-
-      <View style={{ flex: 1 }}>
-        <Text
-          style={{ fontFamily: FONT.bold, fontSize: 16, color: COLORS.dark }}
-          numberOfLines={1}
+        <View
+          style={{
+            width: 32,
+            height: 32,
+            borderRadius: 16,
+            backgroundColor: COLORS.primaryMuted,
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginRight: 8,
+          }}
         >
-          {displayName}
-        </Text>
-        {subtitle !== '' && (
+          <Text style={{ fontSize: 16 }}>{avatarEmoji}</Text>
+        </View>
+
+        <View style={{ flex: 1 }}>
           <Text
-            style={{ fontFamily: FONT.regular, fontSize: 12, color: COLORS.textSecondary }}
+            style={{ fontFamily: FONT.bold, fontSize: 16, color: COLORS.dark }}
             numberOfLines={1}
           >
-            {subtitle}
+            {displayName}
           </Text>
-        )}
-      </View>
+          {subtitle !== '' && (
+            <Text
+              style={{ fontFamily: FONT.regular, fontSize: 12, color: COLORS.textSecondary }}
+              numberOfLines={1}
+            >
+              {subtitle}
+            </Text>
+          )}
+        </View>
+      </Pressable>
 
       <Pressable
         onPress={onPressMore}

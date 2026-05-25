@@ -66,9 +66,15 @@ export interface MemberProfileModalProps {
   userId: string | null;
   voiceId: string | null;
   onClose: () => void;
+  /**
+   * Override the default navigation when the user taps "Ouvrir la conversation".
+   * Useful when the modal is opened from inside a ConversationScreen — pass a handler
+   * that simply closes the modal so no duplicate route is pushed onto the stack.
+   */
+  onOpenConversation?: (conversationId: string) => void;
 }
 
-export default function MemberProfileModal({ visible, userId, voiceId, onClose }: MemberProfileModalProps) {
+export default function MemberProfileModal({ visible, userId, voiceId, onClose, onOpenConversation }: MemberProfileModalProps) {
   const insets = useSafeAreaInsets();
   const enabled = visible && !!userId;
 
@@ -162,10 +168,14 @@ export default function MemberProfileModal({ visible, userId, voiceId, onClose }
   const handleOpenConversation = useCallback(
     (targetConversationId: string) => {
       voicePlayerRef.current.stop();
+      if (onOpenConversation) {
+        onOpenConversation(targetConversationId);
+        return;
+      }
       onClose();
       router.push(`/(main)/messages/${targetConversationId}`);
     },
-    [onClose],
+    [onClose, onOpenConversation],
   );
 
   return (
