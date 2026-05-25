@@ -1,4 +1,4 @@
-// Hold-to-record voice recorder state machine for in-conversation voice messages.
+// Tap-to-record voice recorder for in-conversation voice messages (WhatsApp-style).
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -18,13 +18,7 @@ import {
   configureAudioSessionForPlayback,
 } from '@/lib/audio';
 
-export type ChatRecorderState =
-  | 'idle'
-  | 'recording'
-  | 'cancel_hover'
-  | 'preview'
-  | 'cancelled'
-  | 'error';
+export type ChatRecorderState = 'idle' | 'recording' | 'error';
 
 export interface ChatVoiceRecorderResult {
   uri: string;
@@ -37,17 +31,11 @@ export interface ChatVoiceRecorderHook {
   meteringDb: number[];
   result: ChatVoiceRecorderResult | null;
   error: string | null;
-  isLikelySilent: boolean;
   start: () => Promise<void>;
-  setCancelHover: (active: boolean) => void;
   stopAndSend: () => Promise<ChatVoiceRecorderResult | null>;
-  stopAndPreview: () => Promise<void>;
-  reset: () => Promise<void>;
-  rerecord: () => Promise<void>;
+  cancel: () => Promise<void>;
 }
 
-const VOICE_THRESHOLD_DB = -30;
-const VOICE_SAMPLE_MIN_RATIO = 0.05;
 const METERING_RING_SIZE = 60;
 
 function ensurePendingDirectory(): Directory {
@@ -62,13 +50,10 @@ export function useChatVoiceRecorder(): ChatVoiceRecorderHook {
   const [state, setState] = useState<ChatRecorderState>('idle');
   const [durationMs, setDurationMs] = useState(0);
   const [meteringDb, setMeteringDb] = useState<number[]>([]);
-  const [isLikelySilent, setIsLikelySilent] = useState(false);
   const [result, setResult] = useState<ChatVoiceRecorderResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const hardCapFiredRef = useRef(false);
-  const totalSamplesRef = useRef(0);
-  const voiceSamplesRef = useRef(0);
   const stateRef = useRef(state);
   stateRef.current = state;
 
@@ -76,15 +61,11 @@ export function useChatVoiceRecorder(): ChatVoiceRecorderHook {
   const recorderState = useAudioRecorderState(recorder, METERING_INTERVAL_MS);
 
   useEffect(() => {
-    if (state !== 'recording' && state !== 'cancel_hover') return;
+    if (state !== 'recording') return;
     setDurationMs(Math.min(recorderState.durationMillis, MAX_VOICE_DURATION_MS));
 
     if (recorderState.metering !== undefined) {
       const sample = recorderState.metering as number;
-      totalSamplesRef.current += 1;
-      if (sample > VOICE_THRESHOLD_DB) {
-        voiceSamplesRef.current += 1;
-      }
       setMeteringDb((prev) => {
         const next = [...prev, sample];
         return next.length > METERING_RING_SIZE ? next.slice(-METERING_RING_SIZE) : next;
@@ -92,15 +73,20 @@ export function useChatVoiceRecorder(): ChatVoiceRecorderHook {
     }
   }, [recorderState.durationMillis, recorderState.metering, state]);
 
-  // Hard cap auto-stop: always lands in preview so the user can decide.
+  // Hard cap auto-stop: finalize and return to idle with result ready to send.
   useEffect(() => {
     if (
-      (state === 'recording' || state === 'cancel_hover') &&
+      state === 'recording' &&
       recorderState.durationMillis >= MAX_VOICE_DURATION_MS &&
       !hardCapFiredRef.current
     ) {
       hardCapFiredRef.current = true;
-      void performStopAndPreview();
+      void finalizeRecording().then((res) => {
+        if (res) {
+          setResult(res);
+          setState('idle');
+        }
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recorderState.durationMillis, state]);
@@ -135,16 +121,12 @@ export function useChatVoiceRecorder(): ChatVoiceRecorderHook {
       const rawDuration = recorderState.durationMillis || durationMs;
       const finalDuration = Math.min(rawDuration, MAX_VOICE_DURATION_MS);
 
-      const voiceRatio =
-        totalSamplesRef.current > 0
-          ? voiceSamplesRef.current / totalSamplesRef.current
-          : 0;
-      setIsLikelySilent(voiceRatio < VOICE_SAMPLE_MIN_RATIO);
-
+      await configureAudioSessionForPlayback();
       return { uri: destFile.uri, durationMs: finalDuration };
     } catch (err) {
       setState('error');
       setError(err instanceof Error ? err.message : 'stop_failed');
+      await configureAudioSessionForPlayback();
       return null;
     }
   }, [recorder, recorderState.durationMillis, durationMs]);
@@ -163,11 +145,8 @@ export function useChatVoiceRecorder(): ChatVoiceRecorderHook {
       recorder.record();
 
       hardCapFiredRef.current = false;
-      totalSamplesRef.current = 0;
-      voiceSamplesRef.current = 0;
       setDurationMs(0);
       setMeteringDb([]);
-      setIsLikelySilent(false);
       setResult(null);
       setError(null);
       setState('recording');
@@ -177,16 +156,8 @@ export function useChatVoiceRecorder(): ChatVoiceRecorderHook {
     }
   }, [recorder]);
 
-  const setCancelHover = useCallback((active: boolean) => {
-    setState((prev) => {
-      if (active && prev === 'recording') return 'cancel_hover';
-      if (!active && prev === 'cancel_hover') return 'recording';
-      return prev;
-    });
-  }, []);
-
   const stopAndSend = useCallback(async (): Promise<ChatVoiceRecorderResult | null> => {
-    if (stateRef.current !== 'recording' && stateRef.current !== 'cancel_hover') return null;
+    if (stateRef.current !== 'recording') return null;
     const res = await finalizeRecording();
     if (!res) return null;
 
@@ -196,71 +167,35 @@ export function useChatVoiceRecorder(): ChatVoiceRecorderHook {
       } catch { /* non-fatal */ }
       setState('idle');
       setError('too_short');
-      await configureAudioSessionForPlayback();
       return null;
     }
 
     setResult(res);
     setState('idle');
-    await configureAudioSessionForPlayback();
     return res;
   }, [finalizeRecording]);
 
-  const performStopAndPreview = useCallback(async (): Promise<void> => {
-    const res = await finalizeRecording();
-    if (!res) return;
-
-    if (res.durationMs < MIN_VOICE_MESSAGE_DURATION_MS) {
-      try {
-        new File(res.uri).delete();
-      } catch { /* non-fatal */ }
-      setState('idle');
-      setError('too_short');
-      await configureAudioSessionForPlayback();
-      return;
-    }
-
-    setResult(res);
-    setState('preview');
-    await configureAudioSessionForPlayback();
-  }, [finalizeRecording]);
-
-  const stopAndPreview = useCallback(async (): Promise<void> => {
-    if (stateRef.current !== 'recording' && stateRef.current !== 'cancel_hover') return;
-    await performStopAndPreview();
-  }, [performStopAndPreview]);
-
-  const reset = useCallback(async () => {
+  const cancel = useCallback(async () => {
     try {
-      try {
-        if (recorder.isRecording) {
-          await recorder.stop();
-        }
-      } catch { /* already released */ }
-
-      if (result?.uri) {
-        try {
-          new File(result.uri).delete();
-        } catch { /* non-fatal */ }
+      if (recorder.isRecording) {
+        await recorder.stop();
       }
-    } finally {
-      setResult(null);
-      setError(null);
-      setDurationMs(0);
-      setMeteringDb([]);
-      setIsLikelySilent(false);
-      hardCapFiredRef.current = false;
-      totalSamplesRef.current = 0;
-      voiceSamplesRef.current = 0;
-      setState('idle');
-      await configureAudioSessionForPlayback();
-    }
-  }, [recorder, result]);
+    } catch { /* already released */ }
 
-  const rerecord = useCallback(async () => {
-    await reset();
-    await start();
-  }, [reset, start]);
+    if (result?.uri) {
+      try {
+        new File(result.uri).delete();
+      } catch { /* non-fatal */ }
+    }
+
+    setResult(null);
+    setError(null);
+    setDurationMs(0);
+    setMeteringDb([]);
+    hardCapFiredRef.current = false;
+    setState('idle');
+    await configureAudioSessionForPlayback();
+  }, [recorder, result]);
 
   return {
     state,
@@ -268,12 +203,8 @@ export function useChatVoiceRecorder(): ChatVoiceRecorderHook {
     meteringDb,
     result,
     error,
-    isLikelySilent,
     start,
-    setCancelHover,
     stopAndSend,
-    stopAndPreview,
-    reset,
-    rerecord,
+    cancel,
   };
 }

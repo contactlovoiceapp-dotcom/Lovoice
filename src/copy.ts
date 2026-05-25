@@ -285,7 +285,10 @@ export const COPY = {
       composerHintInitial: 'Envoie un vocal — tu n\'as qu\'une chance.',
       composerHintRecipientReply: 'À ton tour — réponds avec un vocal.',
       composerHintEmptyDefensive: 'Cette conversation n\'est pas disponible.',
-      composerHintVoiceOnly: 'Mode vocal — envoie un vocal.',
+      composerHintVoiceOnly: (h: number, m: number) =>
+        `Messagerie texte disponible dans ${h}h${m.toString().padStart(2, '0')}`,
+      conversationInfoBanner: (name: string) =>
+        `Si tu réponds à ${name}, ${name} pourra te répondre librement.`,
       sendError: {
         first_message_must_be_voice: 'Le premier message doit être un vocal.',
         reply_must_be_voice: 'Réponds avec un vocal pour démarrer la conversation.',
@@ -313,17 +316,10 @@ export const COPY = {
       inputPlaceholder: 'Écris ton message…',
       sendingLabel: 'Envoi…',
       failedLabel: 'Échec — toucher pour réessayer',
-      recordingHint: 'Glisse vers le haut pour annuler',
-      recordingCancelHint: 'Relâche pour annuler',
-      recordingTooShort: 'Maintiens plus longtemps pour enregistrer.',
+      cancelRecording: 'Annuler l\'enregistrement',
+      sendVoice: 'Envoyer le vocal',
+      recordingTooShort: 'Trop court — enregistre au moins 1 seconde.',
       recordingError: 'Échec de l\'enregistrement. Réessaie.',
-      preview: {
-        reRecord: 'Réenregistrer',
-        send: 'Envoyer',
-        discard: 'Annuler',
-        playA11y: 'Lecture du vocal',
-        pauseA11y: 'Pause du vocal',
-      },
       voiceMessage: {
         playA11y: 'Lecture du message vocal',
         pauseA11y: 'Pause du message vocal',

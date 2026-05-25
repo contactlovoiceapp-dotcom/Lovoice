@@ -1,16 +1,15 @@
 /* Presentational conversation screen — message list, composer, and header. No data fetching. */
 
 import React, { useCallback, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, View } from 'react-native';
+import { ActivityIndicator, FlatList, Text, View } from 'react-native';
 
-import { COLORS } from '@/theme';
+import { COLORS, FONT, RADIUS } from '@/theme';
 import { COPY } from '@/copy';
 import type { ChatMessage, ConversationDetails } from '@/features/chat/types';
 import { groupMessagesIntoBursts } from '@/features/chat/types';
 import MessageBubble from '@/features/chat/components/MessageBubble';
 import ConversationComposer from '@/features/chat/components/ConversationComposer';
 import ConversationHeader from '@/features/chat/components/ConversationHeader';
-import VoiceOnlyCountdown from '@/features/chat/components/VoiceOnlyCountdown';
 import ActionsSheet from '@/features/moderation/components/ActionsSheet';
 import ReportSheet from '@/features/moderation/components/ReportSheet';
 import BlockConfirmModal from '@/features/moderation/components/BlockConfirmModal';
@@ -38,8 +37,8 @@ export interface ConversationScreenProps {
   onTextChange: (text: string) => void;
 }
 
-// The voice-only countdown lives in the screen body (VoiceOnlyCountdown) and ticks every 30s,
-// so the header subtitle stays static and complementary instead of duplicating a snapshot.
+// The voice-only countdown lives in the composer bar (voice_only state).
+// The header subtitle stays static and complementary.
 function deriveHeaderSubtitle(details: ConversationDetails | undefined): string {
   if (!details) return '';
   const { lifecycle } = details;
@@ -50,6 +49,38 @@ function deriveHeaderSubtitle(details: ConversationDetails | undefined): string 
   }
   if (lifecycle.state === 'voice_only') return COPY.chat.inbox.voiceOnlyBadge;
   return '';
+}
+
+// Inline info banner — shown at the top of the message list (ListFooterComponent on inverted FlatList)
+// when the current user is the recipient who hasn't replied yet.
+function ConversationInfoBanner({ name }: { name: string }) {
+  return (
+    <View
+      style={{
+        marginHorizontal: 16,
+        marginTop: 12,
+        marginBottom: 8,
+        paddingVertical: 10,
+        paddingHorizontal: 14,
+        backgroundColor: COLORS.surface,
+        borderRadius: RADIUS.card,
+        borderWidth: 1,
+        borderColor: COLORS.border,
+      }}
+    >
+      <Text
+        style={{
+          fontFamily: FONT.regular,
+          fontSize: 13,
+          color: COLORS.textSecondary,
+          textAlign: 'center',
+          lineHeight: 18,
+        }}
+      >
+        {COPY.chat.conversation.conversationInfoBanner(name)}
+      </Text>
+    </View>
+  );
 }
 
 export default function ConversationScreen({
@@ -119,15 +150,6 @@ export default function ConversationScreen({
         onPressProfile={() => setProfileVisible(true)}
       />
 
-      {details?.lifecycle.state === 'voice_only' && (
-        <View style={{ paddingTop: 8, paddingBottom: 4 }}>
-          <VoiceOnlyCountdown
-            voiceOnlyUntil={details.lifecycle.voiceOnlyUntil}
-            onExpired={onCountdownExpired}
-          />
-        </View>
-      )}
-
       {isLoadingMessages && messages.length === 0 ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
           <ActivityIndicator size="small" color={COLORS.primary} />
@@ -141,9 +163,14 @@ export default function ConversationScreen({
           onEndReached={hasOlderMessages ? fetchOlderMessages : undefined}
           onEndReachedThreshold={0.3}
           ListFooterComponent={
-            isFetchingOlder ? (
-              <ActivityIndicator size="small" color={COLORS.primary} style={{ marginVertical: 12 }} />
-            ) : null
+            <>
+              {details?.lifecycle.state === 'awaiting_reply' && !details.iAmInitiator && (
+                <ConversationInfoBanner name={details.otherDisplayName} />
+              )}
+              {isFetchingOlder && (
+                <ActivityIndicator size="small" color={COLORS.primary} style={{ marginVertical: 12 }} />
+              )}
+            </>
           }
           renderItem={({ item }) => (
             <MessageBubble
@@ -170,6 +197,7 @@ export default function ConversationScreen({
         isSendingVoice={isSendingVoice}
         onRecordingStateChange={onRecordingStateChange}
         onTextChange={onTextChange}
+        onCountdownExpired={onCountdownExpired}
       />
 
       {details && (

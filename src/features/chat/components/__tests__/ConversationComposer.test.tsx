@@ -98,12 +98,13 @@ describe('ConversationComposer', () => {
   });
 
   it('renders a voice button in voice_only state', () => {
-    const { getByTestId, getByText } = renderComposer({
-      lifecycle: { state: 'voice_only', firstReplyAt: '2026-05-24T10:00:00Z', voiceOnlyUntil: '2026-05-25T10:00:00Z' },
+    // voiceOnlyUntil is far in the future so the countdown renders a non-expired time.
+    const future = new Date(Date.now() + 23 * 60 * 60 * 1000).toISOString();
+    const { getByTestId } = renderComposer({
+      lifecycle: { state: 'voice_only', firstReplyAt: new Date().toISOString(), voiceOnlyUntil: future },
     });
 
     expect(getByTestId('voice-button')).toBeTruthy();
-    expect(getByText(COPY.chat.conversation.composerHintVoiceOnly)).toBeTruthy();
   });
 
   it('renders a voice button for initiator in empty state', () => {

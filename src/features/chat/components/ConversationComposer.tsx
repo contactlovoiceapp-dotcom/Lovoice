@@ -1,26 +1,23 @@
-/* Composer bar — text input + hold-to-record voice, adapts to the 4-state conversation lifecycle. */
+/* Composer bar — text input + tap-to-record voice, adapts to the 4-state conversation lifecycle. */
 
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  PanResponder,
   Pressable,
   Text,
   TextInput,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Mic, Pause, Play, Send, X } from 'lucide-react-native';
+import { ArrowRight, Mic, Send, X } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 
 import { COLORS, FONT, RADIUS } from '@/theme';
 import { COPY } from '@/copy';
 import type { ConversationLifecycle } from '../types';
+import { formatVoiceOnlyCountdown } from '../types';
 import { useChatVoiceRecorder } from '../hooks/useChatVoiceRecorder';
-import { useVoicePlayer } from '@/features/voices/hooks/useVoicePlayer';
 import { pauseAllChatMessages } from '../lib/chatMessagePlayer';
-
-const CANCEL_THRESHOLD_Y = -60;
 
 interface ConversationComposerProps {
   lifecycle: ConversationLifecycle;
@@ -30,10 +27,10 @@ interface ConversationComposerProps {
   onSendVoice: (uri: string, durationMs: number) => Promise<void>;
   isSending: boolean;
   isSendingVoice: boolean;
-  /** Fired on every text change with the raw (untrimmed) value. Used by the route to emit typing broadcasts. */
   onTextChange?: (text: string) => void;
-  /** Hook for Block 7.6 — typing/recording broadcasts. */
   onRecordingStateChange?: (isRecording: boolean) => void;
+  /** Called when the voice-only window expires so the route can re-fetch the lifecycle. */
+  onCountdownExpired?: () => void;
 }
 
 function HintBanner({ text }: { text: string }) {
@@ -69,6 +66,37 @@ function formatTimer(ms: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
+/**
+ * Ticking countdown banner for the voice-only window.
+ * Fires onExpired when the target time is reached.
+ */
+function VoiceOnlyHintBanner({
+  voiceOnlyUntil,
+  onExpired,
+}: {
+  voiceOnlyUntil: string;
+  onExpired?: () => void;
+}) {
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 30_000);
+    return () => clearInterval(id);
+  }, []);
+
+  const { hours, minutes, expired } = formatVoiceOnlyCountdown(voiceOnlyUntil, now);
+
+  useEffect(() => {
+    if (expired) onExpired?.();
+  }, [expired, onExpired]);
+
+  const text = expired
+    ? COPY.chat.conversation.composerHintVoiceOnly(0, 0)
+    : COPY.chat.conversation.composerHintVoiceOnly(hours, minutes);
+
+  return <HintBanner text={text} />;
+}
+
 export default function ConversationComposer({
   lifecycle,
   iAmInitiator,
@@ -79,21 +107,14 @@ export default function ConversationComposer({
   isSendingVoice,
   onTextChange,
   onRecordingStateChange,
+  onCountdownExpired,
 }: ConversationComposerProps) {
   const insets = useSafeAreaInsets();
   const [text, setText] = useState('');
   const [tooShortHint, setTooShortHint] = useState(false);
 
   const recorder = useChatVoiceRecorder();
-  const previewPlayer = useVoicePlayer({ uri: recorder.result?.uri ?? null });
-
-  const isRecording = recorder.state === 'recording' || recorder.state === 'cancel_hover';
-  const isPreview = recorder.state === 'preview';
-  const isCancelHover = recorder.state === 'cancel_hover';
-
-  // Whether releasing the button should preview (vs direct send).
-  const shouldPreview =
-    lifecycle.state === 'empty' || lifecycle.state === 'awaiting_reply';
+  const isRecording = recorder.state === 'recording';
 
   const canSendText = text.trim().length > 0 && !isSending;
 
@@ -104,77 +125,29 @@ export default function ConversationComposer({
     await onSendText(body);
   }, [text, onSendText]);
 
-  // PanResponder for slide-up cancel detection during recording.
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => false,
-      onMoveShouldSetPanResponder: (_evt, gs) => Math.abs(gs.dy) > 10,
-      onPanResponderMove: (_evt, gs) => {
-        if (gs.dy < CANCEL_THRESHOLD_Y) {
-          recorder.setCancelHover(true);
-        } else {
-          recorder.setCancelHover(false);
-        }
-      },
-      onPanResponderRelease: () => {
-        // Release handling is done in onPressOut.
-      },
-    }),
-  ).current;
-
-  const handlePressIn = useCallback(async () => {
+  const handleStartRecording = useCallback(async () => {
     setTooShortHint(false);
     pauseAllChatMessages();
     onRecordingStateChange?.(true);
     await recorder.start();
   }, [recorder, onRecordingStateChange]);
 
-  const handlePressOut = useCallback(async () => {
+  const handleSendVoice = useCallback(async () => {
     onRecordingStateChange?.(false);
-
-    if (recorder.state === 'cancel_hover') {
-      await recorder.reset();
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      return;
+    const result = await recorder.stopAndSend();
+    if (result) {
+      await onSendVoice(result.uri, result.durationMs);
+    } else if (recorder.error === 'too_short') {
+      setTooShortHint(true);
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     }
+  }, [recorder, onSendVoice, onRecordingStateChange]);
 
-    if (recorder.state !== 'recording') return;
-
-    if (shouldPreview) {
-      await recorder.stopAndPreview();
-      if (recorder.error === 'too_short') {
-        setTooShortHint(true);
-        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      }
-    } else {
-      const result = await recorder.stopAndSend();
-      if (result) {
-        await onSendVoice(result.uri, result.durationMs);
-      } else if (recorder.error === 'too_short') {
-        setTooShortHint(true);
-        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      }
-    }
-  }, [recorder, shouldPreview, onSendVoice, onRecordingStateChange]);
-
-  const handlePreviewSend = useCallback(async () => {
-    if (!recorder.result) return;
-    previewPlayer.stop();
-    await onSendVoice(recorder.result.uri, recorder.result.durationMs);
-    await recorder.reset();
-  }, [recorder, previewPlayer, onSendVoice]);
-
-  const handlePreviewDiscard = useCallback(async () => {
-    previewPlayer.stop();
-    await recorder.reset();
-  }, [recorder, previewPlayer]);
-
-  const handleRerecord = useCallback(async () => {
-    previewPlayer.stop();
-    pauseAllChatMessages();
-    onRecordingStateChange?.(true);
-    await recorder.rerecord();
-  }, [recorder, previewPlayer, onRecordingStateChange]);
+  const handleCancelRecording = useCallback(async () => {
+    onRecordingStateChange?.(false);
+    await recorder.cancel();
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+  }, [recorder, onRecordingStateChange]);
 
   const containerStyle = {
     borderTopWidth: 1,
@@ -185,143 +158,61 @@ export default function ConversationComposer({
     backgroundColor: COLORS.background,
   };
 
-  // Recording overlay state.
+  // Recording state — simple: cancel (X) on left, timer in center, send (→) on right.
   if (isRecording) {
     return (
-      <View style={containerStyle} {...panResponder.panHandlers}>
-        {isCancelHover ? (
-          <View style={{ alignItems: 'center', paddingVertical: 14 }}>
-            <View
-              style={{
-                backgroundColor: '#ef4444',
-                borderRadius: RADIUS.cta,
-                paddingVertical: 8,
-                paddingHorizontal: 16,
-              }}
-            >
-              <Text style={{ fontFamily: FONT.medium, fontSize: 14, color: '#ffffff' }}>
-                ✕ {COPY.chat.conversation.recordingCancelHint}
-              </Text>
-            </View>
-          </View>
-        ) : (
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6 }}>
-            <View
-              style={{
-                width: 10,
-                height: 10,
-                borderRadius: 5,
-                backgroundColor: '#ef4444',
-              }}
-            />
-            <Text style={{ fontFamily: FONT.medium, fontSize: 15, color: COLORS.dark }}>
-              {formatTimer(recorder.durationMs)} / 1:30
-            </Text>
-            <View style={{ flex: 1 }} />
-            <Text style={{ fontFamily: FONT.regular, fontSize: 12, color: COLORS.textSecondary }}>
-              {COPY.chat.conversation.recordingHint}
-            </Text>
-          </View>
-        )}
-
-        <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: 8 }}>
-          <View
+      <View style={containerStyle}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <Pressable
+            onPress={() => void handleCancelRecording()}
+            accessibilityLabel={COPY.chat.conversation.cancelRecording}
+            accessibilityRole="button"
+            testID="recording-cancel-button"
             style={{
-              width: 52,
-              height: 52,
-              borderRadius: 26,
-              backgroundColor: '#ef4444',
+              width: 40,
+              height: 40,
+              borderRadius: 20,
+              backgroundColor: COLORS.surface,
+              borderWidth: 1,
+              borderColor: COLORS.border,
               alignItems: 'center',
               justifyContent: 'center',
             }}
           >
-            <Mic size={22} color="#ffffff" />
+            <X size={20} color={COLORS.textSecondary} />
+          </Pressable>
+
+          <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+            <View
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: 4,
+                backgroundColor: '#ef4444',
+              }}
+            />
+            <Text style={{ fontFamily: FONT.medium, fontSize: 16, color: COLORS.dark }}>
+              {formatTimer(recorder.durationMs)}
+            </Text>
           </View>
+
+          <Pressable
+            onPress={() => void handleSendVoice()}
+            accessibilityLabel={COPY.chat.conversation.sendVoice}
+            accessibilityRole="button"
+            testID="recording-send-button"
+            style={{
+              width: 40,
+              height: 40,
+              borderRadius: 20,
+              backgroundColor: COLORS.primary,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <ArrowRight size={20} color="#ffffff" />
+          </Pressable>
         </View>
-      </View>
-    );
-  }
-
-  // Preview state.
-  if (isPreview && recorder.result) {
-    return (
-      <View style={{ ...containerStyle, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-        <Pressable
-          onPress={handlePreviewDiscard}
-          accessibilityLabel={COPY.chat.conversation.preview.discard}
-          accessibilityRole="button"
-          style={{
-            width: 32,
-            height: 32,
-            borderRadius: 16,
-            backgroundColor: COLORS.primaryMuted,
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <X size={16} color={COLORS.primary} />
-        </Pressable>
-
-        <Pressable
-          onPress={previewPlayer.isPlaying ? previewPlayer.pause : () => void previewPlayer.play()}
-          accessibilityLabel={
-            previewPlayer.isPlaying
-              ? COPY.chat.conversation.preview.pauseA11y
-              : COPY.chat.conversation.preview.playA11y
-          }
-          accessibilityRole="button"
-          testID="preview-play-button"
-          style={{
-            width: 32,
-            height: 32,
-            borderRadius: 16,
-            backgroundColor: COLORS.primary,
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          {previewPlayer.isPlaying ? (
-            <Pause size={14} color="#ffffff" fill="#ffffff" />
-          ) : (
-            <Play size={14} color="#ffffff" fill="#ffffff" />
-          )}
-        </Pressable>
-
-        <Text style={{ fontFamily: FONT.medium, fontSize: 13, color: COLORS.dark, flex: 1 }}>
-          {formatTimer(recorder.result.durationMs)}
-        </Text>
-
-        <Pressable
-          onPress={handleRerecord}
-          accessibilityRole="button"
-        >
-          <Text style={{ fontFamily: FONT.medium, fontSize: 13, color: COLORS.primary }}>
-            {COPY.chat.conversation.preview.reRecord}
-          </Text>
-        </Pressable>
-
-        <Pressable
-          onPress={() => void handlePreviewSend()}
-          disabled={isSendingVoice}
-          accessibilityLabel={COPY.chat.conversation.preview.send}
-          accessibilityRole="button"
-          testID="preview-send-button"
-          style={{
-            width: 36,
-            height: 36,
-            borderRadius: 18,
-            backgroundColor: COLORS.primary,
-            alignItems: 'center',
-            justifyContent: 'center',
-            opacity: isSendingVoice ? 0.5 : 1,
-          }}
-        >
-          {isSendingVoice ? (
-            <ActivityIndicator size="small" color="#ffffff" />
-          ) : (
-            <Send size={16} color="#ffffff" />
-          )}
-        </Pressable>
       </View>
     );
   }
@@ -368,11 +259,10 @@ export default function ConversationComposer({
     </Text>
   ) : null;
 
-  // Voice button — press-and-hold for recording.
+  // Voice button — tap to start recording.
   const voiceButton = (
     <Pressable
-      onPressIn={() => void handlePressIn()}
-      onPressOut={() => void handlePressOut()}
+      onPress={() => void handleStartRecording()}
       accessibilityLabel={COPY.chat.conversation.voiceCtaLabel}
       accessibilityRole="button"
       testID="voice-button"
@@ -430,7 +320,10 @@ export default function ConversationComposer({
         {tooShortBanner}
         {errorBanner}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <HintBanner text={COPY.chat.conversation.composerHintVoiceOnly} />
+          <VoiceOnlyHintBanner
+            voiceOnlyUntil={lifecycle.voiceOnlyUntil}
+            onExpired={onCountdownExpired}
+          />
           {voiceButton}
         </View>
       </View>
