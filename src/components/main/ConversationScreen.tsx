@@ -63,7 +63,7 @@ function ConversationInfoBanner({ name }: { name: string }) {
         paddingVertical: 10,
         paddingHorizontal: 14,
         backgroundColor: COLORS.surface,
-        borderRadius: RADIUS.card,
+        borderRadius: RADIUS.md,
         borderWidth: 1,
         borderColor: COLORS.border,
       }}
