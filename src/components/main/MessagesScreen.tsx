@@ -1,6 +1,6 @@
 /* Presentational inbox screen — renders a list of conversations from props, no data fetching. */
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -206,6 +206,13 @@ const MessagesScreen: React.FC<MessagesScreenProps> = ({
   isRefreshing,
   onOpenConversation,
 }) => {
+  // Tick every minute so relative-time labels (e.g. "À l'instant" → "Il y a 1 min") stay current.
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), 60_000);
+    return () => clearInterval(id);
+  }, []);
+
   return (
     <View style={{ flex: 1, flexDirection: 'column' }}>
       <Text
