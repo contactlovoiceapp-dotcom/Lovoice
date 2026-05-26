@@ -126,6 +126,21 @@ function json(body: unknown, status: number, req: Request): Response {
   });
 }
 
+// Decodes the JWT role claim without re-verifying the signature.
+// The Supabase Edge Runtime validates the JWT signature before our code runs
+// (visible as "invalid: null" in Edge Function request logs). We only need
+// to confirm the decoded role is "service_role" to block non-internal callers.
+function getJwtRole(token: string): string | null {
+  try {
+    const payload = token.split('.')[1];
+    if (!payload) return null;
+    const decoded = JSON.parse(atob(payload)) as { role?: string };
+    return decoded.role ?? null;
+  } catch {
+    return null;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Handler
 // ---------------------------------------------------------------------------
@@ -139,13 +154,13 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return json({ error: 'method_not_allowed' }, 405, req);
   }
 
-  // Service-to-service auth: the DB trigger sends the service_role_key as a
-  // bearer token. This is NOT a user JWT — do not use requireAuth().
+  // Service-to-service auth: the DB trigger sends the service_role JWT as a
+  // bearer token. Supabase Edge Runtime validates the signature; we check the
+  // decoded role claim to block any non-service_role caller.
   const authHeader = req.headers.get('Authorization');
   const bearerToken = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
-  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
-  if (!bearerToken || !serviceRoleKey || bearerToken !== serviceRoleKey) {
+  if (!bearerToken || getJwtRole(bearerToken) !== 'service_role') {
     return json({ error: 'unauthorized' }, 401, req);
   }
 
