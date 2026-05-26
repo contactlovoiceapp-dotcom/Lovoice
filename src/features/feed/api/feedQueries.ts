@@ -55,6 +55,9 @@ async function fetchFeedPage(
   });
 
   if (error) {
+    if (__DEV__) {
+      console.error('[feed] get_feed RPC error', error.code, error.message, error.details);
+    }
     throw new Error(error.message);
   }
 

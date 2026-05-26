@@ -21,16 +21,59 @@ type SupabaseConfigResult =
 
 const extra = Constants.expoConfig?.extra as SupabaseExtra | undefined;
 
-const secureSessionStorage = {
-  async getItem(key: string): Promise<string | null> {
+// Android SecureStore has a 2048-byte limit per entry. Supabase session JSON
+// (JWT + refresh token + user metadata) can exceed this limit. We split large
+// values into chunks and reassemble them transparently.
+const CHUNK_SIZE = 1900; // stay well under the 2048-byte Android limit
+
+async function secureGet(key: string): Promise<string | null> {
+  const countStr = await SecureStore.getItemAsync(`${key}_numchunks`);
+  if (!countStr) {
+    // No chunked value — try the legacy single-key path (migration safety).
     return SecureStore.getItemAsync(key);
-  },
-  async setItem(key: string, value: string): Promise<void> {
-    await SecureStore.setItemAsync(key, value);
-  },
-  async removeItem(key: string): Promise<void> {
-    await SecureStore.deleteItemAsync(key);
-  },
+  }
+  const count = parseInt(countStr, 10);
+  const chunks: string[] = [];
+  for (let i = 0; i < count; i++) {
+    const chunk = await SecureStore.getItemAsync(`${key}_chunk_${i}`);
+    if (chunk === null) return null;
+    chunks.push(chunk);
+  }
+  return chunks.join('');
+}
+
+async function secureSet(key: string, value: string): Promise<void> {
+  // Remove any pre-existing chunked entries to avoid stale tails.
+  await secureRemove(key);
+
+  const chunks: string[] = [];
+  for (let i = 0; i < value.length; i += CHUNK_SIZE) {
+    chunks.push(value.slice(i, i + CHUNK_SIZE));
+  }
+
+  for (let i = 0; i < chunks.length; i++) {
+    await SecureStore.setItemAsync(`${key}_chunk_${i}`, chunks[i]);
+  }
+  await SecureStore.setItemAsync(`${key}_numchunks`, String(chunks.length));
+}
+
+async function secureRemove(key: string): Promise<void> {
+  const countStr = await SecureStore.getItemAsync(`${key}_numchunks`).catch(() => null);
+  if (countStr) {
+    const count = parseInt(countStr, 10);
+    for (let i = 0; i < count; i++) {
+      await SecureStore.deleteItemAsync(`${key}_chunk_${i}`).catch(() => null);
+    }
+    await SecureStore.deleteItemAsync(`${key}_numchunks`).catch(() => null);
+  }
+  // Also clean up legacy single-key entry if present.
+  await SecureStore.deleteItemAsync(key).catch(() => null);
+}
+
+const secureSessionStorage = {
+  getItem: secureGet,
+  setItem: secureSet,
+  removeItem: secureRemove,
 };
 
 let supabaseClient: SupabaseClient<Database> | null = null;
