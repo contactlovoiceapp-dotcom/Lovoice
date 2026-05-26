@@ -324,6 +324,7 @@ export const COPY = {
         playA11y: 'Lecture du message vocal',
         pauseA11y: 'Pause du message vocal',
         duration: (mmss: string) => `Durée : ${mmss}`,
+        playError: 'Impossible de lire ce vocal',
       },
       otherIsTyping: (name: string) => `${name} écrit…`,
       otherIsRecording: (name: string) => `${name} enregistre un vocal…`,

@@ -1,8 +1,8 @@
 /* Single chat bubble — renders text and voice messages with inline playback. */
 
 import React, { useMemo } from 'react';
-import { Dimensions, Pressable, Text, View } from 'react-native';
-import { Play, Pause } from 'lucide-react-native';
+import { ActivityIndicator, Dimensions, Pressable, Text, View } from 'react-native';
+import { AlertCircle, Play, Pause } from 'lucide-react-native';
 
 import { COLORS, FONT } from '@/theme';
 import { COPY } from '@/copy';
@@ -90,10 +90,53 @@ function VoiceBubbleContent({
   const barActiveColor = isMine ? '#ffffff' : COLORS.dark;
   const textColor = isMine ? '#ffffff' : COLORS.dark;
   const iconColor = isMine ? '#ffffff' : COLORS.primary;
+  const errorColor = isMine ? 'rgba(255,255,255,0.85)' : '#ef4444';
 
   const displayDuration = snapshot.isPlaying
     ? formatDurationMmSs(snapshot.positionMs)
     : formatDurationMmSs(durationMs);
+
+  // Error state: show a clear "can't play" indicator with tap-to-retry.
+  if (snapshot.error) {
+    return (
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          width: VOICE_BUBBLE_WIDTH,
+          height: VOICE_BUBBLE_HEIGHT,
+          gap: 8,
+        }}
+      >
+        <Pressable
+          onPress={controls.play}
+          accessibilityLabel={COPY.chat.conversation.voiceMessage.playA11y}
+          accessibilityRole="button"
+          hitSlop={8}
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: 18,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <AlertCircle size={18} color={errorColor} />
+        </Pressable>
+        <Text
+          style={{
+            flex: 1,
+            fontFamily: FONT.regular,
+            fontSize: 12,
+            color: errorColor,
+          }}
+          numberOfLines={1}
+        >
+          {COPY.chat.conversation.voiceMessage.playError}
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <View
@@ -123,7 +166,9 @@ function VoiceBubbleContent({
           justifyContent: 'center',
         }}
       >
-        {snapshot.isPlaying ? (
+        {snapshot.isLoading ? (
+          <ActivityIndicator size="small" color={iconColor} />
+        ) : snapshot.isPlaying ? (
           <Pause size={18} color={iconColor} fill={iconColor} />
         ) : (
           <Play size={18} color={iconColor} fill={iconColor} />

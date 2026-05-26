@@ -1,6 +1,7 @@
 // Single-instance audio player for chat voice message bubbles. Only one bubble plays at a time.
 // Uses an event-driven approach: waits for the native player to confirm source loading
 // before issuing play(), preventing silent failures and premature didJustFinish.
+// Includes timeout detection and one auto-retry with cache-bust for broken/expired URLs.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
@@ -12,12 +13,21 @@ const SIGNED_URL_TTL_SECONDS = 60 * 60;
 const SIGNED_URL_REFRESH_BUFFER_MS = 10 * 60 * 1000;
 const SIGNED_URL_LIFETIME_MS = SIGNED_URL_TTL_SECONDS * 1000 - SIGNED_URL_REFRESH_BUFFER_MS;
 
+// If the player doesn't start within this delay, consider the file unplayable.
+const PLAY_TIMEOUT_MS = 8_000;
+// If didJustFinish fires within this window after confirmed playback, it's likely a broken file.
+const SUSPICIOUS_FINISH_MS = 400;
+
 interface SignedUrlEntry {
   url: string;
   fetchedAt: number;
 }
 
 const signedUrlCache = new Map<string, SignedUrlEntry>();
+
+function invalidateCachedUrl(path: string): void {
+  signedUrlCache.delete(path);
+}
 
 async function ensureSignedUrl(path: string): Promise<string> {
   const now = Date.now();
@@ -44,6 +54,13 @@ async function ensureSignedUrl(path: string): Promise<string> {
 // Module-scoped: tracks which messageId is currently "owning" the shared player.
 let activeMessageId: string | null = null;
 let activeReleaseCallback: (() => void) | null = null;
+
+function clearActiveOwner(messageId: string): void {
+  if (activeMessageId === messageId) {
+    activeMessageId = null;
+    activeReleaseCallback = null;
+  }
+}
 
 /** Pauses whatever message bubble is currently playing. Called before recording starts. */
 export function pauseAllChatMessages(): void {
@@ -107,23 +124,32 @@ export function useChatMessagePlayer({
   const [isActive, setIsActive] = useState(false);
   const loadTokenRef = useRef(0);
   const sessionConfiguredRef = useRef(false);
-  // Track whether we want to auto-play once the native player finishes loading.
   const pendingPlayRef = useRef(false);
-  // Track the source we last fed to player.replace() to avoid redundant reloads.
   const loadedSourceRef = useRef<string | null>(null);
+  const playConfirmedAtRef = useRef<number>(0);
+  const retriedRef = useRef(false);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Register/unregister with the module-scoped singleton.
+  // Rising-edge detection: only react when didJustFinish transitions false→true.
+  // Prevents stale didJustFinish=true from killing a new play attempt.
+  const prevDidJustFinishRef = useRef(false);
+
+  const clearPlayTimeout = useCallback(() => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+  }, []);
+
   const releaseOwnership = useCallback(() => {
     try {
       player.pause();
     } catch { /* native recycled */ }
     pendingPlayRef.current = false;
+    clearPlayTimeout();
     setIsActive(false);
-    if (activeMessageId === messageId) {
-      activeMessageId = null;
-      activeReleaseCallback = null;
-    }
-  }, [player, messageId]);
+    clearActiveOwner(messageId);
+  }, [player, messageId, clearPlayTimeout]);
 
   useEffect(() => {
     return () => {
@@ -132,40 +158,8 @@ export function useChatMessagePlayer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Auto-play once the native player transitions from buffering to ready.
-  // This handles the case where play() is called before the source is loaded.
-  useEffect(() => {
-    if (!pendingPlayRef.current || !isActive) return;
-    // status.playing means the player already started on its own after replace+play.
-    // duration > 0 means the source is loaded and ready.
-    if (status.playing) {
-      pendingPlayRef.current = false;
-      setIsLoading(false);
-      return;
-    }
-    if (status.duration > 0 && !status.playing && !status.didJustFinish) {
-      pendingPlayRef.current = false;
-      setIsLoading(false);
-      try {
-        player.seekTo(0);
-        player.play();
-      } catch { /* native recycled */ }
-    }
-  }, [isActive, status.playing, status.duration, status.didJustFinish, player]);
-
-  // Reset play state when the track ends naturally.
-  useEffect(() => {
-    if (isActive && status.didJustFinish) {
-      pendingPlayRef.current = false;
-      setIsActive(false);
-      if (activeMessageId === messageId) {
-        activeMessageId = null;
-        activeReleaseCallback = null;
-      }
-    }
-  }, [isActive, status.didJustFinish, messageId]);
-
-  const play = useCallback(async () => {
+  // Core play logic — extracted so it can be called for initial play and for retry.
+  const doPlay = useCallback(async (isRetry: boolean) => {
     if (!source) return;
 
     // Claim ownership, kicking out any other playing bubble.
@@ -176,6 +170,9 @@ export function useChatMessagePlayer({
     activeReleaseCallback = releaseOwnership;
     setIsActive(true);
     setError(null);
+
+    // Reset rising-edge detector so we catch the next didJustFinish transition.
+    prevDidJustFinishRef.current = true;
 
     if (!sessionConfiguredRef.current) {
       await configureAudioSessionForPlayback();
@@ -190,13 +187,14 @@ export function useChatMessagePlayer({
       if (isLocalFile) {
         url = source;
       } else {
+        if (isRetry) invalidateCachedUrl(source);
         url = await ensureSignedUrl(source);
       }
 
       if (loadTokenRef.current !== token) return;
 
-      // Only call replace() if the source changed, to avoid resetting mid-playback.
-      if (loadedSourceRef.current !== url) {
+      // Always replace on retry; otherwise only if the source changed.
+      if (isRetry || loadedSourceRef.current !== url) {
         try {
           player.replace(url);
           loadedSourceRef.current = url;
@@ -207,29 +205,105 @@ export function useChatMessagePlayer({
         }
       }
 
-      // Mark that we want to play once the player is ready.
       pendingPlayRef.current = true;
+      playConfirmedAtRef.current = 0;
 
-      // Attempt immediate play — works if the source loaded synchronously (local file)
-      // or the native player already buffered enough. If the player is not ready yet,
-      // the effect above will catch it once duration > 0.
       try {
         player.seekTo(0);
         player.play();
       } catch { /* native recycled */ }
+
+      // Safety timeout: if the player doesn't confirm playback within PLAY_TIMEOUT_MS,
+      // surface an error so the user is not left hanging.
+      clearPlayTimeout();
+      timeoutRef.current = setTimeout(() => {
+        if (!pendingPlayRef.current) return;
+        pendingPlayRef.current = false;
+        setIsLoading(false);
+        setError('play_timeout');
+        setIsActive(false);
+        clearActiveOwner(messageId);
+      }, PLAY_TIMEOUT_MS);
     } catch (err) {
       if (loadTokenRef.current !== token) return;
       setError(err instanceof Error ? err.message : 'play_failed');
       setIsLoading(false);
     }
-  }, [source, isLocalFile, messageId, player, releaseOwnership]);
+  }, [source, isLocalFile, messageId, player, releaseOwnership, clearPlayTimeout]);
+
+  // Detect when playback actually starts (player confirms it's running).
+  useEffect(() => {
+    if (!pendingPlayRef.current || !isActive) return;
+    if (status.playing) {
+      pendingPlayRef.current = false;
+      playConfirmedAtRef.current = Date.now();
+      setIsLoading(false);
+      clearPlayTimeout();
+      // Reset edge detector now that playback is confirmed — next didJustFinish=true is real.
+      prevDidJustFinishRef.current = false;
+      return;
+    }
+    // Source loaded (duration known) but not yet playing — kick it.
+    if (status.duration > 0 && !status.playing && !status.didJustFinish) {
+      pendingPlayRef.current = false;
+      playConfirmedAtRef.current = Date.now();
+      setIsLoading(false);
+      clearPlayTimeout();
+      prevDidJustFinishRef.current = false;
+      try {
+        player.seekTo(0);
+        player.play();
+      } catch { /* native recycled */ }
+    }
+  }, [isActive, status.playing, status.duration, status.didJustFinish, player, clearPlayTimeout]);
+
+  // Handle track end — only on rising edge (false→true) to avoid reacting to stale state.
+  useEffect(() => {
+    const wasFinished = prevDidJustFinishRef.current;
+    prevDidJustFinishRef.current = status.didJustFinish;
+
+    // Only act on rising edge: was false, now true.
+    if (!status.didJustFinish || wasFinished) return;
+    if (!isActive) return;
+
+    clearPlayTimeout();
+
+    // If playback was never confirmed (or confirmed very recently), the file is likely broken.
+    const timeSinceConfirmed = playConfirmedAtRef.current > 0
+      ? Date.now() - playConfirmedAtRef.current
+      : 0;
+
+    const isSuspicious = playConfirmedAtRef.current === 0 || timeSinceConfirmed < SUSPICIOUS_FINISH_MS;
+
+    if (isSuspicious && !retriedRef.current) {
+      retriedRef.current = true;
+      void doPlay(true);
+      return;
+    }
+
+    // Normal end of playback, or retry also failed with the same suspicious finish.
+    pendingPlayRef.current = false;
+
+    if (isSuspicious) {
+      setError('play_failed');
+    }
+
+    setIsActive(false);
+    clearActiveOwner(messageId);
+  }, [isActive, status.didJustFinish, messageId, doPlay, clearPlayTimeout]);
+
+  const play = useCallback(() => {
+    retriedRef.current = false;
+    void doPlay(false);
+  }, [doPlay]);
 
   const pause = useCallback(() => {
     pendingPlayRef.current = false;
+    clearPlayTimeout();
     try {
       player.pause();
     } catch { /* native recycled */ }
-  }, [player]);
+  }, [player, clearPlayTimeout]);
 
   const snapshot = useMemo<ChatMessagePlayerSnapshot>(() => {
     if (!isActive) {
@@ -245,7 +319,7 @@ export function useChatMessagePlayer({
   }, [isActive, status.playing, status.currentTime, status.duration, isLoading, error]);
 
   const controls = useMemo<ChatMessagePlayerControls>(
-    () => ({ play: () => void play(), pause }),
+    () => ({ play, pause }),
     [play, pause],
   );
 
