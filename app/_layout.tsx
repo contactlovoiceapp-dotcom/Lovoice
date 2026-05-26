@@ -29,7 +29,12 @@ import {
 import { COLORS } from '../src/theme';
 import AuthRedirector from '../src/features/auth/components/AuthRedirector';
 import { AuthProvider } from '../src/features/auth/hooks/useAuth';
+import { setupNotificationHandler } from '../src/lib/push';
 import '../global.css';
+
+// Register the foreground notification handler once at module load — idempotent
+// per Expo docs, so calling it here (before any component mounts) is safe.
+setupNotificationHandler();
 
 // Keep native splash visible indefinitely
 SplashScreen.preventAutoHideAsync();

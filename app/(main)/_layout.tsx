@@ -1,6 +1,9 @@
 /* Main tab navigator — renders the 4 primary tabs with a custom floating pill nav bar.
-   Also mounts the global Realtime inbox listener so push badge updates work on all tabs,
-   and the push registration hook so the device token is stored on login. */
+   Mounts global side-effect hooks shared across all tabs:
+   - useRealtimeInbox: keeps the message badge live via Supabase Realtime
+   - usePushRegistration: stores the device Expo Push Token on login
+   - usePushDeepLink: navigates to the right screen when the user taps a notification
+   - useAppIconBadge: syncs the OS app icon badge with unread/unseen counts */
 
 import React from 'react';
 import { Tabs } from 'expo-router';
@@ -11,6 +14,8 @@ import BottomNav from '../../src/components/BottomNav';
 import { shouldHideMainTabBar } from '../../src/navigation/shouldHideMainTabBar';
 import { useRealtimeInbox } from '../../src/features/chat/hooks/useRealtimeInbox';
 import { usePushRegistration } from '../../src/features/push/hooks/usePushRegistration';
+import { usePushDeepLink } from '../../src/features/push/hooks/usePushDeepLink';
+import { useAppIconBadge } from '../../src/features/push/hooks/useAppIconBadge';
 
 function MainTabBar(props: BottomTabBarProps) {
   const segments = useSegments();
@@ -25,6 +30,8 @@ function MainTabBar(props: BottomTabBarProps) {
 export default function MainLayout() {
   useRealtimeInbox();
   usePushRegistration();
+  usePushDeepLink();
+  useAppIconBadge();
 
   return (
     <Tabs screenOptions={{ headerShown: false }} tabBar={(props) => <MainTabBar {...props} />}>
