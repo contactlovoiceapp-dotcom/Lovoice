@@ -450,16 +450,24 @@ V1 MVP — committed (Phase 8):
 
 **Runtime configuration (set by the operator post-deploy, never committed):**
 
+Secrets are stored in Supabase Vault — run once from the SQL Editor (replace the two placeholders):
+
 ```sql
--- On Supabase Cloud, ALTER DATABASE is denied (superuser required).
--- Use ALTER ROLE postgres — the postgres user can set its own role attributes.
-ALTER ROLE postgres SET "app.settings.dispatch_push_url"
-  = 'https://<project-ref>.supabase.co/functions/v1/dispatch_push';
-ALTER ROLE postgres SET "app.settings.dispatch_push_service_key"
-  = '<service_role_key>';
+SELECT vault.create_secret(
+  'https://<project-ref>.supabase.co/functions/v1/dispatch_push',
+  'dispatch_push_url'
+);
+
+SELECT vault.create_secret(
+  '<service_role_key>',
+  'dispatch_push_service_key'
+);
 ```
 
-Plus `npx supabase secrets set EXPO_ACCESS_TOKEN=<token>` (optional, recommended in production).
+`<project-ref>` : Dashboard → Settings → General → Reference ID  
+`<service_role_key>` : Dashboard → Settings → API → Legacy keys → service_role JWT
+
+Plus `npx supabase secrets set EXPO_ACCESS_TOKEN=<token>` for the Edge Function (optional, recommended in production).
 
 **Post-V1 evolutions** (out of scope for the MVP, doc tracked here for context):
 - Per-actor / per-kind **debounce** (e.g. max 1 like push per hour per pair). The `notifications.pushed_at` column is the anchor for this future query.
