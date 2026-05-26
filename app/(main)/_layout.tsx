@@ -1,4 +1,5 @@
-/* Main tab navigator — renders the 4 primary tabs with a custom floating pill nav bar. */
+/* Main tab navigator — renders the 4 primary tabs with a custom floating pill nav bar.
+   Also mounts the global Realtime inbox listener so push badge updates work on all tabs. */
 
 import React from 'react';
 import { Tabs } from 'expo-router';
@@ -7,6 +8,7 @@ import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 
 import BottomNav from '../../src/components/BottomNav';
 import { shouldHideMainTabBar } from '../../src/navigation/shouldHideMainTabBar';
+import { useRealtimeInbox } from '../../src/features/chat/hooks/useRealtimeInbox';
 
 function MainTabBar(props: BottomTabBarProps) {
   const segments = useSegments();
@@ -19,6 +21,8 @@ function MainTabBar(props: BottomTabBarProps) {
 }
 
 export default function MainLayout() {
+  useRealtimeInbox();
+
   return (
     <Tabs screenOptions={{ headerShown: false }} tabBar={(props) => <MainTabBar {...props} />}>
       <Tabs.Screen name="discover" />

@@ -81,13 +81,18 @@ export function getSupabaseClient(): SupabaseClient<Database> | null {
     configResult.config.url,
     configResult.config.publishableKey,
     {
-    auth: {
-      autoRefreshToken: true,
-      detectSessionInUrl: false,
-      persistSession: true,
-      storage: secureSessionStorage,
+      auth: {
+        autoRefreshToken: true,
+        detectSessionInUrl: false,
+        persistSession: true,
+        storage: secureSessionStorage,
+      },
+      realtime: {
+        params: {
+          eventsPerSecond: 10,
+        },
+      },
     },
-  },
   );
 
   return supabaseClient;

@@ -114,6 +114,7 @@ export default function ConversationRoute() {
         () => {
           void queryClient.invalidateQueries({ queryKey: chatQueryKeys.messages(id) });
           void queryClient.invalidateQueries({ queryKey: chatQueryKeys.conversation(id) });
+          void queryClient.invalidateQueries({ queryKey: chatQueryKeys.inbox });
           markReadRef.current();
         },
       )
@@ -130,12 +131,10 @@ export default function ConversationRoute() {
         },
       )
       .on('broadcast', { event: 'typing' }, ({ payload }: { payload: BroadcastPayload }) => {
-        // Ignore events from the current user (they can echo back on multi-device setups).
         if (payload.userId === currentUserId) return;
 
         if (payload.value) {
           setOtherIsTyping(true);
-          // Reset the auto-clear timer on each incoming event.
           if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
           typingTimerRef.current = setTimeout(() => setOtherIsTyping(false), TYPING_CLEAR_DELAY_MS);
         } else {
@@ -155,15 +154,22 @@ export default function ConversationRoute() {
           setOtherIsRecording(false);
         }
       })
-      .subscribe((status) => {
+      .subscribe((status, err) => {
         channelReadyRef.current = status === 'SUBSCRIBED';
+        if (__DEV__) {
+          if (status === 'SUBSCRIBED') {
+            console.log(`[RealtimeConv] conv:${id} subscribed`);
+          } else if (status === 'CHANNEL_ERROR') {
+            console.warn(`[RealtimeConv] conv:${id} error`, err?.message);
+          } else if (status === 'TIMED_OUT') {
+            console.warn(`[RealtimeConv] conv:${id} timed out`);
+          }
+        }
       });
 
     channelRef.current = channel;
 
     return () => {
-      // Only emit cleanup when the channel was actually subscribed — otherwise send()
-      // falls back to REST and spams warnings if the effect re-runs in a tight loop.
       if (channelReadyRef.current) {
         void channel.send({
           type: 'broadcast',
