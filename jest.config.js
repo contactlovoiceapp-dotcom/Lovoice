@@ -7,6 +7,7 @@ module.exports = {
   transformIgnorePatterns: [
     'node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@sentry/react-native|native-base|react-native-svg|nativewind|react-native-reanimated|lucide-react-native|expo-audio|expo-file-system|expo-crypto)',
   ],
+  testPathIgnorePatterns: ['/node_modules/', '<rootDir>/supabase/functions/'],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
   },
