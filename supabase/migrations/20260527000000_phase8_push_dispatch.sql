@@ -20,18 +20,21 @@
 --
 -- Runtime secrets (set by the operator AFTER deploying this migration — never committed):
 --
---   Run from psql or Supabase Studio SQL Editor, substituting real values:
+--   On Supabase Cloud, ALTER DATABASE requires superuser and is denied.
+--   Use ALTER ROLE postgres instead — the postgres user can set its own role attributes:
 --
---     ALTER DATABASE postgres
+--     ALTER ROLE postgres
 --       SET "app.settings.dispatch_push_url" =
 --           'https://<PROJECT_REF>.supabase.co/functions/v1/dispatch_push';
 --
---     ALTER DATABASE postgres
+--     ALTER ROLE postgres
 --       SET "app.settings.dispatch_push_service_key" = '<SERVICE_ROLE_KEY>';
 --
---   After each ALTER DATABASE, new DB sessions inherit the setting automatically.
---   Existing long-lived connections (e.g. pgbouncer pool) must reconnect or the operator
---   can call SELECT pg_reload_conf() to make most session-cached settings visible sooner.
+--   <PROJECT_REF>   : Supabase Dashboard → Settings → General → Reference ID
+--   <SERVICE_ROLE_KEY> : Dashboard → Settings → API → Legacy keys → service_role JWT
+--
+--   New sessions inherit the setting automatically after ALTER ROLE.
+--   Existing pgbouncer connections pick it up on reconnect or after SELECT pg_reload_conf().
 --
 --   If either setting is absent or empty at trigger execution time, the trigger logs a
 --   RAISE WARNING and returns without pushing — the originating INSERT is never blocked.

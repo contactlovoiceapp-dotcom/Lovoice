@@ -451,9 +451,11 @@ V1 MVP — committed (Phase 8):
 **Runtime configuration (set by the operator post-deploy, never committed):**
 
 ```sql
-ALTER DATABASE postgres SET "app.settings.dispatch_push_url"
+-- On Supabase Cloud, ALTER DATABASE is denied (superuser required).
+-- Use ALTER ROLE postgres — the postgres user can set its own role attributes.
+ALTER ROLE postgres SET "app.settings.dispatch_push_url"
   = 'https://<project-ref>.supabase.co/functions/v1/dispatch_push';
-ALTER DATABASE postgres SET "app.settings.dispatch_push_service_key"
+ALTER ROLE postgres SET "app.settings.dispatch_push_service_key"
   = '<service_role_key>';
 ```
 

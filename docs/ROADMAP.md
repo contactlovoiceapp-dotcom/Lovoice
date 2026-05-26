@@ -277,9 +277,10 @@ This phase produces a **separate Next.js repository** (suggested name `lovoice-a
 3. Set the runtime settings (replace placeholders), from psql or Supabase Studio SQL editor:
 
    ```sql
-   ALTER DATABASE postgres SET "app.settings.dispatch_push_url"
+   -- On Supabase Cloud, ALTER DATABASE is denied — use ALTER ROLE instead:
+   ALTER ROLE postgres SET "app.settings.dispatch_push_url"
      = 'https://<project-ref>.supabase.co/functions/v1/dispatch_push';
-   ALTER DATABASE postgres SET "app.settings.dispatch_push_service_key"
+   ALTER ROLE postgres SET "app.settings.dispatch_push_service_key"
      = '<service_role_key>';
    ```
 4. (Optional but recommended) `npx supabase secrets set EXPO_ACCESS_TOKEN=<token>`.
