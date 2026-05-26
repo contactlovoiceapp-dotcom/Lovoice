@@ -430,12 +430,39 @@ The `first_reply_at` timestamp is written automatically by the `update_conversat
 
 ## 6. Push notifications
 
-- On login, fetch Expo push token, store on `profiles.push_token`.
-- An Edge Function `dispatch_notification` is called from triggers/jobs:
-  - new like (debounced: max 1 push per liker per recipient per hour),
-  - new message (silent if recipient is online, i.e. has an open Realtime channel — check via Presence),
-  - moderation rejection (only to the author).
-- Payload includes `data.deep_link` so tapping opens the right screen.
+V1 MVP — committed (Phase 8):
+
+- On login, the mobile client requests notification permission, fetches the **Expo Push Token** via `getExpoPushTokenAsync({ projectId })` (the EAS project id from `app.config.ts`), and stores it on `profiles.push_token` via a single `update`.
+- The token is refreshed only when it changes (idempotent write). On a denied permission or a simulator, the helper returns `null` and the app keeps working.
+- The setup is fan-out via the database itself:
+  1. The Phase 6 trigger `notify_on_like()` and the Phase 7 trigger `notify_on_message()` insert one row into `notifications` for every relevant event.
+  2. The Phase 8 trigger `dispatch_push_notification()` fires AFTER INSERT on `notifications` and calls the `dispatch_push` Edge Function asynchronously through `pg_net.http_post`. The trigger is downgraded to a `RAISE WARNING` on any failure so the originating INSERT is never blocked.
+  3. The Edge Function `dispatch_push` (Deno) loads the recipient's `profiles.push_token`, builds the Expo Push payload, POSTs to `https://exp.host/--/api/v2/push/send` with an optional `EXPO_ACCESS_TOKEN`, and stamps `notifications.pushed_at = now()` on success. On `DeviceNotRegistered` it nulls out `profiles.push_token` so the next login re-registers the device.
+- **V1 fan-out rules — deliberately simple**:
+  - **Every** `kind = 'like'` insert is pushed. No debounce.
+  - **Every** `kind = 'message'` insert is pushed. No presence skip — even if the recipient is currently in the conversation, the OS notifies them and the in-app Realtime keeps the inbox up to date independently.
+  - `kind = 'system'` notifications (e.g. moderation rejections) are inserted in `notifications` but `dispatch_push` skips them in V1. Surfacing them to the user is deferred to a later phase.
+- **Payload shape** (the client only reads `data.deep_link` and `data.notification_id`):
+  - `kind = 'like'`   → title `"Nouveau like 💜"`, body `"<actor> a liké ta voix"`, `data.deep_link = '/likes'`.
+  - `kind = 'message'` → title `<actor>`, body either `"Message vocal"` or the first 60 chars of the text + `…`, `data.deep_link = '/messages/<conversation_id>'`.
+- Tapping a push runs `usePushDeepLink` (cold-start replay via `getLastNotificationResponseAsync` + live tap via `addNotificationResponseReceivedListener`). The `deep_link` is allowlisted against `^/likes$|^/messages/<uuid>$` before `router.push` — defence against a payload tampering attempt.
+- The OS app icon badge is kept in sync by `useAppIconBadge`, which mirrors the in-app counters (`useUnseenLikesCount + useUnreadMessagesCount`) onto `Notifications.setBadgeCountAsync(...)`. The in-app red dot on the BottomNav (Likes / Messages tabs) is unchanged.
+
+**Runtime configuration (set by the operator post-deploy, never committed):**
+
+```sql
+ALTER DATABASE postgres SET "app.settings.dispatch_push_url"
+  = 'https://<project-ref>.supabase.co/functions/v1/dispatch_push';
+ALTER DATABASE postgres SET "app.settings.dispatch_push_service_key"
+  = '<service_role_key>';
+```
+
+Plus `npx supabase secrets set EXPO_ACCESS_TOKEN=<token>` (optional, recommended in production).
+
+**Post-V1 evolutions** (out of scope for the MVP, doc tracked here for context):
+- Per-actor / per-kind **debounce** (e.g. max 1 like push per hour per pair). The `notifications.pushed_at` column is the anchor for this future query.
+- **Presence skip** (do not push if the recipient is currently online). Requires either a heartbeat on `profiles.last_seen_at` or a server-readable presence source — not implemented in V1.
+- Push for `kind = 'system'` notifications (moderation rejections), once the in-app surfacing is designed.
 
 ---
 

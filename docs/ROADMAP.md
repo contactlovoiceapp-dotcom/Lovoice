@@ -237,29 +237,53 @@ This phase produces a **separate Next.js repository** (suggested name `lovoice-a
 
 ---
 
-## Phase 8 — Push notifications (Expo Push)
+## Phase 8 — Push notifications (Expo Push) 🟢
 
 **Goal**: push notifications for likes and new messages, deep-linking to the relevant screen. There is no dedicated Notifications screen — likes appear in the Likes screen (received tab) and messages appear in the Messages screen.
 
-### Scope
+### Scope (shipped)
 
-1. Edge Function `dispatch_push(notification_id)` triggered after `notifications` insert (DB trigger calls `pg_net` to invoke it). Sends to Expo Push API using the recipient's `push_token`.
-2. Debounce rule: max 1 push per (actor → recipient → kind) per hour for likes. Messages always push (unless recipient currently online — checked via Realtime presence).
-3. On app launch, register for push and store/refresh `profiles.push_token`.
-4. Tap a push → deep link to the right screen via expo-router (`likes` for a like push, `messages/[id]` for a message push).
-5. Unread badge on the Likes tab (count of unseen received likes) and Messages tab (count of unread conversations). Realtime subscription to update badges live.
+1. **Migration `20260527000000_phase8_push_dispatch.sql`** — enables `pg_net`, adds the diagnostic column `notifications.pushed_at`, and creates the AFTER INSERT trigger `dispatch_push_notification_trg` on `notifications` that calls the `dispatch_push` Edge Function via `net.http_post`. Trigger errors are downgraded to `RAISE WARNING` so the originating INSERT never blocks. The runtime URL and service key are read from `app.settings.*` set by the operator post-deploy — no secrets are committed.
+2. **Edge Function `dispatch_push`** — Deno function that receives `{ notification_id }`, loads the row + recipient's `profiles.push_token` (and the actor's `display_name` and the message body when relevant), builds the Expo Push payload, POSTs to `https://exp.host/--/api/v2/push/send` (10 s timeout, optional `EXPO_ACCESS_TOKEN`), nulls `profiles.push_token` on `DeviceNotRegistered`, and stamps `notifications.pushed_at = now()` on success. Pure helpers (`buildExpoPushMessage`, `parseExpoPushResponse`) are exported and covered by Deno tests (`npm run test:edge`).
+3. **Client push registration** — `npx expo install expo-notifications`, plugin wired in `app.config.ts` (icon, brand color `#e724ab`, `defaultChannel: 'default'`). Helpers in `src/lib/push.ts` (`setupNotificationHandler`, `registerForPushNotificationsAsync`) and a hook `usePushRegistration` mounted in `app/(main)/_layout.tsx` that writes the Expo Push Token into `profiles.push_token` only when it changes. Permission is requested once; `canAskAgain === false` blocks re-prompts.
+4. **Foreground handler** — `setupNotificationHandler()` runs at module load in `app/_layout.tsx` so banners surface while the app is foreground (`shouldShowBanner`, `shouldShowList`, `shouldPlaySound`, `shouldSetBadge` — SDK 54 field names).
+5. **Deep-link tap routing** — `usePushDeepLink` (mounted in `app/(main)/_layout.tsx`) replays the cold-start tap via `getLastNotificationResponseAsync()` and listens to live taps via `addNotificationResponseReceivedListener`. Routes are allowlisted against `/likes` or `/messages/<uuid>` before `router.push`. Deduplication via `data.notification_id` (fallback `request.identifier`) prevents double-navigation between the cold-start replay and the live listener.
+6. **OS app icon badge** — `useAppIconBadge` mirrors `useUnseenLikesCount + useUnreadMessagesCount` onto `Notifications.setBadgeCountAsync(...)`. The in-app red dot on the BottomNav is unchanged.
 
-### Deliverables
+### Deliberately deferred (post-V1)
 
-- Push received on real device for a like and a message.
-- Tapping a like push opens the Likes screen. Tapping a message push opens the conversation.
-- Unread badges update in real time.
+- **Per-actor / per-kind debounce** (e.g. max 1 like push per hour per pair). The `notifications.pushed_at` column is the anchor for this query when it ships.
+- **Presence skip** (do not push if the recipient is currently online). Requires a heartbeat or a server-readable presence source — not implemented.
+- **Push for `kind = 'system'`** notifications (moderation rejections). `dispatch_push` skips them today; surfacing them to the user is a later UX decision.
 
-### Acceptance
+### Deliverables — shipped
 
-- iOS push works in background AND when app is killed.
+- Push received on a physical iOS device for a like and for a message.
+- Tap routes to `/likes` (like) or `/messages/<conversation_id>` (message), background and killed states alike.
+- OS app icon badge stays in sync with the in-app counters.
+- 56 Jest suites / 419 tests green; 12 Deno tests on the pure helpers of `dispatch_push`.
+
+### Acceptance criteria
+
+- iOS push works in background AND when the app is killed.
 - Android push works on a Pixel with Play Services.
-- Disabling push in OS settings is handled gracefully.
+- Disabling push in OS settings is handled gracefully (the helpers return `null`, the hooks no-op, the app does not crash).
+- Tapping a push twice (e.g. lock screen + notification center) navigates only once.
+
+### Operator runbook
+
+1. Deploy the Edge Function: `npx supabase functions deploy dispatch_push`.
+2. Apply the migration: `npx supabase db push`.
+3. Set the runtime settings (replace placeholders), from psql or Supabase Studio SQL editor:
+
+   ```sql
+   ALTER DATABASE postgres SET "app.settings.dispatch_push_url"
+     = 'https://<project-ref>.supabase.co/functions/v1/dispatch_push';
+   ALTER DATABASE postgres SET "app.settings.dispatch_push_service_key"
+     = '<service_role_key>';
+   ```
+4. (Optional but recommended) `npx supabase secrets set EXPO_ACCESS_TOKEN=<token>`.
+5. Rebuild and install a dev build that includes the new `expo-notifications` plugin: `npx expo run:ios` (and Android equivalent).
 
 ---
 
