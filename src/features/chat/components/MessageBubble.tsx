@@ -14,8 +14,8 @@ import {
 } from '../lib/chatMessagePlayer';
 
 const MAX_BUBBLE_WIDTH = Dimensions.get('window').width * 0.75;
-const VOICE_BUBBLE_WIDTH = 220;
-const VOICE_BUBBLE_HEIGHT = 36;
+const VOICE_BUBBLE_WIDTH = 250;
+const VOICE_BUBBLE_HEIGHT = 44;
 const BAR_COUNT = 28;
 
 interface MessageBubbleProps {
@@ -114,22 +114,23 @@ function VoiceBubbleContent({
         }
         accessibilityRole="button"
         testID="voice-play-button"
+        hitSlop={8}
         style={{
-          width: 28,
-          height: 28,
-          borderRadius: 14,
+          width: 36,
+          height: 36,
+          borderRadius: 18,
           alignItems: 'center',
           justifyContent: 'center',
         }}
       >
         {snapshot.isPlaying ? (
-          <Pause size={16} color={iconColor} fill={iconColor} />
+          <Pause size={18} color={iconColor} fill={iconColor} />
         ) : (
-          <Play size={16} color={iconColor} fill={iconColor} />
+          <Play size={18} color={iconColor} fill={iconColor} />
         )}
       </Pressable>
 
-      <View style={{ flex: 1, flexDirection: 'row', alignItems: 'flex-end', height: 20, gap: 1 }}>
+      <View style={{ flex: 1, flexDirection: 'row', alignItems: 'flex-end', height: 24, gap: 1 }}>
         {bars.map((h, i) => {
           const filled = i / bars.length < progress;
           return (
@@ -149,9 +150,9 @@ function VoiceBubbleContent({
       <Text
         style={{
           fontFamily: FONT.medium,
-          fontSize: 11,
+          fontSize: 12,
           color: textColor,
-          minWidth: 32,
+          minWidth: 34,
           textAlign: 'right',
         }}
       >

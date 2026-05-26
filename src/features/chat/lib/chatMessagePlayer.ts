@@ -1,4 +1,6 @@
 // Single-instance audio player for chat voice message bubbles. Only one bubble plays at a time.
+// Uses an event-driven approach: waits for the native player to confirm source loading
+// before issuing play(), preventing silent failures and premature didJustFinish.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
@@ -105,12 +107,17 @@ export function useChatMessagePlayer({
   const [isActive, setIsActive] = useState(false);
   const loadTokenRef = useRef(0);
   const sessionConfiguredRef = useRef(false);
+  // Track whether we want to auto-play once the native player finishes loading.
+  const pendingPlayRef = useRef(false);
+  // Track the source we last fed to player.replace() to avoid redundant reloads.
+  const loadedSourceRef = useRef<string | null>(null);
 
   // Register/unregister with the module-scoped singleton.
   const releaseOwnership = useCallback(() => {
     try {
       player.pause();
     } catch { /* native recycled */ }
+    pendingPlayRef.current = false;
     setIsActive(false);
     if (activeMessageId === messageId) {
       activeMessageId = null;
@@ -125,6 +132,39 @@ export function useChatMessagePlayer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Auto-play once the native player transitions from buffering to ready.
+  // This handles the case where play() is called before the source is loaded.
+  useEffect(() => {
+    if (!pendingPlayRef.current || !isActive) return;
+    // status.playing means the player already started on its own after replace+play.
+    // duration > 0 means the source is loaded and ready.
+    if (status.playing) {
+      pendingPlayRef.current = false;
+      setIsLoading(false);
+      return;
+    }
+    if (status.duration > 0 && !status.playing && !status.didJustFinish) {
+      pendingPlayRef.current = false;
+      setIsLoading(false);
+      try {
+        player.seekTo(0);
+        player.play();
+      } catch { /* native recycled */ }
+    }
+  }, [isActive, status.playing, status.duration, status.didJustFinish, player]);
+
+  // Reset play state when the track ends naturally.
+  useEffect(() => {
+    if (isActive && status.didJustFinish) {
+      pendingPlayRef.current = false;
+      setIsActive(false);
+      if (activeMessageId === messageId) {
+        activeMessageId = null;
+        activeReleaseCallback = null;
+      }
+    }
+  }, [isActive, status.didJustFinish, messageId]);
+
   const play = useCallback(async () => {
     if (!source) return;
 
@@ -135,6 +175,7 @@ export function useChatMessagePlayer({
     activeMessageId = messageId;
     activeReleaseCallback = releaseOwnership;
     setIsActive(true);
+    setError(null);
 
     if (!sessionConfiguredRef.current) {
       await configureAudioSessionForPlayback();
@@ -143,7 +184,6 @@ export function useChatMessagePlayer({
 
     const token = ++loadTokenRef.current;
     setIsLoading(true);
-    setError(null);
 
     try {
       let url: string;
@@ -155,35 +195,37 @@ export function useChatMessagePlayer({
 
       if (loadTokenRef.current !== token) return;
 
-      try {
-        player.replace(url);
-      } catch {
-        // Native player mid-recycle.
-      }
-
-      // Seek to 0 if the track previously ended.
-      const atEnd =
-        status.didJustFinish ||
-        (status.duration > 0 && status.currentTime >= status.duration - 0.1);
-      if (atEnd) {
+      // Only call replace() if the source changed, to avoid resetting mid-playback.
+      if (loadedSourceRef.current !== url) {
         try {
-          player.seekTo(0);
-        } catch { /* native recycled */ }
+          player.replace(url);
+          loadedSourceRef.current = url;
+        } catch {
+          setError('play_failed');
+          setIsLoading(false);
+          return;
+        }
       }
 
+      // Mark that we want to play once the player is ready.
+      pendingPlayRef.current = true;
+
+      // Attempt immediate play — works if the source loaded synchronously (local file)
+      // or the native player already buffered enough. If the player is not ready yet,
+      // the effect above will catch it once duration > 0.
       try {
+        player.seekTo(0);
         player.play();
       } catch { /* native recycled */ }
-
-      setIsLoading(false);
     } catch (err) {
       if (loadTokenRef.current !== token) return;
       setError(err instanceof Error ? err.message : 'play_failed');
       setIsLoading(false);
     }
-  }, [source, isLocalFile, messageId, player, releaseOwnership, status.didJustFinish, status.duration, status.currentTime]);
+  }, [source, isLocalFile, messageId, player, releaseOwnership]);
 
   const pause = useCallback(() => {
+    pendingPlayRef.current = false;
     try {
       player.pause();
     } catch { /* native recycled */ }
