@@ -74,6 +74,15 @@ const config: ExpoConfig = {
           "Lovoice utilise ton micro pour enregistrer ta voix.",
       },
     ],
+    [
+      "expo-notifications",
+      {
+        // TODO(phase-11): replace with a dedicated monochrome 96×96 PNG before App Store / Play Store submission.
+        icon: "./assets/adaptive-icon.png",
+        color: "#e724ab",
+        defaultChannel: "default",
+      },
+    ],
   ],
   extra: {
     supabaseUrl,
