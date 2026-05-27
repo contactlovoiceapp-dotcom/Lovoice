@@ -282,3 +282,4 @@ Optional: under `submit.production.ios`, add `appleId`, `ascAppId` (numeric App 
 | How does audio upload work? | `docs/ARCHITECTURE.md` |
 | How does the admin back-office work? | `docs/ARCHITECTURE.md` §13 |
 | What am I supposed to build right now? | `docs/ROADMAP.md` (current phase) |
+| Anything chat audio / voice playback related (bug, refactor, regression)? | `docs/CHAT_AUDIO.md` — **read this before touching `chatMessagePlayer.ts`, `MessageBubble.tsx`, or the chat Realtime handlers** |
