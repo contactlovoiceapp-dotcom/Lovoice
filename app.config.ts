@@ -84,7 +84,17 @@ const config: ExpoConfig = {
         defaultChannel: "default",
       },
     ],
-    "@sentry/react-native",
+    [
+      "@sentry/react-native",
+      {
+        // Used by the plugin at build time to write sentry.properties so the
+        // Sentry Gradle/Xcode build phase can upload source maps and debug
+        // symbols automatically. The auth token is read from the
+        // SENTRY_AUTH_TOKEN environment variable (EAS Secret) — never hardcoded.
+        organization: "shrtcut",
+        project: "lovoice",
+      },
+    ],
   ],
   extra: {
     supabaseUrl,
