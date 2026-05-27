@@ -84,6 +84,7 @@ const config: ExpoConfig = {
         defaultChannel: "default",
       },
     ],
+    "@sentry/react-native",
   ],
   extra: {
     supabaseUrl,

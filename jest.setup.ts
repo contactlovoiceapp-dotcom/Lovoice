@@ -220,6 +220,13 @@ jest.mock('expo-font', () => ({
   isLoaded: () => true,
 }));
 
+jest.mock('@sentry/react-native', () => ({
+  init: jest.fn(),
+  wrap: <T,>(component: T) => component,
+  captureException: jest.fn(),
+  captureMessage: jest.fn(),
+}));
+
 jest.mock('expo-linear-gradient', () => {
   const { View } = require('react-native');
   return { LinearGradient: View };

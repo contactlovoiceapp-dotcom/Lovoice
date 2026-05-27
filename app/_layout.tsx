@@ -30,7 +30,12 @@ import { COLORS } from '../src/theme';
 import AuthRedirector from '../src/features/auth/components/AuthRedirector';
 import { AuthProvider } from '../src/features/auth/hooks/useAuth';
 import { setupNotificationHandler } from '../src/lib/push';
+import { initSentry, Sentry } from '../src/lib/sentry';
 import '../global.css';
+
+// Initialise Sentry first so any error during the rest of the boot is captured.
+// No-op if EXPO_PUBLIC_SENTRY_DSN is missing (e.g. local dev without a project).
+initSentry();
 
 // Register the foreground notification handler once at module load — idempotent
 // per Expo docs, so calling it here (before any component mounts) is safe.
@@ -39,7 +44,7 @@ setupNotificationHandler();
 // Keep native splash visible indefinitely
 SplashScreen.preventAutoHideAsync();
 
-export default function RootLayout() {
+function RootLayout() {
   const [queryClient] = useState(
     () =>
       new QueryClient({
@@ -81,3 +86,7 @@ export default function RootLayout() {
     </QueryClientProvider>
   );
 }
+
+// Sentry.wrap() enables touch-event breadcrumbs and React Navigation auto-instrumentation.
+// Safe to use even when initSentry() no-ops: the wrap is inert without a configured client.
+export default Sentry.wrap(RootLayout);

@@ -255,6 +255,10 @@ for full prerequisites and the revocation one-liner.
 
 Only use `EXPO_PUBLIC_*` for values that are safe to ship in the client bundle. Supabase URL and publishable key are public by design; secrets belong in Supabase Edge Functions or EAS Secrets, not in the mobile app.
 
+#### Optional: Sentry crash reporting
+
+Set `EXPO_PUBLIC_SENTRY_DSN` (in `.env.local` and in EAS via `sync-eas-env`) to enable JS error capture and native crash reporting via `@sentry/react-native`. When the DSN is missing, `initSentry()` is a no-op so the app still runs cleanly without it. The DSN is a public identifier; safe to ship in the client bundle.
+
 ### App Store / TestFlight (EAS)
 
 `eas.json` defines **two** profile families with the same names (`production`, `preview`, …): **`build.*`** (native compile) and **`submit.*`** (upload to App Store Connect). `npm run submit:ios` uses `--profile production`, so a matching **`submit.production`** entry must exist.
