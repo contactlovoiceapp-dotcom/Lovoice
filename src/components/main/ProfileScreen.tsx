@@ -1,6 +1,7 @@
 /* Shared profile screen — renders the full profile editor for both the main tab and onboarding setup. */
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import Constants from 'expo-constants';
 import {
   ActivityIndicator,
   Alert,
@@ -1102,9 +1103,33 @@ export default function ProfileScreen({ isOnboarding = false, onOnboardingComple
                 </View>
               </LinearGradient>
             </Pressable>
+            <AppVersion />
           </ScrollView>
         </KeyboardAvoidingView>
       </LinearGradient>
     </>
+  );
+}
+
+function AppVersion() {
+  const version = Constants.expoConfig?.version ?? '—';
+  const build = Constants.platform?.android?.versionCode
+    ?? (Constants.platform?.ios as { buildNumber?: string } | undefined)?.buildNumber
+    ?? null;
+  const label = build != null ? `v${version} (${build})` : `v${version}`;
+
+  return (
+    <Text
+      style={{
+        marginTop: 20,
+        textAlign: 'center',
+        fontSize: 11,
+        fontFamily: FONT.regular,
+        color: COLORS.textTertiary,
+        opacity: 0.6,
+      }}
+    >
+      {label}
+    </Text>
   );
 }
