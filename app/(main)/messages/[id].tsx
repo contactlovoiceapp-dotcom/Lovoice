@@ -22,7 +22,7 @@ import {
 } from '../../../src/features/chat/api/messageMutations';
 import type { ChatMessage } from '../../../src/features/chat/types';
 import { getSupabaseClient } from '../../../src/lib/supabase';
-import { createThrottle } from '../../../src/features/chat/lib/throttle';
+import { createDebouncer, createThrottle } from '../../../src/features/chat/lib/throttle';
 import ConversationScreen from '../../../src/components/main/ConversationScreen';
 
 // How long (ms) with no typing event before the indicator auto-clears.
@@ -31,6 +31,8 @@ const TYPING_CLEAR_DELAY_MS = 5_000;
 const RECORDING_CLEAR_DELAY_MS = 10_000;
 // Throttle window for typing=true broadcasts.
 const TYPING_THROTTLE_MS = 3_000;
+// Collapse bursts of UPDATE events (read receipts, etc.) into one refetch.
+const MESSAGES_UPDATE_DEBOUNCE_MS = 500;
 
 interface BroadcastPayload {
   userId: string;
@@ -101,6 +103,12 @@ export default function ConversationRoute() {
     const supabase = getSupabaseClient();
     if (!supabase || !session || !id) return;
 
+    // Debounce UPDATE invalidations (read receipt bursts) into a single refetch.
+    // INSERTs are not debounced — new messages must surface immediately.
+    const updateDebouncer = createDebouncer(() => {
+      void queryClient.invalidateQueries({ queryKey: chatQueryKeys.messages(id) });
+    }, MESSAGES_UPDATE_DEBOUNCE_MS);
+
     const channel = supabase
       .channel(`conv:${id}`)
       .on(
@@ -111,11 +119,22 @@ export default function ConversationRoute() {
           table: 'messages',
           filter: `conversation_id=eq.${id}`,
         },
-        () => {
-          void queryClient.invalidateQueries({ queryKey: chatQueryKeys.messages(id) });
+        (payload) => {
+          // Skip the messages cache invalidation when this is our own INSERT:
+          // the mutation has already written the optimistic row with a stable
+          // clientId. A refetch here would overwrite that with rows whose
+          // clientId equals the server UUID, breaking the FlatList key
+          // continuity and forcing a remount of the voice bubble (which would
+          // recreate its native audio binding).
+          const newRow = payload?.new as { sender_id?: string } | undefined;
+          const isOwnMessage = newRow?.sender_id === currentUserId;
+
+          if (!isOwnMessage) {
+            void queryClient.invalidateQueries({ queryKey: chatQueryKeys.messages(id) });
+            markReadRef.current();
+          }
           void queryClient.invalidateQueries({ queryKey: chatQueryKeys.conversation(id) });
           void queryClient.invalidateQueries({ queryKey: chatQueryKeys.inbox });
-          markReadRef.current();
         },
       )
       .on(
@@ -127,7 +146,7 @@ export default function ConversationRoute() {
           filter: `conversation_id=eq.${id}`,
         },
         () => {
-          void queryClient.invalidateQueries({ queryKey: chatQueryKeys.messages(id) });
+          updateDebouncer.schedule();
         },
       )
       .on('broadcast', { event: 'typing' }, ({ payload }: { payload: BroadcastPayload }) => {
@@ -185,6 +204,8 @@ export default function ConversationRoute() {
       channelReadyRef.current = false;
       void supabase.removeChannel(channel);
       channelRef.current = null;
+
+      updateDebouncer.cancel();
 
       if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
       if (recordingTimerRef.current) clearTimeout(recordingTimerRef.current);

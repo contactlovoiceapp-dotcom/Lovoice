@@ -1,10 +1,27 @@
-// Single-instance audio player for chat voice message bubbles. Only one bubble plays at a time.
-// Uses an event-driven approach: waits for the native player to confirm source loading
-// before issuing play(), preventing silent failures and premature didJustFinish.
-// Includes timeout detection and one auto-retry with cache-bust for broken/expired URLs.
+// True single-instance audio player for chat voice message bubbles.
+//
+// The original implementation instantiated one `useAudioPlayer` per bubble,
+// which meant every voice message in a conversation kept a live native
+// AVAudioPlayer polling status every 100 ms. Combined with the FlatList
+// remounting bubbles when their optimistic clientId was swapped for the
+// server UUID, this caused a steady accumulation of native players and a
+// torrent of TurboModule traffic that ended up corrupting the Hermes heap
+// during messaging (cf. crash 2026-05-27 in TestFlight 0.8.0).
+//
+// The new design owns a single native player at module scope: a host hook
+// (`useChatMessagePlayerHost`) is mounted once by ConversationScreen and
+// publishes the player snapshot into a Zustand store. Each bubble subscribes
+// to that store and only re-renders when it is the active bubble OR when its
+// active/inactive status flips. Inactive bubbles never touch native code.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
+import { useCallback, useEffect, useMemo } from 'react';
+import {
+  useAudioPlayer,
+  useAudioPlayerStatus,
+  type AudioPlayer,
+} from 'expo-audio';
+import { create } from 'zustand';
+import { useShallow } from 'zustand/react/shallow';
 
 import { configureAudioSessionForPlayback } from '@/lib/audio';
 import { getSupabaseClient } from '@/lib/supabase';
@@ -15,7 +32,8 @@ const SIGNED_URL_LIFETIME_MS = SIGNED_URL_TTL_SECONDS * 1000 - SIGNED_URL_REFRES
 
 // If the player doesn't start within this delay, consider the file unplayable.
 const PLAY_TIMEOUT_MS = 8_000;
-// If didJustFinish fires within this window after confirmed playback, it's likely a broken file.
+// If didJustFinish fires within this window after confirmed playback, it's
+// likely a broken / expired signed URL — retry once with cache-bust.
 const SUSPICIOUS_FINISH_MS = 400;
 
 interface SignedUrlEntry {
@@ -51,23 +69,9 @@ async function ensureSignedUrl(path: string): Promise<string> {
   return data.signedUrl;
 }
 
-// Module-scoped: tracks which messageId is currently "owning" the shared player.
-let activeMessageId: string | null = null;
-let activeReleaseCallback: (() => void) | null = null;
-
-function clearActiveOwner(messageId: string): void {
-  if (activeMessageId === messageId) {
-    activeMessageId = null;
-    activeReleaseCallback = null;
-  }
-}
-
-/** Pauses whatever message bubble is currently playing. Called before recording starts. */
-export function pauseAllChatMessages(): void {
-  if (activeReleaseCallback) {
-    activeReleaseCallback();
-  }
-}
+// ---------------------------------------------------------------------------
+// Public types
+// ---------------------------------------------------------------------------
 
 export interface ChatMessagePlayerSnapshot {
   isPlaying: boolean;
@@ -82,7 +86,18 @@ export interface ChatMessagePlayerControls {
   pause: () => void;
 }
 
-// Deterministic bar heights derived from a seed string — stable across renders.
+const INACTIVE_SNAPSHOT: ChatMessagePlayerSnapshot = {
+  isPlaying: false,
+  positionMs: 0,
+  durationMs: 0,
+  isLoading: false,
+  error: null,
+};
+
+// ---------------------------------------------------------------------------
+// Bar heights helper — kept here for backwards-compat with MessageBubble.
+// ---------------------------------------------------------------------------
+
 export function generateBarHeights(seedId: string, count: number): number[] {
   let hash = 0;
   for (let i = 0; i < seedId.length; i++) {
@@ -100,6 +115,287 @@ export function generateBarHeights(seedId: string, count: number): number[] {
   return bars;
 }
 
+// ---------------------------------------------------------------------------
+// Shared store: published snapshot of the singleton player, scoped to the
+// currently-active message (the bubble the user last tapped Play on).
+// ---------------------------------------------------------------------------
+
+interface ChatPlayerStoreState {
+  activeMessageId: string | null;
+  activeSource: string | null;
+  activeIsLocal: boolean;
+  isPlaying: boolean;
+  positionMs: number;
+  durationMs: number;
+  isLoading: boolean;
+  error: string | null;
+}
+
+const INITIAL_STORE_STATE: ChatPlayerStoreState = {
+  activeMessageId: null,
+  activeSource: null,
+  activeIsLocal: false,
+  isPlaying: false,
+  positionMs: 0,
+  durationMs: 0,
+  isLoading: false,
+  error: null,
+};
+
+const useChatPlayerStore = create<ChatPlayerStoreState>(() => INITIAL_STORE_STATE);
+
+/** Test-only: reset the singleton store between tests. */
+export function __resetChatPlayerStoreForTests(): void {
+  useChatPlayerStore.setState(INITIAL_STORE_STATE);
+  hostPlayer = null;
+  loadToken = 0;
+  loadedUrl = null;
+  playConfirmedAt = 0;
+  retried = false;
+  sessionConfigured = false;
+  if (playTimeoutId !== null) {
+    clearTimeout(playTimeoutId);
+    playTimeoutId = null;
+  }
+  signedUrlCache.clear();
+}
+
+// ---------------------------------------------------------------------------
+// Module-level player + transient bookkeeping.
+//
+// The host hook installs/uninstalls `hostPlayer`. All other state is reset on
+// uninstall. `loadToken` guards against out-of-order URL resolutions when the
+// user spams Play across bubbles faster than the network.
+// ---------------------------------------------------------------------------
+
+let hostPlayer: AudioPlayer | null = null;
+let loadToken = 0;
+let loadedUrl: string | null = null;
+let playConfirmedAt = 0;
+let retried = false;
+let sessionConfigured = false;
+let playTimeoutId: ReturnType<typeof setTimeout> | null = null;
+
+function clearPlayTimeout(): void {
+  if (playTimeoutId !== null) {
+    clearTimeout(playTimeoutId);
+    playTimeoutId = null;
+  }
+}
+
+function safeNativeCall(fn: () => void): void {
+  try {
+    fn();
+  } catch {
+    // expo-audio can throw NativeSharedObjectNotFoundException during transient
+    // re-mount states; safe to ignore — the next render retries.
+  }
+}
+
+async function startPlayback(args: {
+  messageId: string;
+  source: string;
+  isLocalFile: boolean;
+  isRetry: boolean;
+}): Promise<void> {
+  const { messageId, source, isLocalFile, isRetry } = args;
+  if (!hostPlayer) return;
+
+  const currentState = useChatPlayerStore.getState();
+  const isSwitchingBubble = currentState.activeMessageId !== messageId;
+
+  if (isSwitchingBubble) {
+    retried = false;
+    loadedUrl = null;
+    playConfirmedAt = 0;
+  }
+
+  useChatPlayerStore.setState({
+    activeMessageId: messageId,
+    activeSource: source,
+    activeIsLocal: isLocalFile,
+    isLoading: true,
+    error: null,
+    isPlaying: false,
+    positionMs: isSwitchingBubble ? 0 : currentState.positionMs,
+    durationMs: isSwitchingBubble ? 0 : currentState.durationMs,
+  });
+
+  if (!sessionConfigured) {
+    try {
+      await configureAudioSessionForPlayback();
+      sessionConfigured = true;
+    } catch {
+      // Continue anyway — playback will likely fail, the timeout will surface.
+    }
+  }
+
+  const token = ++loadToken;
+
+  let url: string;
+  try {
+    if (isLocalFile) {
+      url = source;
+    } else {
+      if (isRetry) invalidateCachedUrl(source);
+      url = await ensureSignedUrl(source);
+    }
+  } catch (err) {
+    if (loadToken !== token) return;
+    useChatPlayerStore.setState({
+      isLoading: false,
+      error: err instanceof Error ? err.message : 'play_failed',
+    });
+    return;
+  }
+
+  if (loadToken !== token || !hostPlayer) return;
+
+  if (isRetry || loadedUrl !== url) {
+    try {
+      hostPlayer.replace(url);
+      loadedUrl = url;
+    } catch {
+      useChatPlayerStore.setState({ isLoading: false, error: 'play_failed' });
+      return;
+    }
+  }
+
+  playConfirmedAt = 0;
+  safeNativeCall(() => hostPlayer?.seekTo(0));
+  safeNativeCall(() => hostPlayer?.play());
+
+  clearPlayTimeout();
+  playTimeoutId = setTimeout(() => {
+    if (loadToken !== token) return;
+    const stateNow = useChatPlayerStore.getState();
+    if (stateNow.activeMessageId === messageId && stateNow.isLoading) {
+      useChatPlayerStore.setState({
+        ...INITIAL_STORE_STATE,
+        error: 'play_timeout',
+      });
+    }
+  }, PLAY_TIMEOUT_MS);
+}
+
+function pauseMessage(messageId: string): void {
+  const state = useChatPlayerStore.getState();
+  if (state.activeMessageId !== messageId || !hostPlayer) return;
+  safeNativeCall(() => hostPlayer?.pause());
+  clearPlayTimeout();
+}
+
+/** Public: pause whatever bubble is currently playing. Called before recording. */
+export function pauseAllChatMessages(): void {
+  if (!hostPlayer) {
+    useChatPlayerStore.setState({ isPlaying: false });
+    clearPlayTimeout();
+    return;
+  }
+  safeNativeCall(() => hostPlayer?.pause());
+  useChatPlayerStore.setState({ isPlaying: false });
+  clearPlayTimeout();
+}
+
+// ---------------------------------------------------------------------------
+// Host hook — mounted once per ConversationScreen.
+// ---------------------------------------------------------------------------
+
+/**
+ * Mount once per ConversationScreen. Creates the single AVAudioPlayer the
+ * whole screen shares, mirrors its status into the store, and orchestrates
+ * the suspicious-finish retry. Returns nothing — bubbles read state via
+ * `useChatMessagePlayer`.
+ */
+export function useChatMessagePlayerHost(): void {
+  const player = useAudioPlayer(null, { updateInterval: 100 });
+  const status = useAudioPlayerStatus(player);
+
+  // Install/uninstall the player at module scope.
+  useEffect(() => {
+    hostPlayer = player;
+    return () => {
+      safeNativeCall(() => player.pause());
+      hostPlayer = null;
+      clearPlayTimeout();
+      loadedUrl = null;
+      playConfirmedAt = 0;
+      retried = false;
+      useChatPlayerStore.setState(INITIAL_STORE_STATE);
+    };
+  }, [player]);
+
+  // Mirror status into the store. Granular field comparison avoids a setState
+  // when the native tick reports the same values.
+  const statusPlaying = status.playing ?? false;
+  const statusCurrentMs = Math.round((status.currentTime ?? 0) * 1000);
+  const statusDurationMs = Math.round((status.duration ?? 0) * 1000);
+
+  useEffect(() => {
+    const state = useChatPlayerStore.getState();
+    if (!state.activeMessageId) return;
+
+    const patch: Partial<ChatPlayerStoreState> = {};
+    if (state.isPlaying !== statusPlaying) patch.isPlaying = statusPlaying;
+    if (state.positionMs !== statusCurrentMs) patch.positionMs = statusCurrentMs;
+    if (state.durationMs !== statusDurationMs) patch.durationMs = statusDurationMs;
+
+    if (statusPlaying && state.isLoading) {
+      patch.isLoading = false;
+      patch.error = null;
+      playConfirmedAt = Date.now();
+      clearPlayTimeout();
+    }
+
+    if (Object.keys(patch).length > 0) {
+      useChatPlayerStore.setState(patch);
+    }
+  }, [statusPlaying, statusCurrentMs, statusDurationMs]);
+
+  // End-of-track handler. Retries once on a suspiciously fast finish (broken
+  // or expired signed URL), otherwise clears the active bubble.
+  const didJustFinish = status.didJustFinish ?? false;
+  useEffect(() => {
+    if (!didJustFinish) return;
+    const state = useChatPlayerStore.getState();
+    if (!state.activeMessageId) return;
+
+    clearPlayTimeout();
+
+    const timeSinceConfirmed = playConfirmedAt > 0 ? Date.now() - playConfirmedAt : 0;
+    const isSuspicious =
+      playConfirmedAt === 0 || timeSinceConfirmed < SUSPICIOUS_FINISH_MS;
+
+    if (isSuspicious && !retried && state.activeSource) {
+      retried = true;
+      void startPlayback({
+        messageId: state.activeMessageId,
+        source: state.activeSource,
+        isLocalFile: state.activeIsLocal,
+        isRetry: true,
+      });
+      return;
+    }
+
+    loadedUrl = null;
+    playConfirmedAt = 0;
+    retried = false;
+
+    if (isSuspicious) {
+      useChatPlayerStore.setState({
+        ...INITIAL_STORE_STATE,
+        error: 'play_failed',
+      });
+    } else {
+      useChatPlayerStore.setState(INITIAL_STORE_STATE);
+    }
+  }, [didJustFinish]);
+}
+
+// ---------------------------------------------------------------------------
+// Per-bubble hook — selective subscription.
+// ---------------------------------------------------------------------------
+
 interface UseChatMessagePlayerArgs {
   messageId: string;
   /** Local file URI (optimistic / sending) or Supabase storage path (confirmed). */
@@ -116,207 +412,44 @@ export function useChatMessagePlayer({
   snapshot: ChatMessagePlayerSnapshot;
   controls: ChatMessagePlayerControls;
 } {
-  const player = useAudioPlayer(null, { updateInterval: 100 });
-  const status = useAudioPlayerStatus(player);
-
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [isActive, setIsActive] = useState(false);
-  const loadTokenRef = useRef(0);
-  const sessionConfiguredRef = useRef(false);
-  const pendingPlayRef = useRef(false);
-  const loadedSourceRef = useRef<string | null>(null);
-  const playConfirmedAtRef = useRef<number>(0);
-  const retriedRef = useRef(false);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Rising-edge detection: only react when didJustFinish transitions false→true.
-  // Prevents stale didJustFinish=true from killing a new play attempt.
-  const prevDidJustFinishRef = useRef(false);
-
-  const clearPlayTimeout = useCallback(() => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
-    }
-  }, []);
-
-  const releaseOwnership = useCallback(() => {
-    try {
-      player.pause();
-    } catch { /* native recycled */ }
-    pendingPlayRef.current = false;
-    clearPlayTimeout();
-    setIsActive(false);
-    clearActiveOwner(messageId);
-  }, [player, messageId, clearPlayTimeout]);
-
-  useEffect(() => {
-    return () => {
-      releaseOwnership();
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Core play logic — extracted so it can be called for initial play and for retry.
-  const doPlay = useCallback(async (isRetry: boolean) => {
-    if (!source) return;
-
-    // Claim ownership, kicking out any other playing bubble.
-    if (activeMessageId && activeMessageId !== messageId && activeReleaseCallback) {
-      activeReleaseCallback();
-    }
-    activeMessageId = messageId;
-    activeReleaseCallback = releaseOwnership;
-    setIsActive(true);
-    setError(null);
-
-    // Reset rising-edge detector so we catch the next didJustFinish transition.
-    prevDidJustFinishRef.current = true;
-
-    if (!sessionConfiguredRef.current) {
-      await configureAudioSessionForPlayback();
-      sessionConfiguredRef.current = true;
-    }
-
-    const token = ++loadTokenRef.current;
-    setIsLoading(true);
-
-    try {
-      let url: string;
-      if (isLocalFile) {
-        url = source;
-      } else {
-        if (isRetry) invalidateCachedUrl(source);
-        url = await ensureSignedUrl(source);
-      }
-
-      if (loadTokenRef.current !== token) return;
-
-      // Always replace on retry; otherwise only if the source changed.
-      if (isRetry || loadedSourceRef.current !== url) {
-        try {
-          player.replace(url);
-          loadedSourceRef.current = url;
-        } catch {
-          setError('play_failed');
-          setIsLoading(false);
-          return;
-        }
-      }
-
-      pendingPlayRef.current = true;
-      playConfirmedAtRef.current = 0;
-
-      try {
-        player.seekTo(0);
-        player.play();
-      } catch { /* native recycled */ }
-
-      // Safety timeout: if the player doesn't confirm playback within PLAY_TIMEOUT_MS,
-      // surface an error so the user is not left hanging.
-      clearPlayTimeout();
-      timeoutRef.current = setTimeout(() => {
-        if (!pendingPlayRef.current) return;
-        pendingPlayRef.current = false;
-        setIsLoading(false);
-        setError('play_timeout');
-        setIsActive(false);
-        clearActiveOwner(messageId);
-      }, PLAY_TIMEOUT_MS);
-    } catch (err) {
-      if (loadTokenRef.current !== token) return;
-      setError(err instanceof Error ? err.message : 'play_failed');
-      setIsLoading(false);
-    }
-  }, [source, isLocalFile, messageId, player, releaseOwnership, clearPlayTimeout]);
-
-  // Detect when playback actually starts (player confirms it's running).
-  useEffect(() => {
-    if (!pendingPlayRef.current || !isActive) return;
-    if (status.playing) {
-      pendingPlayRef.current = false;
-      playConfirmedAtRef.current = Date.now();
-      setIsLoading(false);
-      clearPlayTimeout();
-      // Reset edge detector now that playback is confirmed — next didJustFinish=true is real.
-      prevDidJustFinishRef.current = false;
-      return;
-    }
-    // Source loaded (duration known) but not yet playing — kick it.
-    if (status.duration > 0 && !status.playing && !status.didJustFinish) {
-      pendingPlayRef.current = false;
-      playConfirmedAtRef.current = Date.now();
-      setIsLoading(false);
-      clearPlayTimeout();
-      prevDidJustFinishRef.current = false;
-      try {
-        player.seekTo(0);
-        player.play();
-      } catch { /* native recycled */ }
-    }
-  }, [isActive, status.playing, status.duration, status.didJustFinish, player, clearPlayTimeout]);
-
-  // Handle track end — only on rising edge (false→true) to avoid reacting to stale state.
-  useEffect(() => {
-    const wasFinished = prevDidJustFinishRef.current;
-    prevDidJustFinishRef.current = status.didJustFinish;
-
-    // Only act on rising edge: was false, now true.
-    if (!status.didJustFinish || wasFinished) return;
-    if (!isActive) return;
-
-    clearPlayTimeout();
-
-    // If playback was never confirmed (or confirmed very recently), the file is likely broken.
-    const timeSinceConfirmed = playConfirmedAtRef.current > 0
-      ? Date.now() - playConfirmedAtRef.current
-      : 0;
-
-    const isSuspicious = playConfirmedAtRef.current === 0 || timeSinceConfirmed < SUSPICIOUS_FINISH_MS;
-
-    if (isSuspicious && !retriedRef.current) {
-      retriedRef.current = true;
-      void doPlay(true);
-      return;
-    }
-
-    // Normal end of playback, or retry also failed with the same suspicious finish.
-    pendingPlayRef.current = false;
-
-    if (isSuspicious) {
-      setError('play_failed');
-    }
-
-    setIsActive(false);
-    clearActiveOwner(messageId);
-  }, [isActive, status.didJustFinish, messageId, doPlay, clearPlayTimeout]);
+  // For inactive bubbles the selector returns the stable INACTIVE_SNAPSHOT
+  // reference, so the shallow comparison skips re-render entirely.
+  const snapshot = useChatPlayerStore(
+    useShallow((s): ChatMessagePlayerSnapshot => {
+      if (s.activeMessageId !== messageId) return INACTIVE_SNAPSHOT;
+      return {
+        isPlaying: s.isPlaying,
+        positionMs: s.positionMs,
+        durationMs: s.durationMs,
+        isLoading: s.isLoading,
+        error: s.error,
+      };
+    }),
+  );
 
   const play = useCallback(() => {
-    retriedRef.current = false;
-    void doPlay(false);
-  }, [doPlay]);
+    if (!source) return;
+    void startPlayback({ messageId, source, isLocalFile, isRetry: false });
+  }, [messageId, source, isLocalFile]);
 
   const pause = useCallback(() => {
-    pendingPlayRef.current = false;
-    clearPlayTimeout();
-    try {
-      player.pause();
-    } catch { /* native recycled */ }
-  }, [player, clearPlayTimeout]);
+    pauseMessage(messageId);
+  }, [messageId]);
 
-  const snapshot = useMemo<ChatMessagePlayerSnapshot>(() => {
-    if (!isActive) {
-      return { isPlaying: false, positionMs: 0, durationMs: 0, isLoading: false, error };
-    }
-    return {
-      isPlaying: status.playing,
-      positionMs: Math.round(status.currentTime * 1000),
-      durationMs: Math.round(status.duration * 1000),
-      isLoading,
-      error,
+  // If this bubble unmounts while it owns the player, release ownership so
+  // the next bubble can claim it without inheriting stale state.
+  useEffect(() => {
+    return () => {
+      const state = useChatPlayerStore.getState();
+      if (state.activeMessageId !== messageId) return;
+      if (hostPlayer) safeNativeCall(() => hostPlayer?.pause());
+      clearPlayTimeout();
+      loadedUrl = null;
+      playConfirmedAt = 0;
+      retried = false;
+      useChatPlayerStore.setState(INITIAL_STORE_STATE);
     };
-  }, [isActive, status.playing, status.currentTime, status.duration, isLoading, error]);
+  }, [messageId]);
 
   const controls = useMemo<ChatMessagePlayerControls>(
     () => ({ play, pause }),

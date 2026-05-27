@@ -22,3 +22,31 @@ export function createThrottle(intervalMs: number): Throttle {
     },
   };
 }
+
+// Trailing-edge debounce: each schedule() resets a single pending timer; the
+// callback fires once `delayMs` after the most recent schedule() call.
+// Used to collapse bursty Realtime invalidations into a single refetch.
+export interface Debouncer {
+  schedule: () => void;
+  cancel: () => void;
+}
+
+export function createDebouncer(fn: () => void, delayMs: number): Debouncer {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+  return {
+    schedule(): void {
+      if (timeoutId !== null) clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => {
+        timeoutId = null;
+        fn();
+      }, delayMs);
+    },
+    cancel(): void {
+      if (timeoutId !== null) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+    },
+  };
+}

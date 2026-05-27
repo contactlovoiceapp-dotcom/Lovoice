@@ -67,13 +67,19 @@ function prependMessage(
 function replaceMessage(
   old: InfiniteData<ChatMessage[]> | undefined,
   clientId: string,
-  replacement: ChatMessage,
+  serverRow: MessageRow,
 ): InfiniteData<ChatMessage[]> | undefined {
   if (!old) return old;
   return {
     ...old,
     pages: old.pages.map((page) =>
-      page.map((m) => (m.clientId === clientId ? replacement : m)),
+      page.map((m) =>
+        // Preserve the optimistic clientId so the FlatList key stays stable
+        // across the optimistic→confirmed transition. Without this the bubble
+        // would unmount and remount, recreating its native AVAudioPlayer just
+        // after every voice message is sent (cf. crash 2026-05-27).
+        m.clientId === clientId ? { ...rowToMessage(serverRow), clientId } : m,
+      ),
     ),
   };
 }
@@ -217,7 +223,7 @@ export function useSendTextMessage(): UseMutationResult<
       if (!context) return;
       queryClient.setQueryData<InfiniteData<ChatMessage[]>>(
         chatQueryKeys.messages(context.conversationId),
-        (old) => replaceMessage(old, context.clientId, rowToMessage(serverRow)),
+        (old) => replaceMessage(old, context.clientId, serverRow),
       );
     },
 
@@ -344,7 +350,7 @@ export function useSendVoiceMessage(): UseMutationResult<
       if (!context) return;
       queryClient.setQueryData<InfiniteData<ChatMessage[]>>(
         chatQueryKeys.messages(context.conversationId),
-        (old) => replaceMessage(old, context.clientId, rowToMessage(serverRow)),
+        (old) => replaceMessage(old, context.clientId, serverRow),
       );
     },
 

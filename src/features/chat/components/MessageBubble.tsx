@@ -75,13 +75,16 @@ function VoiceBubbleContent({
   const isLocalFile = message.status === 'sending';
   const source = message.voicePath;
 
+  // Use clientId (stable across the optimistic→confirmed transition) so the
+  // player's "active bubble" identifier never flips mid-playback when the
+  // server confirms a just-sent voice message.
   const { snapshot, controls } = useChatMessagePlayer({
-    messageId: message.id,
+    messageId: message.clientId,
     source,
     isLocalFile,
   });
 
-  const bars = useMemo(() => generateBarHeights(message.id, BAR_COUNT), [message.id]);
+  const bars = useMemo(() => generateBarHeights(message.clientId, BAR_COUNT), [message.clientId]);
   const durationMs = message.voiceDurationMs ?? 0;
   const progress =
     snapshot.durationMs > 0 ? snapshot.positionMs / snapshot.durationMs : 0;

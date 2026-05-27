@@ -99,13 +99,16 @@ describe('useSendTextMessage', () => {
     });
 
     // Before server responds, optimistic message should be in cache with status 'sending'.
+    let optimisticClientId: string | undefined;
     await waitFor(() => {
       const cache = queryClient.getQueryData<InfiniteData<ChatMessage[]>>(
         chatQueryKeys.messages(MOCK_CONV_ID),
       );
       expect(cache?.pages[0]?.[0]?.status).toBe('sending');
       expect(cache?.pages[0]?.[0]?.bodyText).toBe('Hello');
+      optimisticClientId = cache?.pages[0]?.[0]?.clientId;
     });
+    expect(optimisticClientId).toMatch(/^optimistic-/);
 
     // Resolve the server response.
     resolveInsert({ data: serverRow, error: null });
@@ -118,6 +121,9 @@ describe('useSendTextMessage', () => {
     );
     expect(confirmed?.pages[0]?.[0]?.id).toBe('msg-server-1');
     expect(confirmed?.pages[0]?.[0]?.status).toBe('sent');
+    // clientId must survive the optimistic→confirmed swap so the FlatList key
+    // stays stable and the voice bubble does not remount mid-playback.
+    expect(confirmed?.pages[0]?.[0]?.clientId).toBe(optimisticClientId);
   });
 
   it('marks the optimistic message as "failed" when the server returns an error', async () => {

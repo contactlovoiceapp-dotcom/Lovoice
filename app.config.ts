@@ -37,6 +37,7 @@ const config: ExpoConfig = {
     },
   },
   android: {
+    googleServicesFile: "./google-services.json",
     splash: {
       image: "./assets/splash-logo.png",
       resizeMode: "contain",

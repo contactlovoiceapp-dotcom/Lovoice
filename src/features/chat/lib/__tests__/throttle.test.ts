@@ -1,5 +1,5 @@
-// Tests for the time-based throttle helper.
-import { createThrottle } from '../throttle';
+// Tests for the time-based throttle and trailing-edge debouncer helpers.
+import { createDebouncer, createThrottle } from '../throttle';
 
 describe('createThrottle', () => {
   beforeEach(() => {
@@ -52,5 +52,69 @@ describe('createThrottle', () => {
     jest.advanceTimersByTime(3001);
     expect(t.ping()).toBe(true);
     expect(t.ping()).toBe(false);
+  });
+});
+
+describe('createDebouncer', () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('fires once after delayMs of silence', () => {
+    const fn = jest.fn();
+    const d = createDebouncer(fn, 500);
+
+    d.schedule();
+    expect(fn).not.toHaveBeenCalled();
+    jest.advanceTimersByTime(499);
+    expect(fn).not.toHaveBeenCalled();
+    jest.advanceTimersByTime(1);
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
+  it('collapses a burst of schedule() calls into a single fire', () => {
+    const fn = jest.fn();
+    const d = createDebouncer(fn, 500);
+
+    d.schedule();
+    jest.advanceTimersByTime(100);
+    d.schedule();
+    jest.advanceTimersByTime(100);
+    d.schedule();
+    jest.advanceTimersByTime(100);
+    d.schedule();
+
+    // Only the last schedule() arms the live timer.
+    expect(fn).not.toHaveBeenCalled();
+    jest.advanceTimersByTime(500);
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
+  it('cancel() prevents a pending fire', () => {
+    const fn = jest.fn();
+    const d = createDebouncer(fn, 500);
+
+    d.schedule();
+    jest.advanceTimersByTime(200);
+    d.cancel();
+    jest.advanceTimersByTime(1000);
+    expect(fn).not.toHaveBeenCalled();
+  });
+
+  it('can be re-armed after a fire', () => {
+    const fn = jest.fn();
+    const d = createDebouncer(fn, 500);
+
+    d.schedule();
+    jest.advanceTimersByTime(500);
+    expect(fn).toHaveBeenCalledTimes(1);
+
+    d.schedule();
+    jest.advanceTimersByTime(500);
+    expect(fn).toHaveBeenCalledTimes(2);
   });
 });
