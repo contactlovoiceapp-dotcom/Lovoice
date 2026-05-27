@@ -17,8 +17,6 @@ export interface VoicePlayerHook {
   positionMs: number;
   play: () => void;
   pause: () => void;
-  /** Seek to an absolute position. */
-  seek: (ms: number) => void;
   /** Pause + seek to 0 so the next play() restarts from the beginning. */
   stop: () => void;
   /** Pause and clear the source so the player releases its audio focus. */
@@ -109,14 +107,6 @@ export function useVoicePlayer({ uri }: { uri: string | null }): VoicePlayerHook
     }
   }, [player]);
 
-  const seek = useCallback(
-    (ms: number) => {
-      // seekTo takes seconds; convert from ms.
-      player.seekTo(ms / 1000);
-    },
-    [player],
-  );
-
   const stop = useCallback(() => {
     try {
       player.pause();
@@ -146,7 +136,6 @@ export function useVoicePlayer({ uri }: { uri: string | null }): VoicePlayerHook
     positionMs: Math.round(status.currentTime * 1000),
     play,
     pause,
-    seek,
     stop,
     unload,
   };

@@ -89,20 +89,6 @@ describe('useVoicePlayer — pause()', () => {
   });
 });
 
-describe('useVoicePlayer — seek()', () => {
-  it('converts ms to seconds before calling seekTo', () => {
-    const { result } = renderHook(() =>
-      useVoicePlayer({ uri: 'file:///document/pending/voice.m4a' }),
-    );
-
-    act(() => {
-      result.current.seek(5000);
-    });
-
-    expect(mocks.player.seekTo).toHaveBeenCalledWith(5);
-  });
-});
-
 describe('useVoicePlayer — unload()', () => {
   it('pauses without calling replace (expo-audio 0.5 rejects null sources)', async () => {
     const { result } = renderHook(() =>

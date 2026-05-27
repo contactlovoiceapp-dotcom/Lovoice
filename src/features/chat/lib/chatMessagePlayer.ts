@@ -204,12 +204,19 @@ async function startPlayback(args: {
   const currentState = useChatPlayerStore.getState();
   const isSwitchingBubble = currentState.activeMessageId !== messageId;
 
-  if (isSwitchingBubble) {
-    retried = false;
-    loadedUrl = null;
+  // Reset retry / URL bookkeeping whenever we either switch bubble OR explicitly
+  // retry; a fresh play attempt on the same bubble (e.g. after pause) keeps
+  // loadedUrl so we avoid a redundant replace() of the same signed URL.
+  if (isSwitchingBubble || isRetry) {
+    retried = isRetry ? true : false;
+    if (isSwitchingBubble) {
+      loadedUrl = null;
+    }
     playConfirmedAt = 0;
   }
 
+  // Always restart at 0 visually so the progress bar doesn't briefly flash the
+  // previous track's terminal position while the native source swap commits.
   useChatPlayerStore.setState({
     activeMessageId: messageId,
     activeSource: source,
@@ -217,8 +224,8 @@ async function startPlayback(args: {
     isLoading: true,
     error: null,
     isPlaying: false,
-    positionMs: isSwitchingBubble ? 0 : currentState.positionMs,
-    durationMs: isSwitchingBubble ? 0 : currentState.durationMs,
+    positionMs: 0,
+    durationMs: 0,
   });
 
   if (!sessionConfigured) {
@@ -269,12 +276,17 @@ async function startPlayback(args: {
   playTimeoutId = setTimeout(() => {
     if (loadToken !== token) return;
     const stateNow = useChatPlayerStore.getState();
-    if (stateNow.activeMessageId === messageId && stateNow.isLoading) {
-      useChatPlayerStore.setState({
-        ...INITIAL_STORE_STATE,
-        error: 'play_timeout',
-      });
-    }
+    if (stateNow.activeMessageId !== messageId || !stateNow.isLoading) return;
+    // Keep activeMessageId set so the bubble's snapshot can surface the error
+    // (the selector returns INACTIVE_SNAPSHOT — with no error — when active
+    // does not match).
+    useChatPlayerStore.setState({
+      isLoading: false,
+      isPlaying: false,
+      positionMs: 0,
+      durationMs: 0,
+      error: 'play_timeout',
+    });
   }, PLAY_TIMEOUT_MS);
 }
 
@@ -382,8 +394,13 @@ export function useChatMessagePlayerHost(): void {
     retried = false;
 
     if (isSuspicious) {
+      // Keep activeMessageId so the bubble can surface 'play_failed' in its UI;
+      // INACTIVE_SNAPSHOT would hide the error otherwise.
       useChatPlayerStore.setState({
-        ...INITIAL_STORE_STATE,
+        isPlaying: false,
+        isLoading: false,
+        positionMs: 0,
+        durationMs: 0,
         error: 'play_failed',
       });
     } else {

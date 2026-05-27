@@ -33,6 +33,10 @@ const RECORDING_CLEAR_DELAY_MS = 10_000;
 const TYPING_THROTTLE_MS = 3_000;
 // Collapse bursts of UPDATE events (read receipts, etc.) into one refetch.
 const MESSAGES_UPDATE_DEBOUNCE_MS = 500;
+// Collapse multiple incoming messages into a single markRead call: the SQL
+// statement is idempotent, but each redundant invocation costs an HTTP round
+// trip + a Realtime UPDATE broadcast that re-enters our invalidation pipeline.
+const MARK_READ_DEBOUNCE_MS = 400;
 
 interface BroadcastPayload {
   userId: string;
@@ -109,6 +113,10 @@ export default function ConversationRoute() {
       void queryClient.invalidateQueries({ queryKey: chatQueryKeys.messages(id) });
     }, MESSAGES_UPDATE_DEBOUNCE_MS);
 
+    const markReadDebouncer = createDebouncer(() => {
+      markReadRef.current();
+    }, MARK_READ_DEBOUNCE_MS);
+
     const channel = supabase
       .channel(`conv:${id}`)
       .on(
@@ -131,7 +139,7 @@ export default function ConversationRoute() {
 
           if (!isOwnMessage) {
             void queryClient.invalidateQueries({ queryKey: chatQueryKeys.messages(id) });
-            markReadRef.current();
+            markReadDebouncer.schedule();
           }
           void queryClient.invalidateQueries({ queryKey: chatQueryKeys.conversation(id) });
           void queryClient.invalidateQueries({ queryKey: chatQueryKeys.inbox });
@@ -206,6 +214,7 @@ export default function ConversationRoute() {
       channelRef.current = null;
 
       updateDebouncer.cancel();
+      markReadDebouncer.cancel();
 
       if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
       if (recordingTimerRef.current) clearTimeout(recordingTimerRef.current);
