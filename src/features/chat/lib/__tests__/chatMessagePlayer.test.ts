@@ -247,3 +247,50 @@ describe('pauseAllChatMessages', () => {
     expect(expoAudioMocks.player.pause).toHaveBeenCalled();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Nested ConversationScreen — push notification deep-link case.
+// ---------------------------------------------------------------------------
+
+describe('useChatMessagePlayerHost — nested hosts (push notification scenario)', () => {
+  it('mounting a second host resets the store and pauses the previous one', async () => {
+    mockSupabaseSignedUrls();
+
+    // First conv mounts and a bubble plays.
+    const conv1 = renderHook(() => {
+      useChatMessagePlayerHost();
+      return useChatMessagePlayer({ messageId: 'msg-conv1', source: 'p1.m4a', isLocalFile: false });
+    });
+
+    await act(async () => {
+      conv1.result.current.controls.play();
+      await Promise.resolve();
+    });
+    await waitFor(() =>
+      expect(expoAudioMocks.player.replace).toHaveBeenCalledWith('https://signed.example/p1.m4a'),
+    );
+    expoAudioMocks.player.pause.mockClear();
+
+    // Second conv mounts on top (simulating router.push from a push notif).
+    const conv2 = renderHook(() => {
+      useChatMessagePlayerHost();
+      return useChatMessagePlayer({ messageId: 'msg-conv2', source: 'p2.m4a', isLocalFile: false });
+    });
+
+    // Previous top was paused.
+    expect(expoAudioMocks.player.pause).toHaveBeenCalled();
+
+    // Conv2 starts fresh: its bubble can play, conv1's bubble snapshot must
+    // be inactive because the store was reset on push.
+    expect(conv1.result.current.snapshot.isPlaying).toBe(false);
+    expect(conv1.result.current.snapshot.error).toBeNull();
+
+    await act(async () => {
+      conv2.result.current.controls.play();
+      await Promise.resolve();
+    });
+    await waitFor(() =>
+      expect(expoAudioMocks.player.replace).toHaveBeenCalledWith('https://signed.example/p2.m4a'),
+    );
+  });
+});

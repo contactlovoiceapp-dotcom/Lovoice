@@ -29,6 +29,10 @@ import { getSupabaseClient } from '@/lib/supabase';
 const SIGNED_URL_TTL_SECONDS = 60 * 60;
 const SIGNED_URL_REFRESH_BUFFER_MS = 10 * 60 * 1000;
 const SIGNED_URL_LIFETIME_MS = SIGNED_URL_TTL_SECONDS * 1000 - SIGNED_URL_REFRESH_BUFFER_MS;
+// Soft cap on the signed-URL LRU: 200 entries × ~300 bytes ≈ 60 KB.
+// Bounds memory growth on long sessions across many conversations while still
+// covering recently-listened voices for instant replay.
+const SIGNED_URL_CACHE_MAX_ENTRIES = 200;
 
 // If the player doesn't start within this delay, consider the file unplayable.
 const PLAY_TIMEOUT_MS = 8_000;
@@ -41,16 +45,29 @@ interface SignedUrlEntry {
   fetchedAt: number;
 }
 
+// LRU via Map insertion-order: on hit we delete+reinsert to mark recency,
+// on set we evict the oldest key when over capacity.
 const signedUrlCache = new Map<string, SignedUrlEntry>();
 
 function invalidateCachedUrl(path: string): void {
   signedUrlCache.delete(path);
 }
 
+function rememberSignedUrl(path: string, entry: SignedUrlEntry): void {
+  if (signedUrlCache.has(path)) signedUrlCache.delete(path);
+  signedUrlCache.set(path, entry);
+  if (signedUrlCache.size > SIGNED_URL_CACHE_MAX_ENTRIES) {
+    const oldestKey = signedUrlCache.keys().next().value;
+    if (oldestKey !== undefined) signedUrlCache.delete(oldestKey);
+  }
+}
+
 async function ensureSignedUrl(path: string): Promise<string> {
   const now = Date.now();
   const cached = signedUrlCache.get(path);
   if (cached && now - cached.fetchedAt < SIGNED_URL_LIFETIME_MS) {
+    // Touch the entry so it migrates to the most-recent end of the LRU.
+    rememberSignedUrl(path, cached);
     return cached.url;
   }
 
@@ -65,7 +82,7 @@ async function ensureSignedUrl(path: string): Promise<string> {
     throw new Error('chat_player.signed_url_failed');
   }
 
-  signedUrlCache.set(path, { url: data.signedUrl, fetchedAt: now });
+  rememberSignedUrl(path, { url: data.signedUrl, fetchedAt: now });
   return data.signedUrl;
 }
 
@@ -147,7 +164,7 @@ const useChatPlayerStore = create<ChatPlayerStoreState>(() => INITIAL_STORE_STAT
 /** Test-only: reset the singleton store between tests. */
 export function __resetChatPlayerStoreForTests(): void {
   useChatPlayerStore.setState(INITIAL_STORE_STATE);
-  hostPlayer = null;
+  hostPlayerStack.length = 0;
   loadToken = 0;
   loadedUrl = null;
   playConfirmedAt = 0;
@@ -163,18 +180,24 @@ export function __resetChatPlayerStoreForTests(): void {
 // ---------------------------------------------------------------------------
 // Module-level player + transient bookkeeping.
 //
-// The host hook installs/uninstalls `hostPlayer`. All other state is reset on
-// uninstall. `loadToken` guards against out-of-order URL resolutions when the
-// user spams Play across bubbles faster than the network.
+// A stack (rather than a single ref) tolerates nested ConversationScreens —
+// e.g. when a push notification for conversation B is tapped while the user
+// is already inside conversation A, expo-router pushes B on top and both
+// hosts mount simultaneously. The topmost host owns the singleton player;
+// older hosts wait dormant until the top is popped.
 // ---------------------------------------------------------------------------
 
-let hostPlayer: AudioPlayer | null = null;
+const hostPlayerStack: AudioPlayer[] = [];
 let loadToken = 0;
 let loadedUrl: string | null = null;
 let playConfirmedAt = 0;
 let retried = false;
 let sessionConfigured = false;
 let playTimeoutId: ReturnType<typeof setTimeout> | null = null;
+
+function getActiveHost(): AudioPlayer | null {
+  return hostPlayerStack[hostPlayerStack.length - 1] ?? null;
+}
 
 function clearPlayTimeout(): void {
   if (playTimeoutId !== null) {
@@ -199,7 +222,8 @@ async function startPlayback(args: {
   isRetry: boolean;
 }): Promise<void> {
   const { messageId, source, isLocalFile, isRetry } = args;
-  if (!hostPlayer) return;
+  const host = getActiveHost();
+  if (!host) return;
 
   const currentState = useChatPlayerStore.getState();
   const isSwitchingBubble = currentState.activeMessageId !== messageId;
@@ -256,11 +280,14 @@ async function startPlayback(args: {
     return;
   }
 
-  if (loadToken !== token || !hostPlayer) return;
+  // Re-resolve the host: it may have been swapped while awaiting the URL
+  // (e.g. user navigated to a different conversation mid-fetch).
+  const hostAfterAwait = getActiveHost();
+  if (loadToken !== token || !hostAfterAwait) return;
 
   if (isRetry || loadedUrl !== url) {
     try {
-      hostPlayer.replace(url);
+      hostAfterAwait.replace(url);
       loadedUrl = url;
     } catch {
       useChatPlayerStore.setState({ isLoading: false, error: 'play_failed' });
@@ -269,8 +296,8 @@ async function startPlayback(args: {
   }
 
   playConfirmedAt = 0;
-  safeNativeCall(() => hostPlayer?.seekTo(0));
-  safeNativeCall(() => hostPlayer?.play());
+  safeNativeCall(() => hostAfterAwait.seekTo(0));
+  safeNativeCall(() => hostAfterAwait.play());
 
   clearPlayTimeout();
   playTimeoutId = setTimeout(() => {
@@ -292,19 +319,16 @@ async function startPlayback(args: {
 
 function pauseMessage(messageId: string): void {
   const state = useChatPlayerStore.getState();
-  if (state.activeMessageId !== messageId || !hostPlayer) return;
-  safeNativeCall(() => hostPlayer?.pause());
+  const host = getActiveHost();
+  if (state.activeMessageId !== messageId || !host) return;
+  safeNativeCall(() => host.pause());
   clearPlayTimeout();
 }
 
 /** Public: pause whatever bubble is currently playing. Called before recording. */
 export function pauseAllChatMessages(): void {
-  if (!hostPlayer) {
-    useChatPlayerStore.setState({ isPlaying: false });
-    clearPlayTimeout();
-    return;
-  }
-  safeNativeCall(() => hostPlayer?.pause());
+  const host = getActiveHost();
+  if (host) safeNativeCall(() => host.pause());
   useChatPlayerStore.setState({ isPlaying: false });
   clearPlayTimeout();
 }
@@ -323,12 +347,24 @@ export function useChatMessagePlayerHost(): void {
   const player = useAudioPlayer(null, { updateInterval: 100 });
   const status = useAudioPlayerStatus(player);
 
-  // Install/uninstall the player at module scope.
+  // Push/pop on the host stack. When mounting on top of an existing host (nested
+  // conversation case), pause the previous top first so its silent native player
+  // doesn't keep producing status ticks that race ours. The store is reset on
+  // both push and pop so the incoming host starts from a clean slate.
   useEffect(() => {
-    hostPlayer = player;
+    const previous = hostPlayerStack[hostPlayerStack.length - 1];
+    if (previous) safeNativeCall(() => previous.pause());
+    hostPlayerStack.push(player);
+    clearPlayTimeout();
+    loadedUrl = null;
+    playConfirmedAt = 0;
+    retried = false;
+    useChatPlayerStore.setState(INITIAL_STORE_STATE);
+
     return () => {
       safeNativeCall(() => player.pause());
-      hostPlayer = null;
+      const idx = hostPlayerStack.lastIndexOf(player);
+      if (idx !== -1) hostPlayerStack.splice(idx, 1);
       clearPlayTimeout();
       loadedUrl = null;
       playConfirmedAt = 0;
@@ -337,13 +373,14 @@ export function useChatMessagePlayerHost(): void {
     };
   }, [player]);
 
-  // Mirror status into the store. Granular field comparison avoids a setState
-  // when the native tick reports the same values.
+  // Mirror status into the store. Only the topmost host owns the store —
+  // dormant hosts in the back stack must not clobber the active host's state.
   const statusPlaying = status.playing ?? false;
   const statusCurrentMs = Math.round((status.currentTime ?? 0) * 1000);
   const statusDurationMs = Math.round((status.duration ?? 0) * 1000);
 
   useEffect(() => {
+    if (getActiveHost() !== player) return;
     const state = useChatPlayerStore.getState();
     if (!state.activeMessageId) return;
 
@@ -362,13 +399,15 @@ export function useChatMessagePlayerHost(): void {
     if (Object.keys(patch).length > 0) {
       useChatPlayerStore.setState(patch);
     }
-  }, [statusPlaying, statusCurrentMs, statusDurationMs]);
+  }, [player, statusPlaying, statusCurrentMs, statusDurationMs]);
 
   // End-of-track handler. Retries once on a suspiciously fast finish (broken
-  // or expired signed URL), otherwise clears the active bubble.
+  // or expired signed URL), otherwise clears the active bubble. Dormant hosts
+  // ignore their own didJustFinish (they were paused on push).
   const didJustFinish = status.didJustFinish ?? false;
   useEffect(() => {
     if (!didJustFinish) return;
+    if (getActiveHost() !== player) return;
     const state = useChatPlayerStore.getState();
     if (!state.activeMessageId) return;
 
@@ -406,7 +445,7 @@ export function useChatMessagePlayerHost(): void {
     } else {
       useChatPlayerStore.setState(INITIAL_STORE_STATE);
     }
-  }, [didJustFinish]);
+  }, [player, didJustFinish]);
 }
 
 // ---------------------------------------------------------------------------
@@ -459,7 +498,8 @@ export function useChatMessagePlayer({
     return () => {
       const state = useChatPlayerStore.getState();
       if (state.activeMessageId !== messageId) return;
-      if (hostPlayer) safeNativeCall(() => hostPlayer?.pause());
+      const host = getActiveHost();
+      if (host) safeNativeCall(() => host.pause());
       clearPlayTimeout();
       loadedUrl = null;
       playConfirmedAt = 0;
