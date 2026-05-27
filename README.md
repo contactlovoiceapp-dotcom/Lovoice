@@ -245,7 +245,7 @@ for full prerequisites and the revocation one-liner.
 
 ### Environment variables
 
-`.env.example` is the source of truth for required mobile environment variable names. `.env.local` contains local development values and is never committed. Whenever you add a new `EXPO_PUBLIC_*` variable:
+`.env.example` is the source of truth for **required** mobile environment variable names. `.env.local` contains local development values and is never committed. Whenever you add a new **required** `EXPO_PUBLIC_*` variable:
 
 1. Add its name to `.env.example` with an empty value.
 2. Add the real local value to `.env.local`.
@@ -253,11 +253,13 @@ for full prerequisites and the revocation one-liner.
 4. Run `npm run sync-eas-env` so EAS Cloud builds (TestFlight / production) receive the same value.
 5. Rebuild the app, because Expo public env values are embedded at build time.
 
+For **optional** `EXPO_PUBLIC_*` variables (e.g. third-party services that a contributor can opt out of locally), skip step 1 — `sync-eas-env` also picks up any `EXPO_PUBLIC_*` key present in `.env.local` even if it is not declared in `.env.example`.
+
 Only use `EXPO_PUBLIC_*` for values that are safe to ship in the client bundle. Supabase URL and publishable key are public by design; secrets belong in Supabase Edge Functions or EAS Secrets, not in the mobile app.
 
 #### Optional: Sentry crash reporting
 
-Set `EXPO_PUBLIC_SENTRY_DSN` (in `.env.local` and in EAS via `sync-eas-env`) to enable JS error capture and native crash reporting via `@sentry/react-native`. When the DSN is missing, `initSentry()` is a no-op so the app still runs cleanly without it. The DSN is a public identifier; safe to ship in the client bundle.
+Set `EXPO_PUBLIC_SENTRY_DSN` in `.env.local`, then run `npm run sync-eas-env` to push it to EAS. The DSN is a public identifier (safe to ship in the client bundle). When the DSN is missing, `initSentry()` is a no-op so the app still runs cleanly without it.
 
 ### App Store / TestFlight (EAS)
 

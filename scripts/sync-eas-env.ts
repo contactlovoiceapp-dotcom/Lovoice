@@ -36,9 +36,9 @@ function readEnvFile(path: string): Record<string, string> {
   return values;
 }
 
-const expectedKeys = Object.keys(readEnvFile(envExamplePath));
+const requiredKeys = Object.keys(readEnvFile(envExamplePath));
 const localEnv = readEnvFile(envFilePath);
-const missingLocalValues = expectedKeys.filter((key) => !localEnv[key]);
+const missingLocalValues = requiredKeys.filter((key) => !localEnv[key]);
 
 if (missingLocalValues.length > 0) {
   console.error(
@@ -47,7 +47,18 @@ if (missingLocalValues.length > 0) {
   process.exit(1);
 }
 
-for (const key of expectedKeys) {
+// Also push any optional EXPO_PUBLIC_* keys present in .env.local but not declared
+// in .env.example (e.g. EXPO_PUBLIC_SENTRY_DSN). Keeps the .env.example contract
+// minimal for new contributors while letting opt-in services flow to EAS Builds.
+const optionalKeys = Object.keys(localEnv).filter(
+  (key) =>
+    key.startsWith("EXPO_PUBLIC_") &&
+    !requiredKeys.includes(key) &&
+    localEnv[key].length > 0,
+);
+const keysToSync = [...requiredKeys, ...optionalKeys];
+
+for (const key of keysToSync) {
   const args = [
     "eas",
     "env:create",
