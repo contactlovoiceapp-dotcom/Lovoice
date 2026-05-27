@@ -14,6 +14,9 @@ import type {
 
 const MAX_DURATION_MS = 90_000;
 const MAX_FILE_BYTES = 2_000_000;
+// m4a files contain at least ftyp + moov boxes; anything below 100 bytes cannot be a
+// valid audio file and would produce unplayable voice messages in the chat.
+const MIN_FILE_BYTES = 100;
 const MAX_TITLE_LENGTH = 60;
 const VALID_THEMES = new Set(['sunset', 'chill', 'electric', 'midnight']);
 
@@ -107,6 +110,9 @@ async function handleVoiceCommit(
   if (!exists) {
     return json({ error: 'object_not_found' }, 400, req);
   }
+  if (size < MIN_FILE_BYTES) {
+    return json({ error: 'file_too_small' }, 400, req);
+  }
   if (size > MAX_FILE_BYTES) {
     return json({ error: 'file_too_large' }, 400, req);
   }
@@ -180,6 +186,10 @@ async function handleMessageCommit(
   const { exists, size } = await checkStorageObject('messages', objectPath);
   if (!exists) {
     return json({ error: 'object_not_found' }, 400, req);
+  }
+  if (size < MIN_FILE_BYTES) {
+    console.warn('commit_upload: message voice file too small', { objectPath, size });
+    return json({ error: 'file_too_small' }, 400, req);
   }
   if (size > MAX_FILE_BYTES) {
     return json({ error: 'file_too_large' }, 400, req);
