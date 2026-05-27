@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   useAudioRecorder,
   requestRecordingPermissionsAsync,
+  setIsAudioActiveAsync,
 } from 'expo-audio';
 import { Directory, File, Paths } from 'expo-file-system';
 import * as Crypto from 'expo-crypto';
@@ -17,6 +18,7 @@ import {
   configureAudioSessionForPlayback,
   useAudioRecorderStateGated,
 } from '@/lib/audio';
+import { Sentry } from '@/lib/sentry';
 
 export type ChatRecorderState = 'idle' | 'recording' | 'error';
 
@@ -116,7 +118,9 @@ export function useChatVoiceRecorder(): ChatVoiceRecorderHook {
         // Native recorder already released.
       }
       if (recordingSessionTouchedRef.current) {
-        configureAudioSessionForPlayback().catch(() => null);
+        setIsAudioActiveAsync(true)
+          .then(() => configureAudioSessionForPlayback())
+          .catch(() => null);
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -132,16 +136,35 @@ export function useChatVoiceRecorder(): ChatVoiceRecorderHook {
       const uuid = Crypto.randomUUID();
       const destFile = new File(pendingDir, `${uuid}.m4a`);
       const srcFile = new File(tempUri);
+
+      const srcSize = srcFile.size ?? 0;
       srcFile.move(destFile);
+      const destSize = destFile.size ?? 0;
 
       const rawDuration = recorderState.durationMillis || durationMs;
       const finalDuration = Math.min(rawDuration, MAX_VOICE_DURATION_MS);
 
+      if (__DEV__) {
+        console.log('[ChatRecorder] finalize', { srcSize, destSize, finalDuration, tempUri });
+      }
+
+      // Flag suspiciously small recordings: at 32 kbps, even 1 second produces ~4 KB.
+      // A multi-second recording under 35 KB strongly suggests a corrupt M4A container
+      // where the AAC encoder didn't flush its samples (seen on some iOS builds).
+      if (destSize > 0 && destSize < 35_000 && finalDuration > 2_000) {
+        Sentry.captureMessage('Chat voice recording suspiciously small', {
+          level: 'warning',
+          extra: { srcSize, destSize, finalDuration, tempUri },
+        });
+      }
+
+      await setIsAudioActiveAsync(true);
       await configureAudioSessionForPlayback();
       return { uri: destFile.uri, durationMs: finalDuration };
     } catch (err) {
       setState('error');
       setError(err instanceof Error ? err.message : 'stop_failed');
+      await setIsAudioActiveAsync(true).catch(() => null);
       await configureAudioSessionForPlayback();
       return null;
     }
@@ -156,6 +179,14 @@ export function useChatVoiceRecorder(): ChatVoiceRecorderHook {
         return;
       }
 
+      // Deactivate the audio subsystem before reconfiguring for recording.
+      // The native AudioPlayer (running at 100ms updateInterval) can silently
+      // reconfigure the AVAudioSession back to playback-only between async calls,
+      // causing the recorder to produce valid-sized .m4a containers filled with
+      // silence (see expo/expo#39030 and expo-audio-video-conflict).
+      // Deactivating first forces all native audio components to release the
+      // session, then we configure for recording and prepare in tight sequence.
+      await setIsAudioActiveAsync(false);
       await configureAudioSessionForRecording();
       recordingSessionTouchedRef.current = true;
       await recorder.prepareToRecordAsync();
@@ -211,6 +242,7 @@ export function useChatVoiceRecorder(): ChatVoiceRecorderHook {
     setMeteringDb([]);
     hardCapFiredRef.current = false;
     setState('idle');
+    await setIsAudioActiveAsync(true).catch(() => null);
     await configureAudioSessionForPlayback();
   }, [recorder, result]);
 

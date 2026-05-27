@@ -9,6 +9,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   useAudioRecorder,
   requestRecordingPermissionsAsync,
+  setIsAudioActiveAsync,
 } from 'expo-audio';
 import { Directory, File, Paths } from 'expo-file-system';
 import * as Crypto from 'expo-crypto';
@@ -146,7 +147,9 @@ export function useVoiceRecorder(): VoiceRecorderHook {
         // Native recorder already released — nothing to stop.
       }
       if (recordingSessionTouchedRef.current) {
-        configureAudioSessionForPlayback().catch(() => null);
+        setIsAudioActiveAsync(true)
+          .then(() => configureAudioSessionForPlayback())
+          .catch(() => null);
       }
     };
     // recorder reference is stable for the component lifetime.
@@ -162,6 +165,7 @@ export function useVoiceRecorder(): VoiceRecorderHook {
         return;
       }
 
+      await setIsAudioActiveAsync(false);
       await configureAudioSessionForRecording();
       recordingSessionTouchedRef.current = true;
       await recorder.prepareToRecordAsync();
@@ -224,6 +228,7 @@ export function useVoiceRecorder(): VoiceRecorderHook {
       setIsLikelySilent(voiceRatio < VOICE_SAMPLE_MIN_RATIO);
       setResult({ uri: finalUri, durationMs: finalDuration });
       setState('stopped');
+      await setIsAudioActiveAsync(true);
       await configureAudioSessionForPlayback();
     } catch (err) {
       setState('error');
@@ -258,6 +263,7 @@ export function useVoiceRecorder(): VoiceRecorderHook {
       totalSamplesRef.current = 0;
       voiceSamplesRef.current = 0;
       setState('idle');
+      await setIsAudioActiveAsync(true).catch(() => null);
       await configureAudioSessionForPlayback();
     }
   }, [recorder, result]);

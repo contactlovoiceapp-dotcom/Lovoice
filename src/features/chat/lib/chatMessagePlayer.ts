@@ -25,6 +25,7 @@ import { useShallow } from 'zustand/react/shallow';
 
 import { configureAudioSessionForPlayback } from '@/lib/audio';
 import { getSupabaseClient } from '@/lib/supabase';
+import { Sentry } from '@/lib/sentry';
 
 const SIGNED_URL_TTL_SECONDS = 60 * 60;
 const SIGNED_URL_REFRESH_BUFFER_MS = 10 * 60 * 1000;
@@ -79,7 +80,15 @@ async function ensureSignedUrl(path: string): Promise<string> {
     .createSignedUrl(path, SIGNED_URL_TTL_SECONDS);
 
   if (error || !data?.signedUrl) {
-    throw new Error('chat_player.signed_url_failed');
+    const err = new Error(`chat_player.signed_url_failed:${error?.message ?? 'no_url'}`);
+    Sentry.addBreadcrumb({
+      category: 'audio.player',
+      message: 'createSignedUrl failed',
+      data: { path, errorMessage: error?.message },
+      level: 'error',
+    });
+    Sentry.captureException(err);
+    throw err;
   }
 
   rememberSignedUrl(path, { url: data.signedUrl, fetchedAt: now });
@@ -273,10 +282,14 @@ async function startPlayback(args: {
     }
   } catch (err) {
     if (loadToken !== token) return;
-    useChatPlayerStore.setState({
-      isLoading: false,
-      error: err instanceof Error ? err.message : 'play_failed',
+    const errorMsg = err instanceof Error ? err.message : 'play_failed';
+    Sentry.addBreadcrumb({
+      category: 'audio.player',
+      message: 'startPlayback URL resolution failed',
+      data: { messageId, source, isLocalFile, isRetry, error: errorMsg },
+      level: 'error',
     });
+    useChatPlayerStore.setState({ isLoading: false, error: errorMsg });
     return;
   }
 
@@ -284,6 +297,13 @@ async function startPlayback(args: {
   // (e.g. user navigated to a different conversation mid-fetch).
   const hostAfterAwait = getActiveHost();
   if (loadToken !== token || !hostAfterAwait) return;
+
+  Sentry.addBreadcrumb({
+    category: 'audio.player',
+    message: 'startPlayback resolved URL',
+    data: { messageId, isRetry, isLocalFile, urlLength: url.length },
+    level: 'info',
+  });
 
   if (isRetry || loadedUrl !== url) {
     try {
@@ -304,9 +324,10 @@ async function startPlayback(args: {
     if (loadToken !== token) return;
     const stateNow = useChatPlayerStore.getState();
     if (stateNow.activeMessageId !== messageId || !stateNow.isLoading) return;
-    // Keep activeMessageId set so the bubble's snapshot can surface the error
-    // (the selector returns INACTIVE_SNAPSHOT — with no error — when active
-    // does not match).
+    Sentry.captureMessage('Voice playback: 8s timeout reached', {
+      level: 'warning',
+      extra: { messageId, source, isLocalFile },
+    });
     useChatPlayerStore.setState({
       isLoading: false,
       isPlaying: false,
@@ -433,8 +454,16 @@ export function useChatMessagePlayerHost(): void {
     retried = false;
 
     if (isSuspicious) {
-      // Keep activeMessageId so the bubble can surface 'play_failed' in its UI;
-      // INACTIVE_SNAPSHOT would hide the error otherwise.
+      Sentry.captureMessage('Voice playback: suspicious finish after retry', {
+        level: 'warning',
+        extra: {
+          messageId: state.activeMessageId,
+          source: state.activeSource,
+          isLocalFile: state.activeIsLocal,
+          timeSinceConfirmed,
+          playConfirmedAt,
+        },
+      });
       useChatPlayerStore.setState({
         isPlaying: false,
         isLoading: false,

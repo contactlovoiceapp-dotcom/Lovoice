@@ -21,6 +21,14 @@ jest.mock('@/lib/audio', () => ({
   configureAudioSessionForPlayback: jest.fn(() => Promise.resolve()),
 }));
 
+jest.mock('@/lib/sentry', () => ({
+  Sentry: {
+    addBreadcrumb: jest.fn(),
+    captureException: jest.fn(),
+    captureMessage: jest.fn(),
+  },
+}));
+
 const expoAudioMocks = (global as Record<string, unknown>).__expoAudioMocks as {
   player: {
     play: jest.Mock;
