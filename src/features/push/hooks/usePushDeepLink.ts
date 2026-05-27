@@ -1,7 +1,18 @@
 /* Deep-links the user to the right screen when they tap a push notification.
-   Handles both background/foreground taps and the app-killed cold-start case. */
+   Handles both background/foreground taps and the app-killed cold-start case.
+
+   Navigation is deferred via InteractionManager so the actual `router.push` runs
+   after the current JS frame finishes — letting iOS settle its foreground
+   transition (AVAudioSession reactivation, Realtime channel reconnection,
+   pending UI animations) before the React tree starts mounting the
+   conversation screen and allocating native audio resources. This mitigates
+   a race window where concurrent native-module work can throw NSExceptions
+   that get converted to JS errors on background threads, corrupting the
+   Hermes runtime (see docs/CHAT_AUDIO.md and the EXC_BAD_ACCESS crashes
+   observed in TestFlight builds ≤ 0.8.1). */
 
 import { useEffect, useRef } from 'react';
+import { InteractionManager } from 'react-native';
 import { router } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import type { Href } from 'expo-router';
@@ -44,7 +55,9 @@ export function usePushDeepLink(): void {
       const deepLink = extractValidDeepLink(data);
       if (!deepLink) return;
 
-      router.push(deepLink as Href);
+      InteractionManager.runAfterInteractions(() => {
+        router.push(deepLink as Href);
+      });
     }
 
     // Cold-start: the app was killed when the user tapped the notification.

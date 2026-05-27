@@ -1,6 +1,14 @@
-// Central audio configuration: format constants, AVAudioSession helpers, and upload sanity checks.
+// Central audio configuration: format constants, AVAudioSession helpers, gated recorder
+// polling, and upload sanity checks.
 
-import { setAudioModeAsync, IOSOutputFormat, AudioQuality } from 'expo-audio';
+import { useEffect, useState } from 'react';
+import {
+  setAudioModeAsync,
+  IOSOutputFormat,
+  AudioQuality,
+  type AudioRecorder,
+  type RecorderState,
+} from 'expo-audio';
 import type { RecordingOptions } from 'expo-audio';
 
 // AAC mono 32kbps 22050Hz — matches §3 "Audio format" and ARCHITECTURE §4.1 preset.
@@ -64,6 +72,62 @@ export async function configureAudioSessionForPlayback(): Promise<void> {
     shouldPlayInBackground: true,
     shouldRouteThroughEarpiece: false,
   });
+}
+
+/**
+ * Conditional replacement for `useAudioRecorderState` that only polls the native
+ * recorder while `enabled === true`. When `enabled` flips to false, the interval
+ * is cleared so the hook stops the TurboModule round-trips entirely.
+ *
+ * Why this exists: expo-audio's `useAudioRecorderState` sets up its `setInterval`
+ * with a `[recorder.id]` dependency array — changing the interval arg after mount
+ * has no effect. With one recorder hook mounted per conversation, the default
+ * 50 ms polling fires constantly even when the user is just reading messages.
+ * Multiplied by the conversation stack and combined with Hermes heap growth
+ * over a long session, this widens the race window for the
+ * convertNSExceptionToJSError × Hermes crash documented in docs/CHAT_AUDIO.md.
+ *
+ * The shallow-compare logic mirrors the upstream hook so callers get the same
+ * change-detection semantics (avoids re-renders on identical successive polls).
+ */
+export function useAudioRecorderStateGated(
+  recorder: AudioRecorder,
+  enabled: boolean,
+  intervalMs: number,
+): RecorderState {
+  const [state, setState] = useState<RecorderState>(() => recorder.getStatus());
+
+  useEffect(() => {
+    if (!enabled) return;
+
+    const handle = setInterval(() => {
+      const next = recorder.getStatus();
+      setState((prev) => {
+        const meteringChanged =
+          (prev.metering === undefined) !== (next.metering === undefined) ||
+          (prev.metering !== undefined &&
+            next.metering !== undefined &&
+            Math.abs(prev.metering - next.metering) > 0.1);
+
+        if (
+          prev.canRecord !== next.canRecord ||
+          prev.isRecording !== next.isRecording ||
+          prev.mediaServicesDidReset !== next.mediaServicesDidReset ||
+          prev.url !== next.url ||
+          Math.abs(prev.durationMillis - next.durationMillis) > 50 ||
+          meteringChanged
+        ) {
+          return next;
+        }
+        return prev;
+      });
+    }, intervalMs);
+
+    return () => clearInterval(handle);
+    // recorder.id is stable for the recorder lifetime; interval/enabled cover dynamic changes.
+  }, [recorder.id, enabled, intervalMs]);
+
+  return state;
 }
 
 /**

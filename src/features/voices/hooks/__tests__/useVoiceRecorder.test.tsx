@@ -1,28 +1,27 @@
 /* Smoke tests for useVoiceRecorder: state machine transitions, permission denial, and hard-cap behaviour. */
 
 import { act, renderHook, waitFor } from '@testing-library/react-native';
-import {
-  useAudioRecorder,
-  useAudioRecorderState,
-  requestRecordingPermissionsAsync,
-} from 'expo-audio';
+import { requestRecordingPermissionsAsync } from 'expo-audio';
 
 import { useVoiceRecorder } from '../useVoiceRecorder';
 
-// Re-use the shared mock objects injected by jest.setup.ts.
+// Re-use the shared mock objects injected by jest.setup.ts. mockRecorder.getStatus
+// returns a fresh copy of recorderState on each call — mutating mocks.recorderState
+// is the way to drive recorder behaviour through the gated polling hook.
 const mocks = (global as Record<string, unknown>).__expoAudioMocks as {
   recorder: {
     record: jest.Mock;
     pause: jest.Mock;
     stop: jest.Mock;
     prepareToRecordAsync: jest.Mock;
+    getStatus: jest.Mock;
     isRecording: boolean;
     uri: string | null;
   };
   recorderState: {
     isRecording: boolean;
     durationMillis: number;
-    metering: number;
+    metering: number | undefined;
     canRecord: boolean;
   };
 };
@@ -177,15 +176,9 @@ describe('useVoiceRecorder — isLikelySilent', () => {
   });
 
   it('is true after stop() when all metering samples are below the voice threshold (-30 dBFS)', async () => {
-    const { useAudioRecorderState: mockUseState } = jest.requireMock('expo-audio') as {
-      useAudioRecorderState: jest.Mock;
-    };
     // -50 dBFS is ambient noise level — never reaches the -30 voice threshold.
-    mockUseState.mockReturnValue({
-      ...mocks.recorderState,
-      metering: -50,
-      durationMillis: 15_000,
-    });
+    mocks.recorderState.metering = -50;
+    mocks.recorderState.durationMillis = 15_000;
 
     const { result } = renderHook(() => useVoiceRecorder());
 
@@ -200,15 +193,9 @@ describe('useVoiceRecorder — isLikelySilent', () => {
   });
 
   it('is false after stop() when metering consistently exceeds the voice threshold (-30 dBFS)', async () => {
-    const { useAudioRecorderState: mockUseState } = jest.requireMock('expo-audio') as {
-      useAudioRecorderState: jest.Mock;
-    };
     // -20 dBFS is a clear voice signal, well above the -30 threshold.
-    mockUseState.mockReturnValue({
-      ...mocks.recorderState,
-      metering: -20,
-      durationMillis: 15_000,
-    });
+    mocks.recorderState.metering = -20;
+    mocks.recorderState.durationMillis = 15_000;
 
     const { result } = renderHook(() => useVoiceRecorder());
 
@@ -223,14 +210,8 @@ describe('useVoiceRecorder — isLikelySilent', () => {
   });
 
   it('resets to false after reset()', async () => {
-    const { useAudioRecorderState: mockUseState } = jest.requireMock('expo-audio') as {
-      useAudioRecorderState: jest.Mock;
-    };
-    mockUseState.mockReturnValue({
-      ...mocks.recorderState,
-      metering: -50,
-      durationMillis: 15_000,
-    });
+    mocks.recorderState.metering = -50;
+    mocks.recorderState.durationMillis = 15_000;
 
     const { result } = renderHook(() => useVoiceRecorder());
 
@@ -250,14 +231,8 @@ describe('useVoiceRecorder — canStop', () => {
   });
 
   it('is true when durationMs reaches MIN_VOICE_DURATION_MS', async () => {
-    // Simulate durationMillis reaching 10_000ms via the mocked recorder state.
-    const { useAudioRecorderState: mockUseState } = jest.requireMock('expo-audio') as {
-      useAudioRecorderState: jest.Mock;
-    };
-    mockUseState.mockReturnValue({
-      ...mocks.recorderState,
-      durationMillis: 10_000,
-    });
+    // Simulate durationMillis reaching 10_000ms via the gated polling hook.
+    mocks.recorderState.durationMillis = 10_000;
 
     const { result } = renderHook(() => useVoiceRecorder());
 
@@ -265,7 +240,6 @@ describe('useVoiceRecorder — canStop', () => {
       await result.current.start();
     });
 
-    // Trigger a re-render with the updated recorderState.
     await waitFor(() => {
       expect(result.current.canStop).toBe(true);
     });

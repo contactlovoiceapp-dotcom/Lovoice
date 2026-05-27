@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   useAudioRecorder,
-  useAudioRecorderState,
   requestRecordingPermissionsAsync,
 } from 'expo-audio';
 import { Directory, File, Paths } from 'expo-file-system';
@@ -16,6 +15,7 @@ import {
   METERING_INTERVAL_MS,
   configureAudioSessionForRecording,
   configureAudioSessionForPlayback,
+  useAudioRecorderStateGated,
 } from '@/lib/audio';
 
 export type ChatRecorderState = 'idle' | 'recording' | 'error';
@@ -56,9 +56,19 @@ export function useChatVoiceRecorder(): ChatVoiceRecorderHook {
   const hardCapFiredRef = useRef(false);
   const stateRef = useRef(state);
   stateRef.current = state;
+  // Tracks whether the recording session was activated at least once so cleanup only
+  // restores the playback session when we actually swapped to recording mode.
+  const recordingSessionTouchedRef = useRef(false);
 
   const recorder = useAudioRecorder(VOICE_AUDIO_FORMAT);
-  const recorderState = useAudioRecorderState(recorder, METERING_INTERVAL_MS);
+  // Gated polling: 20 Hz only while recording, zero otherwise. Eliminates the
+  // ~20 Hz baseline TurboModule traffic per mounted conversation (idle convs in
+  // the navigation stack were polling continuously even with no UI activity).
+  const recorderState = useAudioRecorderStateGated(
+    recorder,
+    state === 'recording',
+    METERING_INTERVAL_MS,
+  );
 
   useEffect(() => {
     if (state !== 'recording') return;
@@ -91,7 +101,11 @@ export function useChatVoiceRecorder(): ChatVoiceRecorderHook {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recorderState.durationMillis, state]);
 
-  // Cleanup on unmount.
+  // Cleanup on unmount. We only restore the playback session if we actually
+  // swapped to recording mode during this hook's lifetime — otherwise the call
+  // is a redundant `setAudioModeAsync` round-trip that adds pressure to the
+  // native bridge during conv unmount (often racing with iOS audio reactivation
+  // when the user is navigating between conversations).
   useEffect(() => {
     return () => {
       try {
@@ -101,7 +115,9 @@ export function useChatVoiceRecorder(): ChatVoiceRecorderHook {
       } catch {
         // Native recorder already released.
       }
-      configureAudioSessionForPlayback().catch(() => null);
+      if (recordingSessionTouchedRef.current) {
+        configureAudioSessionForPlayback().catch(() => null);
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -141,6 +157,7 @@ export function useChatVoiceRecorder(): ChatVoiceRecorderHook {
       }
 
       await configureAudioSessionForRecording();
+      recordingSessionTouchedRef.current = true;
       await recorder.prepareToRecordAsync();
       recorder.record();
 

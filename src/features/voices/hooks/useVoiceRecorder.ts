@@ -8,7 +8,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   useAudioRecorder,
-  useAudioRecorderState,
   requestRecordingPermissionsAsync,
 } from 'expo-audio';
 import { Directory, File, Paths } from 'expo-file-system';
@@ -21,6 +20,7 @@ import {
   METERING_INTERVAL_MS,
   configureAudioSessionForRecording,
   configureAudioSessionForPlayback,
+  useAudioRecorderStateGated,
 } from '@/lib/audio';
 
 export type RecorderState = 'idle' | 'recording' | 'paused' | 'stopped' | 'error';
@@ -78,10 +78,18 @@ export function useVoiceRecorder(): VoiceRecorderHook {
   // We use refs (not state) to avoid re-renders on every 50ms tick.
   const totalSamplesRef = useRef(0);
   const voiceSamplesRef = useRef(0);
+  // Tracks whether the recording session was activated at least once so cleanup only
+  // restores the playback session when we actually swapped to recording mode.
+  const recordingSessionTouchedRef = useRef(false);
 
   const recorder = useAudioRecorder(VOICE_AUDIO_FORMAT);
-  // Poll at METERING_INTERVAL_MS for live duration and metering updates.
-  const recorderState = useAudioRecorderState(recorder, METERING_INTERVAL_MS);
+  // Gated polling: 20 Hz only while actively recording or paused, zero otherwise.
+  // Mirrors the chat recorder optimisation — see src/lib/audio.ts for the rationale.
+  const recorderState = useAudioRecorderStateGated(
+    recorder,
+    state === 'recording' || state === 'paused',
+    METERING_INTERVAL_MS,
+  );
 
   // Mirror native duration and metering into React state while actively recording.
   useEffect(() => {
@@ -120,9 +128,14 @@ export function useVoiceRecorder(): VoiceRecorderHook {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recorderState.durationMillis, state]);
 
-  // Restore playback session when the hook unmounts (component leaves without publishing).
-  // The recorder.isRecording getter and stop() can both throw NativeSharedObjectNotFoundException
-  // when expo-audio has already released the underlying native recorder; we treat those as no-ops.
+  // Restore playback session when the hook unmounts only if we actually swapped
+  // to recording mode during this hook's lifetime — see useChatVoiceRecorder for
+  // the same rationale. Skipping the redundant setAudioModeAsync call reduces
+  // native bridge pressure on every unmount.
+  //
+  // The recorder.isRecording getter and stop() can both throw
+  // NativeSharedObjectNotFoundException when expo-audio has already released the
+  // underlying native recorder; we treat those as no-ops.
   useEffect(() => {
     return () => {
       try {
@@ -132,7 +145,9 @@ export function useVoiceRecorder(): VoiceRecorderHook {
       } catch {
         // Native recorder already released — nothing to stop.
       }
-      configureAudioSessionForPlayback().catch(() => null);
+      if (recordingSessionTouchedRef.current) {
+        configureAudioSessionForPlayback().catch(() => null);
+      }
     };
     // recorder reference is stable for the component lifetime.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -148,6 +163,7 @@ export function useVoiceRecorder(): VoiceRecorderHook {
       }
 
       await configureAudioSessionForRecording();
+      recordingSessionTouchedRef.current = true;
       await recorder.prepareToRecordAsync();
       recorder.record();
 

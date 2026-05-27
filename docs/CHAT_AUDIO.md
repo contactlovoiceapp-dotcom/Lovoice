@@ -304,6 +304,52 @@ URLs that return HTTP 200 with an empty/short body — expo-audio plays
    could race with expo-audio's internal recycling. expo-audio throws
    `NativeSharedObjectNotFoundException` on transient race windows; these
    are recoverable and must be swallowed.
+8. **Recorder polling must be gated.** Use `useAudioRecorderStateGated`
+   (in `src/lib/audio.ts`) with `enabled` driven by recording state, not
+   the raw `useAudioRecorderState` from expo-audio. The latter polls at
+   the fixed interval forever and the interval arg cannot be changed
+   after mount — it would burn ~20 Hz of TurboModule traffic per mounted
+   conversation, even when nobody is recording.
+9. **Recorder cleanup must guard the `configureAudioSessionForPlayback`
+   call.** Only call it on unmount if recording was actually started at
+   least once during the hook's lifetime (`recordingSessionTouchedRef`).
+   Otherwise every navigation between conversations fires a redundant
+   `setAudioModeAsync` which races with iOS audio reactivation.
+
+## 9bis. Native bridge pressure budget at notif-tap time
+
+The chat audio crash family (`convertNSExceptionToJSError` × Hermes
+runtime race documented in §1 of the original rewrite) reproduces most
+reliably when:
+
+- the user has exchanged several messages (heap growth → longer GC pauses
+  → wider race window),
+- a push notification arrives, and
+- the user taps it from foreground or background.
+
+The tap triggers a synchronous burst of native module work in the same
+JS tick as iOS is reactivating AVAudioSession, replaying queued Realtime
+events, and animating the foreground transition. Any TurboModule that
+throws an NSException during this window can corrupt the Hermes runtime
+through the cross-thread error conversion path.
+
+Mitigations in the codebase:
+
+- `usePushDeepLink` defers `router.push` through
+  `InteractionManager.runAfterInteractions`, letting iOS settle the
+  foreground transition before React starts mounting the conversation
+  screen and its native audio resources.
+- `useAppIconBadge` debounces `setBadgeCountAsync` over a 300 ms window
+  so a burst of message exchanges collapses into a single native call
+  instead of 3–5 in flight at once.
+- `useChatVoiceRecorder` / `useVoiceRecorder` use the gated polling hook
+  (see invariant 8) so idle conversations stop hammering the bridge.
+- The chat `useChatVoiceRecorder` / `useVoiceRecorder` cleanups only call
+  `configureAudioSessionForPlayback` if recording was actually engaged
+  (see invariant 9).
+
+Do not add new synchronous native calls in the notification-tap or
+conversation-mount paths without considering this budget.
 
 ## 10. Test map
 
@@ -343,3 +389,10 @@ Walk through this checklist in order:
    the bridge pressure that motivated the original rewrite.
 7. If memory grows over a long session: log `signedUrlCache.size`; it must
    never exceed `SIGNED_URL_CACHE_MAX_ENTRIES`.
+8. If the iOS `EXC_BAD_ACCESS` / Hermes race crash reappears after a
+   notification tap: check that `usePushDeepLink` still wraps `router.push`
+   in `InteractionManager.runAfterInteractions`, that the recorders still
+   use `useAudioRecorderStateGated`, and that `useAppIconBadge` still
+   debounces. Then enable Sentry (`EXPO_PUBLIC_SENTRY_DSN`) and read the
+   JS stack of the next event to identify the actual throwing
+   TurboModule (the iOS crashlog stacks do not preserve that information).

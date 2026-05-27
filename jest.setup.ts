@@ -6,6 +6,15 @@ import '@testing-library/react-native/build/matchers/extend-expect';
 // expo-audio
 // ---------------------------------------------------------------------------
 
+const mockRecorderState = {
+  canRecord: true,
+  isRecording: false,
+  durationMillis: 0,
+  mediaServicesDidReset: false,
+  metering: -50 as number | undefined,
+  url: null as string | null,
+};
+
 const mockRecorder = {
   id: 'mock-recorder',
   currentTime: 0,
@@ -18,19 +27,14 @@ const mockRecorder = {
     return Promise.resolve();
   }),
   prepareToRecordAsync: jest.fn(() => Promise.resolve()),
-  getStatus: jest.fn(() => ({ canRecord: true, isRecording: false, durationMillis: 0 })),
+  // getStatus is the source of truth for the gated polling hook in src/lib/audio.ts.
+  // Returning a fresh copy of mockRecorderState lets tests mutate that object to
+  // drive recorder behaviour (e.g. mocks.recorderState.durationMillis = 10_000).
+  getStatus: jest.fn(() => ({ ...mockRecorderState })),
   getAvailableInputs: jest.fn(() => []),
   getCurrentInput: jest.fn(() => Promise.resolve({ name: 'Built-in Mic', type: 'mic', uid: '0' })),
   setInput: jest.fn(),
   addListener: jest.fn(() => ({ remove: jest.fn() })),
-};
-
-const mockRecorderState = {
-  canRecord: true,
-  isRecording: false,
-  durationMillis: 0,
-  mediaServicesDidReset: false,
-  metering: -50,
 };
 
 // Build distinct player/status pairs so multi-instance consumers (e.g. the feed ring-buffer)
