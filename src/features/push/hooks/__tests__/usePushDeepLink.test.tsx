@@ -10,11 +10,16 @@ jest.mock('expo-notifications', () => ({
 }));
 
 jest.mock('expo-router', () => ({
-  router: { push: jest.fn() },
+  router: { push: jest.fn(), navigate: jest.fn() },
+}));
+
+jest.mock('@/navigation/messagesNavigation', () => ({
+  openConversation: jest.fn(),
 }));
 
 import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
+import { openConversation } from '@/navigation/messagesNavigation';
 import { usePushDeepLink } from '../usePushDeepLink';
 
 const VALID_UUID = '123e4567-e89b-12d3-a456-426614174000';
@@ -87,7 +92,7 @@ describe('usePushDeepLink', () => {
     render(<HookConsumer />);
 
     await waitFor(() => {
-      expect(router.push).toHaveBeenCalledWith(`/messages/${VALID_UUID}`);
+      expect(openConversation).toHaveBeenCalledWith(VALID_UUID);
     });
   });
 

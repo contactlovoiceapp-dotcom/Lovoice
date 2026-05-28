@@ -29,6 +29,7 @@ import { useFeedSeenBatcher } from '../../src/features/feed/hooks/useFeedSeenBat
 import { useFeedPlayer } from '../../src/lib/feedPlayer';
 import { useFeedConversationMap } from '../../src/features/chat/api/conversationQueries';
 import { showToast } from '../../src/lib/toast';
+import { openConversation } from '../../src/navigation/messagesNavigation';
 import { ageFromBirthdate } from '../../src/lib/age';
 import type { FeedItem, FeedItemTheme } from '../../src/features/feed/types';
 import type { FeedPlayerControls, FeedPlayerSnapshot } from '../../src/lib/feedPlayer';
@@ -230,9 +231,9 @@ export default function DiscoverScreen() {
   const handleOpenConversation = useCallback(
     (conversationId: string) => {
       userControls.stop?.();
-      router.push(`/(main)/messages/${conversationId}`);
+      openConversation(conversationId);
     },
-    [userControls, router],
+    [userControls],
   );
 
   useFocusEffect(

@@ -17,6 +17,8 @@ import { router } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import type { Href } from 'expo-router';
 
+import { openConversation } from '@/navigation/messagesNavigation';
+
 // Only accept internal routes we explicitly dispatch — defence against a
 // compromised notification payload containing an external URL.
 const ALLOWED_DEEP_LINK = /^\/likes$|^\/messages\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -56,6 +58,10 @@ export function usePushDeepLink(): void {
       if (!deepLink) return;
 
       InteractionManager.runAfterInteractions(() => {
+        if (deepLink.startsWith('/messages/')) {
+          openConversation(deepLink.slice('/messages/'.length));
+          return;
+        }
         router.push(deepLink as Href);
       });
     }

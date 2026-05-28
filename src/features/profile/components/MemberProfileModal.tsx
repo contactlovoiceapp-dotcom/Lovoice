@@ -6,7 +6,8 @@ import { StatusBar } from 'expo-status-bar';
 import { X } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
-import { router } from 'expo-router';
+
+import { openConversation } from '@/navigation/messagesNavigation';
 
 import { COPY } from '@/copy';
 import { getSupabaseClient } from '@/lib/supabase';
@@ -173,7 +174,7 @@ export default function MemberProfileModal({ visible, userId, voiceId, onClose, 
         return;
       }
       onClose();
-      router.push(`/(main)/messages/${targetConversationId}`);
+      openConversation(targetConversationId);
     },
     [onClose, onOpenConversation],
   );

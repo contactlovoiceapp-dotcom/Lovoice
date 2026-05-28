@@ -1,9 +1,9 @@
 /* Conversation route — wires Realtime subscriptions, queries, and mutations into ConversationScreen. */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, View } from 'react-native';
+import { BackHandler, KeyboardAvoidingView, Platform, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import type { RealtimeChannel } from '@supabase/supabase-js';
@@ -24,6 +24,7 @@ import type { ChatMessage } from '../../../src/features/chat/types';
 import { getSupabaseClient } from '../../../src/lib/supabase';
 import { createDebouncer, createThrottle } from '../../../src/features/chat/lib/throttle';
 import ConversationScreen from '../../../src/components/main/ConversationScreen';
+import { closeConversation } from '../../../src/navigation/messagesNavigation';
 
 // How long (ms) with no typing event before the indicator auto-clears.
 const TYPING_CLEAR_DELAY_MS = 5_000;
@@ -283,7 +284,15 @@ export default function ConversationRoute() {
   );
 
   const handleClose = useCallback(() => {
-    router.back();
+    closeConversation();
+  }, []);
+
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      closeConversation();
+      return true;
+    });
+    return () => subscription.remove();
   }, []);
 
   const handleCountdownExpired = useCallback(() => {
