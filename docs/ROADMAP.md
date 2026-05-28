@@ -291,7 +291,7 @@ This phase produces a **separate Next.js repository** (suggested name `lovoice-a
 
 ## Phase 9 — RGPD, security hardening, observability (Sentry)
 
-**Goal**: app is store-ready and compliant.
+**Goal**: app is store-ready and compliant, and the remaining Hermes crash on foreground resume is eliminated.
 
 ### Scope (V1 MVP — committed)
 
@@ -301,17 +301,20 @@ This phase produces a **separate Next.js repository** (suggested name `lovoice-a
 4. **Sentry** wired (mobile + Edge Functions) with PII scrubbing.
 5. Rate limiting on Edge Functions: per-user buckets in Postgres (`rate_limits` table) for `request_upload`, `commit_upload`, `like`, `report`. Reasonable limits (e.g. 30 uploads/day, 100 likes/hour).
 6. Audit table `audit_log(actor_id, action, target, created_at)` for security-sensitive actions (block, report, delete, moderate).
+7. **Foreground-resume Realtime defer** — fix the `EXC_BAD_ACCESS` / Hermes heap corruption crash documented in `docs/CHAT_AUDIO.md` §13 (TestFlight 0.8.2, Sentry `44ef6ab8`). When the app returns from a long background period, Supabase Realtime channels reconnect and fire queued postgres_changes callbacks all at once; combined with iOS keyboard/navigation animations settling, this creates enough concurrent native↔JS bridge traffic to corrupt the Hermes GC. **Implementation**: in `app/(main)/messages/[id].tsx` (conversation Realtime effect) and `src/features/chat/hooks/useRealtimeInbox.ts` (global inbox listener), listen to `AppState` changes and wrap `queryClient.invalidateQueries` calls in `InteractionManager.runAfterInteractions` during a transient "resuming" window (~500 ms after background→active transition). Same pattern already used by `usePushDeepLink` for notification taps. Normal foreground operation keeps the current immediate/debounced behaviour unchanged. See `docs/CHAT_AUDIO.md` §13 for the full crash analysis, timeline, and verification steps.
 
 ### Deliverables
 
 - Account deletion fully purges user data.
 - Data export downloads a complete archive.
 - Sentry receives a test crash from mobile and from an Edge Function.
+- The foreground-resume Hermes crash (`GCScope::_newChunkAndPHV`) no longer reproduces on a physical device after >5 min in background.
 
 ### Acceptance
 
 - Test that after `delete_account`, no row referencing the user remains except anonymized message tombstones.
 - App passes Apple's 5.1.1(v) account-deletion requirement.
+- Open a conversation, send a message, put the app in background for >5 min, return: app does not crash. Sentry shows no new `EXC_BAD_ACCESS` events with the `GCScope::_newChunkAndPHV` signature on the new build.
 
 ---
 

@@ -361,3 +361,100 @@ Walk through this checklist in order:
    use `useAudioRecorderStateGated`, and that `useAppIconBadge` still
    debounces. Then enable Sentry and read the breadcrumb trail for the
    `recording.*` and `upload.*` categories to identify the failing step.
+10. If the crash happens on **foreground resume** (not a notification tap):
+    the same Hermes corruption can occur when Supabase Realtime reconnects
+    after a long background period, firing a burst of postgres_changes
+    callbacks that invalidate React Query while iOS is simultaneously running
+    navigation transitions and keyboard animations. See §13 for the full
+    analysis and the recommended `InteractionManager` defer in
+    `useRealtimeInbox` and the conversation Realtime effect.
+
+## 13. Known crash — foreground resume Hermes corruption (TestFlight 0.8.2)
+
+**Sentry event**: `44ef6ab8a4f24358a565592834c64072`, release `0.8.2 (33)`,
+2026-05-28 11:24 UTC.
+
+### Signature
+
+| Field | Value |
+| --- | --- |
+| Exception | `EXC_BAD_ACCESS` / `SIGSEGV` — `KERN_INVALID_ADDRESS` @ `0x466fb188` |
+| Thread | Thread 2, `com.facebook.react.runtime.JavaScript` |
+| Frame at top | `hermes::vm::GCScope::_newChunkAndPHV` |
+| Call chain | `drainMicrotasks` → `Callable::executeCall0` → `interpretFunction` → `caseIteratorBegin` → `JSObject::getNamedDescriptorUnsafe` (×2) → `GCScope::_newChunkAndPHV` |
+| Parallel thread | Thread 13: `ObjCTurboModule::performVoidMethodInvocation` → `convertNSExceptionToJSError` → `convertNSArrayToJSIArray` |
+
+Same root cause as the original per-bubble player crash (§1): **Hermes heap
+corruption caused by concurrent native→JS bridge traffic during microtask
+execution.**
+
+### Scenario (reconstructed from Sentry breadcrumbs)
+
+```
+13:02  App boot
+13:18  Open conversation 3bcbe33c-…, send a text message (POST 201)
+13:18  Burst of Supabase queries (messages, inbox, signed URLs, voices)
+13:18  App → background (user switches away), keyboard stays "shown" in UIKit
+       ─── ~6 min 27 sec in background ───
+13:24  App → foreground
+       iOS: keyboard re-shows (4× UIKeyboardDidShowNotification)
+       iOS: UINavigationParallaxTransition + UITextView resignFirstResponder
+       Supabase: Realtime channels reconnect, fire queued postgres_changes
+       Hermes: drainMicrotasks runs the queued promise continuations
+       A TurboModule throws an NSException on a background dispatch queue
+       → convertNSExceptionToJSError allocates JS objects on Thread 13
+       → Hermes JS thread doing property lookups hits corrupted memory
+       💥 EXC_BAD_ACCESS
+```
+
+**Key difference from the notification-tap variant**: no push notification
+was involved. The user simply returned to the app after a long background
+period. The Realtime reconnection storm + iOS UI transitions created enough
+concurrent bridge pressure to trigger the same corruption.
+
+### Mitigations already in place (were not sufficient)
+
+| Mitigation | Covers |
+| --- | --- |
+| `usePushDeepLink` + `InteractionManager` | Notification taps only — NOT foreground resume |
+| `useAudioRecorderStateGated` | Recorder polling — not relevant (no recording in progress) |
+| `useAppIconBadge` debounce | Badge writes — minimal bridge traffic |
+| Realtime UPDATE debouncers | UPDATE bursts — but INSERT callbacks were immediate |
+| Single-instance `chatMessagePlayer` | Reduced native players — already shipped in 0.8.0 |
+
+### What was missing — the fix (Phase 9)
+
+The Realtime reconnection after a long background fires all queued events
+at once. INSERT handlers in `app/(main)/messages/[id].tsx` and
+`useRealtimeInbox.ts` call `queryClient.invalidateQueries` immediately
+(no debounce on INSERTs by design — §6). Combined with iOS settling its
+foreground transition (keyboard animations, navigation parallax), this
+creates the exact same bridge storm as the per-bubble player did.
+
+**Fix**: wrap Realtime reconnection invalidations in
+`InteractionManager.runAfterInteractions` when the app is resuming from
+background. This defers the React Query refetches until iOS has finished
+its foreground transition, exactly like `usePushDeepLink` does for
+notification taps.
+
+Implementation requirements:
+1. Listen to `AppState` changes (`active` / `background`) in the Realtime
+   effects (conversation channel + inbox channel).
+2. When the app transitions from `background` → `active`, set a transient
+   "resuming" flag (cleared after ~500 ms or after `InteractionManager`
+   confirms interactions are done).
+3. While "resuming" is true, wrap every `queryClient.invalidateQueries`
+   call inside `InteractionManager.runAfterInteractions`.
+4. Normal foreground operation keeps the current immediate/debounced
+   behaviour unchanged — the defer only applies during the resume window.
+
+### Verification
+
+After the fix ships:
+- Monitor Sentry for `GCScope::_newChunkAndPHV` on the new build.
+- Reproduce: open a conversation, send a message, put the app in background
+  for >5 min, return to the app. Should not crash.
+- The fix does NOT change perceived latency: messages will still appear
+  within ~100–200 ms of foreground (the time for `InteractionManager` to
+  fire), which is invisible to the user since the screen is still
+  transitioning anyway.
