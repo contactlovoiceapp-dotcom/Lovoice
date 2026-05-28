@@ -40,7 +40,7 @@ Read it together with `README.md` (constraints) and `docs/ROADMAP.md` (current p
    └──────────────────┘
 ```
 
-> **V1 MVP scope:** only the services above the dashed line are wired in V1. AssemblyAI and Hive (auto-moderation, Phase 9) are **scheduled for ~Q3 2026 (≈3 months post-MVP)**. PostHog (Phase 10.bis) remains optional. The schema, Edge Functions and storage layout are designed so that enabling them later is a drop-in change with no migration.
+> **V1 MVP scope:** only the services above the dashed line are wired in V1. AssemblyAI and Hive (auto-moderation, Phase 10) are **scheduled for ~Q3 2026 (≈3 months post-MVP)**. PostHog (Phase 10.bis) remains optional. The schema, Edge Functions and storage layout are designed so that enabling them later is a drop-in change with no migration.
 
 ---
 
@@ -88,9 +88,9 @@ The voice introduction. A user can have multiple voices but only **one `is_activ
 | `storage_path`      | `text`                                                                                 | `voices/{user_id}/{voice_id}.m4a`                                                                                                            |
 | `duration_ms`       | `integer` check (≤ 90_000)                                                             |                                                                                                                                              |
 | `title`             | `text`                                                                                 | nullable; user-editable catchphrase shown on the voice card                                                                                  |
-| `transcript`        | `text`                                                                                 | nullable; filled by AssemblyAI when Phase 9 ships (~Q3 2026)                                                                                  |
+| `transcript`        | `text`                                                                                 | nullable; filled by AssemblyAI when Phase 10 ships (~Q3 2026)                                                                                  |
 | `theme`             | `text`                                                                                 | UI color theme (`sunset`, `chill`, `electric`, `midnight`)                                                                                   |
-| `status`            | `text` default `'approved'` check in (`pending`,`approved`,`rejected`,`manual_review`) | V1 MVP defaults to `'approved'` (reactive moderation). The `pending` and `manual_review` values are kept in the enum so Phase 9 (~Q3 2026) only flips the default and wires the queue — see §4.3.b. |
+| `status`            | `text` default `'approved'` check in (`pending`,`approved`,`rejected`,`manual_review`) | V1 MVP defaults to `'approved'` (reactive moderation). The `pending` and `manual_review` values are kept in the enum so Phase 10 (~Q3 2026) only flips the default and wires the queue — see §4.3.b. |
 | `moderation_reason` | `text`                                                                                 | filled by Hive                                                                                                                               |
 | `is_active`         | `boolean` default false                                                                | partial unique index per user                                                                                                                |
 | `created_at`        | `timestamptz` default `now()`                                                          |                                                                                                                                              |
@@ -292,15 +292,8 @@ create policy "admins_read_audio" on storage.objects
 ### 4.1 Recording (client)
 
 1. Request mic permission. If denied, show explanation screen with deep link to settings.
-2. Configure `AVAudioSession`: category `playAndRecord`, mode `default`, options `[mixWithOthers, allowBluetooth]`. Activate before recording, deactivate after.
-3. Use `expo-audio` `useAudioRecorder` with preset:
-   ```ts
-   {
-     extension: '.m4a',
-     android: { extension: '.m4a', outputFormat: 'mpeg4', audioEncoder: 'aac', sampleRate: 22050, numberOfChannels: 1, bitRate: 32000 },
-     ios:     { extension: '.m4a', outputFormat: IOSOutputFormat.MPEG4AAC, audioQuality: AudioQuality.MEDIUM, sampleRate: 22050, numberOfChannels: 1, bitRate: 32000 },
-   }
-   ```
+2. `AVAudioSession` is configured **once at app boot** (`app/_layout.tsx` → `configureAudioSession()`) to `playAndRecord` with `playsInSilentMode`, `mixWithOthers`, `allowBluetooth`, and `defaultToSpeaker`. Never swap the category at runtime — see `docs/CHAT_AUDIO.md` invariant #9. Two bugs in expo-audio required a `patch-package` fix (`patches/expo-audio+1.1.1.patch`): `shouldRouteThroughEarpiece` was ignored natively, and `deactivateSession()` killed the mic input by not checking active recorders.
+3. Chat voice recording is encapsulated in `VoiceRecordingSession`, a component that mounts fresh per recording and owns a single `useAudioRecorder` instance. The recorder uses `VOICE_AUDIO_FORMAT` from `src/lib/audio.ts`:
 4. Sample metering at 50 ms for the live waveform.
 5. Hard cap at **90_000 ms**: auto-stop and disable record button.
 6. Save to `FileSystem.documentDirectory + 'pending/{uuid}.m4a'`.
@@ -361,7 +354,7 @@ When enabled, `commit_upload` switches the default row status to `'pending'` and
 
 1. Client fetches a voice row → calls `getSignedUrl(object_path, expiresIn=3600)`. Signed URLs are cached at the module level in `src/lib/feedPlayer.ts` and refreshed 10 minutes before their 1 h TTL expires. Signed URLs for the next two upcoming voices are prefetched in the background so the source swap is near-instant on swipe.
 2. The feed uses a **single `useAudioPlayer` instance** (`src/lib/feedPlayer.ts`). Its source is swapped via `player.replace(signedUrl)` each time the active card changes. A load token guards against out-of-order URL resolutions when the user swipes faster than the network — only the latest token's resolution is applied. The play button is hard-gated on `snapshot.isLoading` (true while the URL is being fetched or the source is being swapped) to prevent calling `play()` on an unready player. Note: `snapshot.isLoading` does **not** include `status.isBuffering` from expo-audio — including it would cause a deadlock where the button stays disabled after `replace()` because expo-audio only clears `isBuffering` once `play()` is called.
-3. Audio session for playback: `playsInSilentMode: true`, `shouldPlayInBackground: true` (see `configureAudioSessionForPlayback` in `src/lib/audio.ts`).
+3. Audio session for playback is the same boot-time `playAndRecord` session (see §4.1 step 2). No per-feature session swap.
 4. Handle interruptions (incoming call): pause and resume on interruption end.
 5. For voice messages in chat, use a single shared player (one playing at a time).
 
@@ -536,7 +529,7 @@ limit p_limit;
 
 ### Ordering rationale
 
-`ORDER BY v.created_at DESC, random()` gives a feed that surfaces new voices first while adding shuffle within the same recency bucket. No engagement-based ranking in V1 — that complexity is unnecessary at the validation cohort scale and would be revisited post-Phase 9 if retention data justifies it.
+`ORDER BY v.created_at DESC, random()` gives a feed that surfaces new voices first while adding shuffle within the same recency bucket. No engagement-based ranking in V1 — that complexity is unnecessary at the validation cohort scale and would be revisited post-Phase 10 if retention data justifies it.
 
 ### Filters modal (Phase 5)
 
@@ -627,7 +620,7 @@ The back-office is a separate Next.js project that gives the operator a point-an
 | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `/login`      |
 | `/reports`    | Paginated table of `reports` where `status = 'pending'`, joined with the target voice/message and the reporter+author profiles. Each row shows: avatars, reason, free text, an inline `<audio>` player on a freshly-fetched signed URL, and the three action buttons (Ignorer / Retirer / Bannir). Confirmation modal on Retirer and Bannir. Auto-refresh every 30s via React Query. |
-| `/users/[id]` | Profile detail: display fields, current voice (with player), recent activity (last 10 messages, last 10 reports filed against them). Buttons: **Bannir** / **Lever le ban**. "Supprimer le compte" is deferred to Phase 10 (current `delete_account_admin` is a soft-delete only; exposing it before the hard-purge ships would mislead the operator).                                                                                                                  |
+| `/users/[id]` | Profile detail: display fields, current voice (with player), recent activity (last 10 messages, last 10 reports filed against them). Buttons: **Bannir** / **Lever le ban**. "Supprimer le compte" is deferred to Phase 9 (current `delete_account_admin` is a soft-delete only; exposing it before the hard-purge ships would mislead the operator).                                                                                                                  |
 | `/banned`     | List of currently banned users, with the reason and an **Unban** button.                                                                                                                                                                                                                                                                                                             |
 | `/audit`      | Read-only paginated view of `audit_log` for the last 90 days, filterable by `actor_id`, `action`, `target_kind`.                                                                                                                                                                                                                                                                     |
 
@@ -659,8 +652,8 @@ Audio files live in private buckets (`voices`, `messages`). The back-office obta
 
 The back-office is designed so each optional phase **adds** capabilities, never replaces existing ones:
 
-- **When AssemblyAI ships (Phase 9)**: the report row in `/reports` gains a transcript column (`voices.transcript` / `messages.transcript`). No structural change.
-- **When Hive ships (Phase 9)**: a new tab `/manual-review` lists items with `status = 'manual_review'`. It reuses the same row component as `/reports`. The decision actions are the same three Edge Functions. The only new thing is the source query.
+- **When AssemblyAI ships (Phase 10)**: the report row in `/reports` gains a transcript column (`voices.transcript` / `messages.transcript`). No structural change.
+- **When Hive ships (Phase 10)**: a new tab `/manual-review` lists items with `status = 'manual_review'`. It reuses the same row component as `/reports`. The decision actions are the same three Edge Functions. The only new thing is the source query.
 - **When PostHog ships (Phase 10.bis)**: a new tab `/stats` embeds PostHog dashboards in iframes (PostHog supports iframe sharing of insights). No back-end change.
 
 This is why Option A (custom Next.js) was chosen over Retool or an in-app admin: every future feature lands as **a new route** in the same codebase, with shared components and shared types.

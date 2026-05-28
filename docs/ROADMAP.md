@@ -13,11 +13,11 @@ Before starting any phase, **re-read `README.md` and `docs/ARCHITECTURE.md`**.
 
 The V1 MVP commitment covers all features described in this roadmap **except**:
 
-- automatic voice transcription (AssemblyAI) — **scheduled for ~Q3 2026, Phase 9**,
-- automatic moderation (Hive — see `docs/ARCHITECTURE.md` §4.3.b) — **scheduled for ~Q3 2026, Phase 9**,
+- automatic voice transcription (AssemblyAI) — **scheduled for ~Q3 2026, Phase 10**,
+- automatic moderation (Hive — see `docs/ARCHITECTURE.md` §4.3.b) — **scheduled for ~Q3 2026, Phase 10**,
 - product analytics (PostHog) — optional, scheduled in V1.x if needed (Phase 10.bis).
 
-Reactive moderation (block + report + manual takedown by the operator) is part of the MVP commitment and is the steady-state moderation strategy until Phase 9 ships. See `docs/ARCHITECTURE.md` §4.3.a.
+Reactive moderation (block + report + manual takedown by the operator) is part of the MVP commitment and is the steady-state moderation strategy until Phase 10 ships. See `docs/ARCHITECTURE.md` §4.3.a.
 
 ---
 
@@ -55,7 +55,7 @@ Reactive moderation (block + report + manual takedown by the operator) is part o
 2. Build `useVoiceRecorder` hook: start, stop, pause, resume, metering at 50 ms, hard cap at 90_000 ms.
 3. Build `useVoicePlayer` hook (single-instance variant for preview).
 4. `app/(auth)/onboarding/record.tsx` (and a reachable `app/(main)/profile/record.tsx`): live waveform, timer, prompt picker (`prompts` table seeded), record / stop / replay / re-record.
-5. Implement Edge Function `request_upload` and `commit_upload` per ARCHITECTURE §4.2. Sign client-side using the helper from `@supabase/storage-js`. **In V1 MVP, `commit_upload` inserts the row with `status = 'approved'` and does NOT enqueue a moderation job** (the auto-moderation pipeline is Phase 9, scheduled for ~Q3 2026). A `// TODO(phase-9)` marker is left at the future enqueue site so Phase 9 is a localized addition, not a refactor.
+5. Implement Edge Function `request_upload` and `commit_upload` per ARCHITECTURE §4.2. Sign client-side using the helper from `@supabase/storage-js`. **In V1 MVP, `commit_upload` inserts the row with `status = 'approved'` and does NOT enqueue a moderation job** (the auto-moderation pipeline is Phase 10, scheduled for ~Q3 2026). A `// TODO(phase-10)` marker is left at the future enqueue site so Phase 10 is a localized addition, not a refactor.
 6. Client uploads via signed PUT directly to Storage.
 7. After commit, set `voices.is_active = true` for the latest, `false` for previous.
 8. Display the user's current voice on the profile screen with replay.
@@ -172,7 +172,7 @@ This phase produces a **separate Next.js repository** (suggested name `lovoice-a
    - Buttons call the corresponding Edge Function (`dismiss_report`, `moderate`, `ban_user`). Confirmation modal on `moderate` and `ban_user`.
    - Toast on success/error. React Query invalidation on the reports list after each action.
    - Auto-refresh every 30s.
-5. **`/users/[id]` page**: profile detail (display fields, current voice with player, last 10 messages of theirs, last 10 reports against them). Buttons: **Bannir** / **Lever le ban** (according to current state). The full account-deletion UI is intentionally deferred to Phase 10 because `delete_account_admin` currently performs a soft-delete only (sets `is_banned` + `deleted_at` + revokes the session — see `supabase/functions/delete_account_admin/index.ts`); exposing it as "Supprimer le compte" before the hard-purge ships would mislead the operator. Phase 10's user-initiated `delete_account` will replace the soft-delete body and the back-office will then surface the action.
+5. **`/users/[id]` page**: profile detail (display fields, current voice with player, last 10 messages of theirs, last 10 reports against them). Buttons: **Bannir** / **Lever le ban** (according to current state). The full account-deletion UI is intentionally deferred to Phase 9 because `delete_account_admin` currently performs a soft-delete only (sets `is_banned` + `deleted_at` + revokes the session — see `supabase/functions/delete_account_admin/index.ts`); exposing it as "Supprimer le compte" before the hard-purge ships would mislead the operator. Phase 9's user-initiated `delete_account` will replace the soft-delete body and the back-office will then surface the action.
 6. **`/banned` page**: list of `profiles` where `is_banned = true`, with reason and an Unban button.
 7. **`/audit` page**: paginated read-only view of `audit_log`, filterable by `actor_id`, `action`, `target_kind`. Last 90 days only.
 8. **Provisioning script**: `scripts/seed-admin.sql` documented in the back-office README — a one-shot insert into `admin_users` (run by the developer the first time, then by the operator herself for any new admin).
@@ -216,7 +216,7 @@ This phase produces a **separate Next.js repository** (suggested name `lovoice-a
 3. `MessagesScreen` (inbox): list conversations with last message preview + unread badge. Realtime subscription on `messages` (RLS-filtered) for live inbox updates.
 4. `ConversationScreen` (`app/(main)/messages/[id].tsx`): paginated message list (cursor on `created_at` desc), Realtime subscription on `messages` filtered by conversation.
 5. **First-reply flow from Discover**: tapping "Répondre" opens an in-feed centered modal (`ReplyVoiceModal`) with tap-to-start / tap-to-stop recording, preview, and background send — the user stays on Discover. Once a thread exists with the profile, the feed CTA flips to "Ouvrir la conversation" (driven by `useFeedConversationMap`).
-6. Conversation composer (in-thread): voice messages use hold-to-record with slide-to-cancel (`useChatVoiceRecorder`) and the same upload pipeline (`kind='message'`). Text input is hidden until the conversation is in OPEN state.
+6. Conversation composer (in-thread): voice messages use `VoiceRecordingSession` (mounts fresh per recording, owns a single `useAudioRecorder`) driven by `ConversationComposer`'s internal state machine. Same upload pipeline (`kind='message'`). Text input is hidden until the conversation is in OPEN state.
 7. Inline voice player per message (reuse the single-instance `chatMessagePlayer` — only one playing at a time, others auto-pause).
 8. Read receipts: on screen open, `update messages set read_at = now() where conversation_id = $1 and sender_id != auth.uid() and read_at is null`. The `update_received_messages_read_at` RLS policy and `guard_message_update()` trigger (restricts non-sender updates to `read_at` only) ship in Phase 7 Block 1.
 9. Typing indicator via Realtime Broadcast (throttled).
@@ -289,43 +289,7 @@ This phase produces a **separate Next.js repository** (suggested name `lovoice-a
 
 ---
 
-## Phase 9 — Auto-moderation pipeline (transcription + safety) (AssemblyAI + Hive) — scheduled ~Q3 2026
-
-**Status**: **NOT in the V1 MVP commitment, but scheduled for ~Q3 2026 (≈3 months post-MVP).** Until this phase ships, content safety is handled by reactive moderation (Phase 6 + `docs/ARCHITECTURE.md` §4.3.a). The schema, Edge Functions and storage layout shipped in Phases 1–8 are designed so this phase is a localized addition, not a refactor.
-
-**Goal**: every uploaded voice and voice message is automatically transcribed and moderated before being visible.
-
-### Pre-requisites
-
-- Client has AssemblyAI and Hive accounts with EU DPA signed.
-- `ASSEMBLYAI_KEY`, `HIVE_KEY`, `OPENAI_API_KEY` are set as Edge Function secrets.
-
-### Scope
-
-1. Flip `voices.status` and `messages.status` defaults from `'approved'` back to `'pending'` (one migration).
-2. Wire the `// TODO(phase-9)` marker in `commit_upload` to enqueue a moderation job (introduce the `AUTO_MODERATION_ENABLED` Edge Function secret at the same time, default `true` for this phase).
-3. Create `moderation_jobs` table + Edge Function `process_moderation_jobs` scheduled every 30s (Supabase scheduled cron).
-4. AssemblyAI integration: submit, poll, store transcript on the parent row.
-5. Hive Audio + Hive Text integrations.
-6. OpenAI Moderation as cheap secondary check on transcript.
-7. Decision logic per ARCHITECTURE §4.3.b.
-8. On rejection: hide content, notify author with reason, allow appeal (a button creates a `manual_review` request).
-9. **Back-office extension** (in the `lovoice-admin` repo): add a new `/manual-review` route that lists items with `status = 'manual_review'` and reuses the same row component and the same `moderate()` action as `/reports`. Add a transcript column on both routes (reads `voices.transcript` / `messages.transcript`). No new Edge Function needed.
-
-### Deliverables
-
-- A clean voice goes from `pending` to `approved` within 60s of upload.
-- A voice with explicit content goes to `rejected` and is invisible in the feed.
-- Author sees the rejection in their notifications with a reason.
-
-### Acceptance
-
-- No voice with `status != 'approved'` ever appears in `get_feed()`.
-- Moderation throughput keeps up with upload throughput at the projected volume (no growing backlog in `moderation_jobs`).
-
----
-
-## Phase 10 — RGPD, security hardening, observability (Sentry)
+## Phase 9 — RGPD, security hardening, observability (Sentry)
 
 **Goal**: app is store-ready and compliant.
 
@@ -348,6 +312,42 @@ This phase produces a **separate Next.js repository** (suggested name `lovoice-a
 
 - Test that after `delete_account`, no row referencing the user remains except anonymized message tombstones.
 - App passes Apple's 5.1.1(v) account-deletion requirement.
+
+---
+
+## Phase 10 — Auto-moderation pipeline (transcription + safety) (AssemblyAI + Hive) — scheduled ~Q3 2026
+
+**Status**: **NOT in the V1 MVP commitment, but scheduled for ~Q3 2026 (≈3 months post-MVP).** Until this phase ships, content safety is handled by reactive moderation (Phase 6 + `docs/ARCHITECTURE.md` §4.3.a). The schema, Edge Functions and storage layout shipped in Phases 1–9 are designed so this phase is a localized addition, not a refactor.
+
+**Goal**: every uploaded voice and voice message is automatically transcribed and moderated before being visible.
+
+### Pre-requisites
+
+- Client has AssemblyAI and Hive accounts with EU DPA signed.
+- `ASSEMBLYAI_KEY`, `HIVE_KEY`, `OPENAI_API_KEY` are set as Edge Function secrets.
+
+### Scope
+
+1. Flip `voices.status` and `messages.status` defaults from `'approved'` back to `'pending'` (one migration).
+2. Wire the `// TODO(phase-10)` marker in `commit_upload` to enqueue a moderation job (introduce the `AUTO_MODERATION_ENABLED` Edge Function secret at the same time, default `true` for this phase).
+3. Create `moderation_jobs` table + Edge Function `process_moderation_jobs` scheduled every 30s (Supabase scheduled cron).
+4. AssemblyAI integration: submit, poll, store transcript on the parent row.
+5. Hive Audio + Hive Text integrations.
+6. OpenAI Moderation as cheap secondary check on transcript.
+7. Decision logic per ARCHITECTURE §4.3.b.
+8. On rejection: hide content, notify author with reason, allow appeal (a button creates a `manual_review` request).
+9. **Back-office extension** (in the `lovoice-admin` repo): add a new `/manual-review` route that lists items with `status = 'manual_review'` and reuses the same row component and the same `moderate()` action as `/reports`. Add a transcript column on both routes (reads `voices.transcript` / `messages.transcript`). No new Edge Function needed.
+
+### Deliverables
+
+- A clean voice goes from `pending` to `approved` within 60s of upload.
+- A voice with explicit content goes to `rejected` and is invisible in the feed.
+- Author sees the rejection in their notifications with a reason.
+
+### Acceptance
+
+- No voice with `status != 'approved'` ever appears in `get_feed()`.
+- Moderation throughput keeps up with upload throughput at the projected volume (no growing backlog in `moderation_jobs`).
 
 ---
 

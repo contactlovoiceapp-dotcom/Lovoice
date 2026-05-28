@@ -290,6 +290,17 @@ All recording errors are instrumented with Sentry breadcrumbs (category
     any higher scope.** Reusing the same `AVAudioRecorder` instance across
     multiple recordings produces silent files on iOS
     (expo/expo#41656, #36193).
+11. **Do not remove `patches/expo-audio+1.1.1.patch`** without verifying that
+    the upstream fixes have shipped. The patch fixes two bugs in expo-audio's
+    native iOS code:
+    - `shouldRouteThroughEarpiece` was declared in TS types but missing from
+      the native Swift `AudioMode` struct, so `.defaultToSpeaker` was never
+      set — all `.playAndRecord` audio routed to the earpiece.
+    - `deactivateSession()` only checked active players, not recorders.
+      When `pause()` was called before recording, the 100ms-delayed
+      deactivation killed the microphone input mid-recording, producing
+      ~32KB silent M4A files with correct container structure but empty
+      AAC frames.
 
 ## 10. Things this architecture deliberately does NOT do
 
@@ -332,11 +343,14 @@ Walk through this checklist in order:
    the bridge pressure that motivated the original rewrite.
 7. If memory grows over a long session: log `signedUrlCache.size`; it must
    never exceed `SIGNED_URL_CACHE_MAX_ENTRIES`.
-8. If recordings are silent on iOS: check that `app/_layout.tsx` still calls
-   `configureAudioSession()` once at module load with `allowsRecording: true`.
-   Check that no other file calls `setAudioModeAsync`. Check that
-   `VoiceRecordingSession` is the only consumer of `useAudioRecorder` and
-   that the component unmounts between recordings (no instance reuse).
+8. If recordings are silent on iOS: check that `patches/expo-audio+1.1.1.patch`
+   is still applied (`npx patch-package` in postinstall). Verify
+   `app/_layout.tsx` still calls `configureAudioSession()` once at module
+   load with `allowsRecording: true`. Check that no other file calls
+   `setAudioModeAsync`. Check that `VoiceRecordingSession` is the only
+   consumer of `useAudioRecorder` and that the component unmounts between
+   recordings (no instance reuse). Use the `[REC]` console.warn logs in
+   Metro to inspect `fileSize` and `bitrateOk` after each recording.
 9. If the iOS `EXC_BAD_ACCESS` / Hermes race crash reappears after a
    notification tap: check that `usePushDeepLink` still wraps `router.push`
    in `InteractionManager.runAfterInteractions`, that the recorders still
