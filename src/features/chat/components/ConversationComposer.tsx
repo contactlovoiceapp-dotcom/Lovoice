@@ -11,13 +11,15 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowRight, Mic, Send, X } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
+import { File } from 'expo-file-system';
 
 import { COLORS, FONT, RADIUS } from '@/theme';
 import { COPY } from '@/copy';
+import { MIN_VOICE_MESSAGE_DURATION_MS } from '@/lib/audio';
 import type { ConversationLifecycle } from '../types';
 import { formatVoiceOnlyCountdown } from '../types';
-import { useChatVoiceRecorder } from '../hooks/useChatVoiceRecorder';
-import { pauseAllChatMessages } from '../lib/chatMessagePlayer';
+import VoiceRecordingSession from './VoiceRecordingSession';
+import type { RecordingSessionMode, RecordingErrorCode } from './VoiceRecordingSession';
 
 interface ConversationComposerProps {
   lifecycle: ConversationLifecycle;
@@ -29,9 +31,15 @@ interface ConversationComposerProps {
   isSendingVoice: boolean;
   onTextChange?: (text: string) => void;
   onRecordingStateChange?: (isRecording: boolean) => void;
-  /** Called when the voice-only window expires so the route can re-fetch the lifecycle. */
   onCountdownExpired?: () => void;
 }
+
+type ComposerRecordingState =
+  | 'idle'
+  | 'starting'
+  | 'recording'
+  | 'finalizing'
+  | 'cancelling';
 
 function HintBanner({ text }: { text: string }) {
   return (
@@ -66,10 +74,6 @@ function formatTimer(ms: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-/**
- * Ticking countdown banner for the voice-only window.
- * Fires onExpired when the target time is reached.
- */
 function VoiceOnlyHintBanner({
   voiceOnlyUntil,
   onExpired,
@@ -112,9 +116,23 @@ export default function ConversationComposer({
   const insets = useSafeAreaInsets();
   const [text, setText] = useState('');
   const [tooShortHint, setTooShortHint] = useState(false);
+  const [errorHint, setErrorHint] = useState(false);
 
-  const recorder = useChatVoiceRecorder();
-  const isRecording = recorder.state === 'recording';
+  const [recordingState, setRecordingState] = useState<ComposerRecordingState>('idle');
+  const [durationMs, setDurationMs] = useState(0);
+
+  const isSessionActive = recordingState !== 'idle';
+  const isRecording = recordingState === 'recording';
+
+  // Map recording session mode for VoiceRecordingSession.
+  const sessionMode: RecordingSessionMode | null =
+    recordingState === 'recording' || recordingState === 'starting'
+      ? 'recording'
+      : recordingState === 'finalizing'
+        ? 'finalizing'
+        : recordingState === 'cancelling'
+          ? 'cancelling'
+          : null;
 
   const canSendText = text.trim().length > 0 && !isSending;
 
@@ -125,29 +143,63 @@ export default function ConversationComposer({
     await onSendText(body);
   }, [text, onSendText]);
 
-  const handleStartRecording = useCallback(async () => {
+  const handleStartRecording = useCallback(() => {
     setTooShortHint(false);
-    pauseAllChatMessages();
+    setErrorHint(false);
+    setDurationMs(0);
+    setRecordingState('starting');
     onRecordingStateChange?.(true);
-    await recorder.start();
-  }, [recorder, onRecordingStateChange]);
+  }, [onRecordingStateChange]);
 
-  const handleSendVoice = useCallback(async () => {
-    onRecordingStateChange?.(false);
-    const result = await recorder.stopAndSend();
-    if (result) {
-      await onSendVoice(result.uri, result.durationMs);
-    } else if (recorder.error === 'too_short') {
-      setTooShortHint(true);
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-    }
-  }, [recorder, onSendVoice, onRecordingStateChange]);
+  const handleSendVoice = useCallback(() => {
+    setRecordingState('finalizing');
+  }, []);
 
-  const handleCancelRecording = useCallback(async () => {
+  const handleCancelRecording = useCallback(() => {
     onRecordingStateChange?.(false);
-    await recorder.cancel();
+    setRecordingState('cancelling');
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-  }, [recorder, onRecordingStateChange]);
+  }, [onRecordingStateChange]);
+
+  const handleSessionReady = useCallback(() => {
+    setRecordingState('recording');
+  }, []);
+
+  const handleSessionTick = useCallback((dur: number, _metering: number[]) => {
+    setDurationMs(dur);
+  }, []);
+
+  const handleSessionFinalized = useCallback(
+    (result: { uri: string; durationMs: number }) => {
+      onRecordingStateChange?.(false);
+      setRecordingState('idle');
+
+      if (result.durationMs < MIN_VOICE_MESSAGE_DURATION_MS) {
+        try {
+          new File(result.uri).delete();
+        } catch { /* non-fatal */ }
+        setTooShortHint(true);
+        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        return;
+      }
+
+      void onSendVoice(result.uri, result.durationMs);
+    },
+    [onSendVoice, onRecordingStateChange],
+  );
+
+  const handleSessionCancelled = useCallback(() => {
+    setRecordingState('idle');
+  }, []);
+
+  const handleSessionError = useCallback(
+    (_code: RecordingErrorCode) => {
+      onRecordingStateChange?.(false);
+      setRecordingState('idle');
+      setErrorHint(true);
+    },
+    [onRecordingStateChange],
+  );
 
   const containerStyle = {
     borderTopWidth: 1,
@@ -159,12 +211,22 @@ export default function ConversationComposer({
   };
 
   // Recording state — simple: cancel (X) on left, timer in center, send (→) on right.
-  if (isRecording) {
+  if (isRecording || recordingState === 'starting') {
     return (
       <View style={containerStyle}>
+        {isSessionActive && sessionMode && (
+          <VoiceRecordingSession
+            mode={sessionMode}
+            onReady={handleSessionReady}
+            onTick={handleSessionTick}
+            onFinalized={handleSessionFinalized}
+            onCancelled={handleSessionCancelled}
+            onError={handleSessionError}
+          />
+        )}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
           <Pressable
-            onPress={() => void handleCancelRecording()}
+            onPress={handleCancelRecording}
             accessibilityLabel={COPY.chat.conversation.cancelRecording}
             accessibilityRole="button"
             testID="recording-cancel-button"
@@ -192,12 +254,12 @@ export default function ConversationComposer({
               }}
             />
             <Text style={{ fontFamily: FONT.medium, fontSize: 16, color: COLORS.dark }}>
-              {formatTimer(recorder.durationMs)}
+              {formatTimer(durationMs)}
             </Text>
           </View>
 
           <Pressable
-            onPress={() => void handleSendVoice()}
+            onPress={handleSendVoice}
             accessibilityLabel={COPY.chat.conversation.sendVoice}
             accessibilityRole="button"
             testID="recording-send-button"
@@ -213,6 +275,28 @@ export default function ConversationComposer({
             <ArrowRight size={20} color="#ffffff" />
           </Pressable>
         </View>
+      </View>
+    );
+  }
+
+  // Finalizing / cancelling — keep session mounted but show the send overlay.
+  if (recordingState === 'finalizing' || recordingState === 'cancelling') {
+    return (
+      <View style={{ ...containerStyle, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+        {isSessionActive && sessionMode && (
+          <VoiceRecordingSession
+            mode={sessionMode}
+            onReady={handleSessionReady}
+            onTick={handleSessionTick}
+            onFinalized={handleSessionFinalized}
+            onCancelled={handleSessionCancelled}
+            onError={handleSessionError}
+          />
+        )}
+        <ActivityIndicator size="small" color={COLORS.primary} />
+        <Text style={{ fontFamily: FONT.medium, fontSize: 13, color: COLORS.textSecondary, marginLeft: 8 }}>
+          {COPY.chat.conversation.status.sending}
+        </Text>
       </View>
     );
   }
@@ -245,7 +329,7 @@ export default function ConversationComposer({
   ) : null;
 
   // Error hint.
-  const errorBanner = recorder.error && recorder.error !== 'too_short' ? (
+  const errorBanner = errorHint ? (
     <Text
       style={{
         fontFamily: FONT.regular,
@@ -262,7 +346,7 @@ export default function ConversationComposer({
   // Voice button — tap to start recording.
   const voiceButton = (
     <Pressable
-      onPress={() => void handleStartRecording()}
+      onPress={handleStartRecording}
       accessibilityLabel={COPY.chat.conversation.voiceCtaLabel}
       accessibilityRole="button"
       testID="voice-button"

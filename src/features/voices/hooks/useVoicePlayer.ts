@@ -5,7 +5,21 @@ import {
   useAudioPlayer,
   useAudioPlayerStatus,
 } from 'expo-audio';
-import type { AudioSource } from 'expo-audio';
+import type { AudioPlayer, AudioSource } from 'expo-audio';
+
+// Module-scoped ref to the active profile voice player. Allows
+// VoiceRecordingSession to pause this player before recording.
+let activeProfilePlayer: AudioPlayer | null = null;
+
+/** Pause the profile voice preview player if it is alive. Called before recording. */
+export function pauseProfileVoicePlayer(): void {
+  if (!activeProfilePlayer) return;
+  try {
+    activeProfilePlayer.pause();
+  } catch {
+    // Native player recycled — safe to ignore.
+  }
+}
 
 export interface VoicePlayerHook {
   isPlaying: boolean;
@@ -61,15 +75,15 @@ export function useVoicePlayer({ uri }: { uri: string | null }): VoicePlayerHook
   // changes; calling pause() on a wrapper whose native counterpart has already been released
   // throws NativeSharedObjectNotFoundException, which is harmless in cleanup.
   useEffect(() => {
+    activeProfilePlayer = player;
     return () => {
+      if (activeProfilePlayer === player) activeProfilePlayer = null;
       try {
         player.pause();
       } catch {
         // Native object already released by expo-audio — nothing to do.
       }
     };
-    // The player ref is intentionally omitted: this effect must run cleanup only on unmount,
-    // not whenever expo-audio recycles the underlying player on source change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

@@ -6,8 +6,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
+import type { AudioPlayer } from 'expo-audio';
 
 import { getSupabaseClient } from '@/lib/supabase';
+
+// Module-scoped ref to the active feed player. Set on hook mount, cleared on
+// unmount. Allows VoiceRecordingSession to pause the feed before recording.
+let activeFeedPlayer: AudioPlayer | null = null;
 import type { FeedItem } from '@/features/feed/types';
 
 // Verbose tracing for the autoplay rollout. Filter with `[feedPlayer]` in Metro.
@@ -41,6 +46,17 @@ const signedUrlCache = new Map<string, SignedUrlEntry>();
 /** Test-only: clear the module-scoped cache between tests. NEVER call in production. */
 export function __resetSignedUrlCacheForTests(): void {
   signedUrlCache.clear();
+  activeFeedPlayer = null;
+}
+
+/** Pause the feed player if it is alive. Called before recording. */
+export function pauseFeedPlayer(): void {
+  if (!activeFeedPlayer) return;
+  try {
+    activeFeedPlayer.pause();
+  } catch {
+    // Native player recycled — safe to ignore.
+  }
 }
 
 async function ensureSignedUrl(path: string): Promise<string> {
@@ -387,9 +403,11 @@ export function useFeedPlayer({
     startPlayback();
   }, [autoplayNext, isLoadingSource, currentVoiceId, currentDidJustFinish, startPlayback]);
 
-  // Pause on unmount.
+  // Register in the module ref so pauseFeedPlayer() can reach this instance.
   useEffect(() => {
+    activeFeedPlayer = player;
     return () => {
+      if (activeFeedPlayer === player) activeFeedPlayer = null;
       try {
         player.pause();
       } catch {
