@@ -15,6 +15,7 @@ import {
   METERING_INTERVAL_MS,
   useAudioRecorderStateGated,
 } from '@/lib/audio';
+import { Sentry } from '@/lib/sentry';
 import { pauseAllChatMessages } from '../lib/chatMessagePlayer';
 import { pauseFeedPlayer } from '@/lib/feedPlayer';
 import { pauseProfileVoicePlayer } from '@/features/voices/hooks/useVoicePlayer';
@@ -88,9 +89,12 @@ export default function VoiceRecordingSession({
     let cancelled = false;
 
     async function boot() {
+      Sentry.addBreadcrumb({ category: 'recording', message: 'recording.session_mounted', level: 'info' });
+
       pauseAllChatMessages();
       pauseFeedPlayer();
       pauseProfileVoicePlayer();
+      Sentry.addBreadcrumb({ category: 'recording', message: 'recording.players_paused', level: 'info' });
 
       const { granted } = await requestRecordingPermissionsAsync();
       if (cancelled) return;
@@ -98,25 +102,30 @@ export default function VoiceRecordingSession({
         onErrorRef.current('permission_denied');
         return;
       }
+      Sentry.addBreadcrumb({ category: 'recording', message: 'recording.permission_granted', level: 'info' });
 
       try {
         await recorder.prepareToRecordAsync();
-      } catch {
+      } catch (err) {
         if (cancelled) return;
+        Sentry.captureException(err, { extra: { step: 'prepare' } });
         onErrorRef.current('prepare_failed');
         return;
       }
+      Sentry.addBreadcrumb({ category: 'recording', message: 'recording.prepare_done', level: 'info' });
 
       if (cancelled) return;
 
       try {
         recorder.record();
-      } catch {
+      } catch (err) {
         if (cancelled) return;
+        Sentry.captureException(err, { extra: { step: 'record' } });
         onErrorRef.current('record_failed');
         return;
       }
 
+      Sentry.addBreadcrumb({ category: 'recording', message: 'recording.record_started', level: 'info' });
       didStartRef.current = true;
       hardCapFiredRef.current = false;
       meteringRef.current = [];
@@ -152,6 +161,7 @@ export default function VoiceRecordingSession({
       !hardCapFiredRef.current
     ) {
       hardCapFiredRef.current = true;
+      Sentry.addBreadcrumb({ category: 'recording', message: 'recording.hard_cap_reached', level: 'info', data: { durationMs: recorderState.durationMillis } });
       void doFinalize('cap');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -176,6 +186,7 @@ export default function VoiceRecordingSession({
   // Unmount cleanup: stop the recorder if still active.
   useEffect(() => {
     return () => {
+      Sentry.addBreadcrumb({ category: 'recording', message: 'recording.session_unmounted', level: 'info', data: { active: didStartRef.current } });
       if (didStartRef.current) {
         try {
           recorder.stop().catch(() => null);
@@ -187,19 +198,25 @@ export default function VoiceRecordingSession({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function doFinalize(_requestedBy: 'send' | 'cap') {
+  async function doFinalize(requestedBy: 'send' | 'cap') {
+    Sentry.addBreadcrumb({ category: 'recording', message: 'recording.stop_called', level: 'info', data: { requestedBy } });
+
     try {
       await recorder.stop();
-    } catch {
+    } catch (err) {
+      Sentry.captureException(err, { extra: { step: 'stop', requestedBy } });
       onErrorRef.current('stop_failed');
       return;
     }
 
     const tempUri = recorder.uri;
     if (!tempUri) {
+      Sentry.addBreadcrumb({ category: 'recording', message: 'recording.no_uri', level: 'warning' });
       onErrorRef.current('no_uri');
       return;
     }
+
+    Sentry.addBreadcrumb({ category: 'recording', message: 'recording.uri_resolved', level: 'info', data: { srcUri: tempUri } });
 
     try {
       const pendingDir = ensurePendingDirectory();
@@ -209,19 +226,26 @@ export default function VoiceRecordingSession({
       srcFile.move(destFile);
 
       const durationMs = Math.min(recorderState.durationMillis, MAX_VOICE_DURATION_MS);
+
+      Sentry.addBreadcrumb({ category: 'recording', message: 'recording.file_moved', level: 'info', data: { durationMs } });
+      Sentry.addBreadcrumb({ category: 'recording', message: 'recording.finalized', level: 'info', data: { durationMs } });
+
       onFinalizedRef.current({ uri: destFile.uri, durationMs });
-    } catch {
+    } catch (err) {
+      Sentry.captureException(err, { extra: { step: 'file_move' } });
       onErrorRef.current('stop_failed');
     }
   }
 
   async function doCancel() {
+    Sentry.addBreadcrumb({ category: 'recording', message: 'recording.stop_called', level: 'info', data: { requestedBy: 'cancel' } });
+
     try {
       if (recorder.isRecording) {
         await recorder.stop();
       }
     } catch {
-      // Already released — nothing to do.
+      Sentry.addBreadcrumb({ category: 'recording', message: 'recording.cancel_stop_swallowed', level: 'warning' });
     }
 
     const tempUri = recorder.uri;
@@ -229,10 +253,11 @@ export default function VoiceRecordingSession({
       try {
         new File(tempUri).delete();
       } catch {
-        // Best-effort cleanup.
+        Sentry.addBreadcrumb({ category: 'recording', message: 'recording.cancel_delete_swallowed', level: 'warning' });
       }
     }
 
+    Sentry.addBreadcrumb({ category: 'recording', message: 'recording.cancelled', level: 'info', data: { requestedBy: 'cancel' } });
     onCancelledRef.current();
   }
 

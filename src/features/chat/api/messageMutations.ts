@@ -8,6 +8,7 @@ import {
 } from '@tanstack/react-query';
 
 import { getSupabaseClient } from '@/lib/supabase';
+import { Sentry } from '@/lib/sentry';
 import type { RequestUploadResult } from '@/features/voices/types';
 import {
   extractFunctionErrorCode,
@@ -285,10 +286,15 @@ export function useSendVoiceMessage(): UseMutationResult<
 
       if (requestError || !requestData) {
         const code = await extractFunctionErrorCode(requestError);
+        Sentry.addBreadcrumb({ category: 'upload', message: 'upload.failed', level: 'warning', data: { stage: 'request', code } });
         throw new Error(`chat.request_upload_failed:${code}`);
       }
 
+      Sentry.addBreadcrumb({ category: 'upload', message: 'upload.request_signed_ok', level: 'info', data: { objectPath: requestData.objectPath } });
+
       await putAudioWithRetry(input.uri, requestData.signedUrl);
+
+      Sentry.addBreadcrumb({ category: 'upload', message: 'upload.put_ok', level: 'info' });
 
       const { data: commitData, error: commitError } =
         await supabase.functions.invoke<CommitMessageUploadResult>('commit_upload', {
@@ -302,8 +308,11 @@ export function useSendVoiceMessage(): UseMutationResult<
 
       if (commitError || !commitData?.message) {
         const code = await extractFunctionErrorCode(commitError);
+        Sentry.addBreadcrumb({ category: 'upload', message: 'upload.failed', level: 'warning', data: { stage: 'commit', code } });
         throw new Error(`chat.commit_upload_failed:${code}`);
       }
+
+      Sentry.addBreadcrumb({ category: 'upload', message: 'upload.commit_ok', level: 'info', data: { messageId: commitData.message.id } });
 
       safeDelete(input.uri);
 

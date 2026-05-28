@@ -9,6 +9,13 @@ import { requestRecordingPermissionsAsync } from 'expo-audio';
 import VoiceRecordingSession from '../VoiceRecordingSession';
 import type { RecordingSessionMode } from '../VoiceRecordingSession';
 
+jest.mock('@/lib/sentry', () => ({
+  Sentry: {
+    addBreadcrumb: jest.fn(),
+    captureException: jest.fn(),
+  },
+}));
+
 jest.mock('@/features/chat/lib/chatMessagePlayer', () => ({
   pauseAllChatMessages: jest.fn(),
 }));
