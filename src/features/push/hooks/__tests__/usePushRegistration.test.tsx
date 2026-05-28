@@ -61,10 +61,6 @@ function createProfile(userId: string, pushToken: string | null = null): Profile
 }
 
 function buildMockSupabase(updateResult: { error: null | { message: string } } = { error: null }) {
-  const updateMock = jest.fn().mockResolvedValue(updateResult);
-  const eqMock = jest.fn(() => ({ ...updateResult, error: updateResult.error }));
-  eqMock.mockReturnValue(Promise.resolve(updateResult));
-
   const mockUpdate = jest.fn(() => ({
     eq: jest.fn().mockResolvedValue(updateResult),
   }));

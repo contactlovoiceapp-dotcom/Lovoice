@@ -238,11 +238,11 @@ just-sent voice bubble.
 
 | Error code | Trigger | Handling |
 | --- | --- | --- |
-| `permission_denied` | Microphone permission not granted | Composer shows alert, session unmounts |
-| `prepare_failed` | `recorder.prepareToRecordAsync()` throws | `Sentry.captureException`, composer shows error, session unmounts |
+| `permission_denied` | Microphone permission not granted | Composer shows a native `Alert` with a "Ouvrir les Réglages" button (`Linking.openSettings()`), session unmounts |
+| `prepare_failed` | `recorder.prepareToRecordAsync()` throws | `Sentry.captureException`, composer shows inline error banner, session unmounts |
 | `record_failed` | `recorder.record()` throws | Same |
 | `stop_failed` | `recorder.stop()` throws or file move fails | Same |
-| `no_uri` | `recorder.uri` is `null` after stop | Breadcrumb logged, composer shows error |
+| `no_uri` | `recorder.uri` is `null` after stop | Breadcrumb logged, composer shows inline error banner |
 
 All recording errors are instrumented with Sentry breadcrumbs (category
 `recording`) so failures are diagnosable from production without device access.
@@ -289,7 +289,11 @@ All recording errors are instrumented with Sentry breadcrumbs (category
     for the duration of one recording. **Do not mount the recorder hook at
     any higher scope.** Reusing the same `AVAudioRecorder` instance across
     multiple recordings produces silent files on iOS
-    (expo/expo#41656, #36193).
+    (expo/expo#41656, #36193). Note: `useVoiceRecorder` (profile and feed-reply
+    paths) reuses a single instance across recordings; this is safe **only
+    because `patches/expo-audio+1.1.1.patch` fixes the underlying native
+    bug**. If you upgrade expo-audio past 1.1.1 and drop the patch, re-test
+    multi-recording on a physical iOS device before shipping.
 11. **Do not remove `patches/expo-audio+1.1.1.patch`** without verifying that
     the upstream fixes have shipped. The patch fixes two bugs in expo-audio's
     native iOS code:

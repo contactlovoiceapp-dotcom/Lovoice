@@ -230,6 +230,10 @@ jest.mock('@sentry/react-native', () => ({
   wrap: <T,>(component: T) => component,
   captureException: jest.fn(),
   captureMessage: jest.fn(),
+  addBreadcrumb: jest.fn(),
+  setUser: jest.fn(),
+  setTag: jest.fn(),
+  withScope: jest.fn((cb: (scope: unknown) => void) => cb({ setExtra: jest.fn() })),
 }));
 
 jest.mock('expo-linear-gradient', () => {

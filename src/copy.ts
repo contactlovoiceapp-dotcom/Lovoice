@@ -320,6 +320,10 @@ export const COPY = {
       sendVoice: 'Envoyer le vocal',
       recordingTooShort: 'Trop court — enregistre au moins 1 seconde.',
       recordingError: 'Échec de l\'enregistrement. Réessaie.',
+      micPermissionDeniedTitle: 'Accès au micro requis',
+      micPermissionDeniedMessage: 'Lovoice a besoin de ton micro pour enregistrer des vocaux. Ouvre les Réglages pour autoriser l\'accès.',
+      micPermissionDeniedOpenSettings: 'Ouvrir les Réglages',
+      micPermissionDeniedCancel: 'Annuler',
       voiceMessage: {
         playA11y: 'Lecture du message vocal',
         pauseA11y: 'Pause du message vocal',

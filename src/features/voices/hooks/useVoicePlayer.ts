@@ -1,4 +1,6 @@
-// Single-instance voice preview player: wraps expo-audio's useAudioPlayer with session management and interruption awareness.
+// Single-instance voice preview player for profile and feed-reply contexts.
+// Exposes module-scoped pauseProfileVoicePlayer() so VoiceRecordingSession can
+// silence playback before recording without importing the full hook.
 
 import { useCallback, useEffect, useRef } from 'react';
 import {

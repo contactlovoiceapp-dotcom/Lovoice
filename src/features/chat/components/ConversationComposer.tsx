@@ -3,6 +3,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
+  Linking,
   Pressable,
   Text,
   TextInput,
@@ -193,9 +195,25 @@ export default function ConversationComposer({
   }, []);
 
   const handleSessionError = useCallback(
-    (_code: RecordingErrorCode) => {
+    (code: RecordingErrorCode) => {
       onRecordingStateChange?.(false);
       setRecordingState('idle');
+
+      if (code === 'permission_denied') {
+        Alert.alert(
+          COPY.chat.conversation.micPermissionDeniedTitle,
+          COPY.chat.conversation.micPermissionDeniedMessage,
+          [
+            { text: COPY.chat.conversation.micPermissionDeniedCancel, style: 'cancel' },
+            {
+              text: COPY.chat.conversation.micPermissionDeniedOpenSettings,
+              onPress: () => void Linking.openSettings(),
+            },
+          ],
+        );
+        return;
+      }
+
       setErrorHint(true);
     },
     [onRecordingStateChange],

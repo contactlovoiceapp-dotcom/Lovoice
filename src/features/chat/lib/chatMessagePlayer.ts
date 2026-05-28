@@ -24,6 +24,7 @@ import { create } from 'zustand';
 import { useShallow } from 'zustand/react/shallow';
 
 import { getSupabaseClient } from '@/lib/supabase';
+import { Sentry } from '@/lib/sentry';
 
 const SIGNED_URL_TTL_SECONDS = 60 * 60;
 const SIGNED_URL_REFRESH_BUFFER_MS = 10 * 60 * 1000;
@@ -251,6 +252,13 @@ async function startPlayback(args: {
 
   const token = ++loadToken;
 
+  Sentry.addBreadcrumb({
+    category: 'playback',
+    message: 'playback.start',
+    level: 'info',
+    data: { messageId, isLocalFile, isRetry },
+  });
+
   let url: string;
   try {
     if (isLocalFile) {
@@ -261,6 +269,7 @@ async function startPlayback(args: {
     }
   } catch (err) {
     if (loadToken !== token) return;
+    Sentry.captureException(err, { extra: { step: 'signed_url', messageId, isRetry } });
     useChatPlayerStore.setState({
       isLoading: false,
       error: err instanceof Error ? err.message : 'play_failed',
@@ -277,7 +286,8 @@ async function startPlayback(args: {
     try {
       hostAfterAwait.replace(url);
       loadedUrl = url;
-    } catch {
+    } catch (err) {
+      Sentry.captureException(err, { extra: { step: 'replace', messageId } });
       useChatPlayerStore.setState({ isLoading: false, error: 'play_failed' });
       return;
     }
@@ -292,6 +302,10 @@ async function startPlayback(args: {
     if (loadToken !== token) return;
     const stateNow = useChatPlayerStore.getState();
     if (stateNow.activeMessageId !== messageId || !stateNow.isLoading) return;
+    Sentry.captureMessage('playback.timeout', {
+      level: 'warning',
+      extra: { messageId, isLocalFile, isRetry },
+    });
     // Keep activeMessageId set so the bubble's snapshot can surface the error
     // (the selector returns INACTIVE_SNAPSHOT — with no error — when active
     // does not match).
@@ -407,6 +421,12 @@ export function useChatMessagePlayerHost(): void {
 
     if (isSuspicious && !retried && state.activeSource) {
       retried = true;
+      Sentry.addBreadcrumb({
+        category: 'playback',
+        message: 'playback.suspicious_finish_retry',
+        level: 'warning',
+        data: { messageId: state.activeMessageId, timeSinceConfirmed },
+      });
       void startPlayback({
         messageId: state.activeMessageId,
         source: state.activeSource,
@@ -421,6 +441,10 @@ export function useChatMessagePlayerHost(): void {
     retried = false;
 
     if (isSuspicious) {
+      Sentry.captureMessage('playback.failed', {
+        level: 'error',
+        extra: { messageId: state.activeMessageId, timeSinceConfirmed, retriedAlready: retried },
+      });
       // Keep activeMessageId so the bubble can surface 'play_failed' in its UI;
       // INACTIVE_SNAPSHOT would hide the error otherwise.
       useChatPlayerStore.setState({
@@ -431,6 +455,12 @@ export function useChatMessagePlayerHost(): void {
         error: 'play_failed',
       });
     } else {
+      Sentry.addBreadcrumb({
+        category: 'playback',
+        message: 'playback.finished',
+        level: 'info',
+        data: { messageId: state.activeMessageId },
+      });
       useChatPlayerStore.setState(INITIAL_STORE_STATE);
     }
   }, [player, didJustFinish]);

@@ -28,16 +28,14 @@ export function initSentry(): void {
     dsn,
     enableNative: true,
     enableNativeCrashHandling: true,
-    enableAutoSessionTracking: true,
     release,
     // Sample errors at 100%; we'll add throttling later if volume grows.
     sampleRate: 1.0,
     // No performance tracing yet — keeps the SDK lightweight.
     tracesSampleRate: 0,
-    // Dev builds: keep events local-only (Sentry SDK already disables uploads in dev,
-    // but we mirror that to avoid surprises if the dev flag changes.)
     debug: false,
-    enabled: true,
+    // Disable in dev to avoid polluting the Sentry project with local noise.
+    enabled: !__DEV__,
   });
 
   initialized = true;

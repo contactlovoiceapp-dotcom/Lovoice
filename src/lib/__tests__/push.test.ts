@@ -54,8 +54,10 @@ describe('setupNotificationHandler', () => {
     setupNotificationHandler();
 
     const handler = jest.mocked(Notifications.setNotificationHandler).mock.calls[0][0];
+    expect(handler).toBeDefined();
+    type NotificationHandler = NonNullable<typeof handler>;
     const behavior = await handler!.handleNotification(
-      {} as Parameters<typeof handler.handleNotification>[0],
+      {} as Parameters<NotificationHandler['handleNotification']>[0],
     );
 
     expect(behavior).toEqual({

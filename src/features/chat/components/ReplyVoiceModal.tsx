@@ -12,6 +12,7 @@ import { MIN_VOICE_MESSAGE_DURATION_MS, MAX_VOICE_DURATION_MS } from '@/lib/audi
 import { formatTime } from '@/lib/formatTime';
 import { useVoiceRecorder } from '@/features/voices/hooks/useVoiceRecorder';
 import { useVoicePlayer } from '@/features/voices/hooks/useVoicePlayer';
+import { pauseFeedPlayer } from '@/lib/feedPlayer';
 import { useStartConversation, useSendVoiceMessage } from '../api/messageMutations';
 import { chatQueryKeys, type FeedConversationMap } from '../api/conversationQueries';
 import ModalOverlay from '@/components/ModalOverlay';
@@ -74,6 +75,8 @@ export default function ReplyVoiceModal({
       if (!canStop) return;
       await recorder.stop();
     } else {
+      // Pause the feed player so recording doesn't mix with active playback.
+      pauseFeedPlayer();
       await recorder.reset();
       await recorder.start();
     }
@@ -81,6 +84,7 @@ export default function ReplyVoiceModal({
 
   const handleRerecord = useCallback(async () => {
     player.stop();
+    pauseFeedPlayer();
     await recorder.reset();
     await recorder.start();
   }, [recorder, player]);
