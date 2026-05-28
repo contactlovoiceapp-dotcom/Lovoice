@@ -39,9 +39,8 @@ on every status tick.
 
 | File | Responsibility |
 | --- | --- |
-| `src/features/chat/lib/chatMessagePlayer.ts` | Singleton host player, store, bubble hook, public `pauseAllChatMessages`, host suspension API (`suspendHostForRecording` / `resumeHostAfterRecording`). **Do not duplicate state here in components.** |
-| `src/features/chat/components/ChatMessagePlayerHostMount.tsx` | Conditional wrapper around the host hook. Unmounts the inner component (and therefore the native `AVAudioPlayer`) while `isHostSuspended` is true — see §9bis. |
-| `src/components/main/ConversationScreen.tsx` | Renders `<ChatMessagePlayerHostMount />`. Never calls `useChatMessagePlayerHost()` directly. |
+| `src/features/chat/lib/chatMessagePlayer.ts` | Singleton host player, store, bubble hook, public `pauseAllChatMessages`. **Do not duplicate state here in components.** |
+| `src/components/main/ConversationScreen.tsx` | Mounts the host once via `useChatMessagePlayerHost()`. Owns the only `useAudioPlayer` of the chat feature. |
 | `src/features/chat/components/MessageBubble.tsx` | Per-bubble UI. Calls `useChatMessagePlayer({ messageId: clientId, ... })` — note: `clientId`, not `id`. |
 | `src/features/chat/components/ConversationComposer.tsx` | Calls `pauseAllChatMessages()` before `recorder.start()`. |
 | `src/features/chat/api/messageMutations.ts` | Preserves `clientId` when replacing the optimistic message with the server row. Breaking this re-introduces FlatList remounts. |
@@ -184,33 +183,20 @@ Two guards make this safe:
 
 ```
 user taps mic in composer
-    ├─ pauseAllChatMessages()                ← UX: pause any active bubble
-    ├─ suspendHostForRecording()             ← unmount host wrapper, await React commit
-    │     ├─ store.isHostSuspended = true
-    │     └─ ChatMessagePlayerHostMount → returns null → useAudioPlayer cleanup
-    │         → native AVAudioPlayer released
-    ├─ setIsAudioActiveAsync(false)          ← belt-and-suspenders, see expo/expo#39030
-    ├─ configureAudioSessionForRecording()   ← session category swap
+    ├─ pauseAllChatMessages()         ← public API, pauses store + native
+    ├─ configureAudioSessionForRecording()  ← session category swap
     ├─ recorder.prepareToRecordAsync(); recorder.record()
     │
 user releases mic
     ├─ recorder.stop()
     ├─ move file to documentDirectory/pending/<uuid>.m4a
-    ├─ setIsAudioActiveAsync(true)
-    ├─ configureAudioSessionForPlayback()    ← swap back
-    ├─ resumeHostAfterRecording()            ← store.isHostSuspended = false
-    │     └─ ChatMessagePlayerHostMount remounts → new AVAudioPlayer
-    ├─ mutation.mutate({uri, durationMs})    ← optimistic insert + upload
+    ├─ configureAudioSessionForPlayback()   ← swap back
+    ├─ mutation.mutate({uri, durationMs})   ← optimistic insert + upload
     │
 optimistic message renders with `clientId = uuid`
     └─ MessageBubble plays from the local file URI (no signed URL needed)
        — `isLocalFile = true` in startPlayback args
 ```
-
-Suspension must complete (the wrapper component must unmount) BEFORE the
-recorder touches `AVAudioSession`. `suspendHostForRecording()` awaits a
-double `requestAnimationFrame` to guarantee React has committed the
-conditional render and expo-audio's cleanup effect has fired.
 
 When the server confirms, `replaceMessage` in `messageMutations.ts` swaps
 `id` to the server UUID **but keeps `clientId` unchanged**. The bubble
@@ -299,10 +285,9 @@ URLs that return HTTP 200 with an empty/short body — expo-audio plays
 
 ## 9. Known invariants — break at your peril
 
-1. **One `<ChatMessagePlayerHostMount />` per `ConversationScreen`**, rendered
-   at the top of the screen (not inside FlatList rendering, not inside a
-   bubble). Never call `useChatMessagePlayerHost()` directly from screen
-   components — go through the wrapper so suspension works (see §9bis).
+1. **One `useChatMessagePlayerHost()` per `ConversationScreen`, mounted at
+   the top of the screen** (not inside FlatList rendering, not inside a
+   bubble, not conditionally).
 2. **`MessageBubble` passes `clientId` (not `id`) as the `messageId` arg**
    to `useChatMessagePlayer`.
 3. **`replaceMessage` in `messageMutations.ts` preserves `clientId`** when
@@ -331,48 +316,7 @@ URLs that return HTTP 200 with an empty/short body — expo-audio plays
    Otherwise every navigation between conversations fires a redundant
    `setAudioModeAsync` which races with iOS audio reactivation.
 
-## 9bis. Recording: keep the host out of the way (silent-M4A mitigation)
-
-On iOS, an alive `AVAudioPlayer` instance — even an idle one with no source —
-contests the `AVAudioSession` with `AVAudioRecorder` when the recorder swaps
-the session category to `.playAndRecord`. Symptom: the AAC encoder receives
-zero samples, writes a valid M4A container of ~32 KB filled with silence,
-and the resulting voice message is forever unplayable. The bug reproduces
-intermittently on iOS device (iPhone 13 Mini / iOS 26.5 in our case) and
-never on the simulator (mocked session) nor on Android (MediaRecorder).
-
-Sentry signature: `LOVOICE-1 "Chat voice recording suspiciously small"`
-(triggered by `useChatVoiceRecorder.finalizeRecording` when `destSize <
-35_000` AND `durationMs > 2_000`).
-
-Mitigation: the host's `useAudioPlayer` lives inside
-`ChatMessagePlayerHostMount`, a conditional wrapper. Before the recorder
-configures the audio session it calls `suspendHostForRecording()` which:
-
-1. Pauses any active playback (UX: the user's previous voice stops).
-2. Sets `store.isHostSuspended = true`, which makes the wrapper return
-   `null` and React unmounts the inner component.
-3. Awaits a double `requestAnimationFrame` so React commits the unmount and
-   expo-audio's cleanup releases the native `AVAudioPlayer` synchronously.
-
-The recorder then swaps the session and `recorder.record()` runs with no
-competing player. After the recording finalises (or is cancelled, or the
-hook unmounts mid-recording for any reason), `resumeHostAfterRecording()`
-clears the flag and the wrapper remounts the host with a fresh native
-player — the previous playback state is gone, which is fine because
-listening was paused by step 1 anyway.
-
-Critical invariants:
-
-- The host's normal mount/unmount cleanup must **NEVER** clear
-  `isHostSuspended`. Use `resetPlaybackState()` instead of
-  `useChatPlayerStore.setState(INITIAL_STORE_STATE)` everywhere except in
-  `__resetChatPlayerStoreForTests`.
-- `resumeHostAfterRecording()` must be called on **every** recorder exit
-  path including the unmount cleanup, otherwise the next
-  `ConversationScreen` mount stays without a host (no voice can play).
-
-## 9ter. Native bridge pressure budget at notif-tap time
+## 9bis. Native bridge pressure budget at notif-tap time
 
 The chat audio crash family (`convertNSExceptionToJSError` × Hermes
 runtime race documented in §1 of the original rewrite) reproduces most
@@ -411,9 +355,7 @@ conversation-mount paths without considering this budget.
 
 | File | Covers |
 | --- | --- |
-| `src/features/chat/lib/__tests__/chatMessagePlayer.test.ts` | `generateBarHeights`, single-instance contract, switching bubbles, local file source, `pauseAllChatMessages`, nested-host scenario, host suspension flag preservation across host mount/unmount |
-| `src/features/chat/components/__tests__/ChatMessagePlayerHostMount.test.tsx` | Conditional mounting contract — host alive when not suspended, returns null while suspended, remounts after resume |
-| `src/features/chat/hooks/__tests__/useChatVoiceRecorder.test.ts` | State machine + suspend-on-start, resume-on-cancel, resume-on-unmount |
+| `src/features/chat/lib/__tests__/chatMessagePlayer.test.ts` | `generateBarHeights`, single-instance contract, switching bubbles, local file source, `pauseAllChatMessages`, nested-host scenario |
 | `src/features/chat/api/__tests__/messageMutations.test.ts` | `clientId` preservation on optimistic→confirmed |
 | `src/features/chat/lib/__tests__/throttle.test.ts` | `createThrottle` + `createDebouncer` |
 | `src/lib/__tests__/feedPlayer.test.tsx` | Sibling single-instance player (independent feature) — reference for a similar pattern |
@@ -435,9 +377,8 @@ Walk through this checklist in order:
 
 1. Verify `MessageBubble` still uses `clientId` for `messageId`.
 2. Verify `messageMutations.replaceMessage` still preserves `clientId`.
-3. Verify `<ChatMessagePlayerHostMount />` is rendered exactly once per
-   `ConversationScreen` and that nothing else calls
-   `useChatMessagePlayerHost()` directly.
+3. Verify `useChatMessagePlayerHost()` is called exactly once per
+   `ConversationScreen` mount.
 4. Add a `console.log` of `hostPlayerStack.length` in the host's mount/unmount
    useEffect to confirm you do not have orphan hosts.
 5. If the bubble shows no error after a failed playback: check that the
@@ -455,10 +396,3 @@ Walk through this checklist in order:
    debounces. Then enable Sentry (`EXPO_PUBLIC_SENTRY_DSN`) and read the
    JS stack of the next event to identify the actual throwing
    TurboModule (the iOS crashlog stacks do not preserve that information).
-9. If `LOVOICE-1 "Chat voice recording suspiciously small"` reappears:
-   verify (a) `useChatVoiceRecorder.start()` still `await`s
-   `suspendHostForRecording()` BEFORE `setIsAudioActiveAsync(false)`, (b)
-   `ConversationScreen` renders `<ChatMessagePlayerHostMount />` (not the
-   raw host hook), and (c) the host's normal lifecycle still uses
-   `resetPlaybackState()` rather than resetting the whole store, so the
-   suspension flag survives the unmount-then-remount cycle.

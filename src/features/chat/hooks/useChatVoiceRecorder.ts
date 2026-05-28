@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   useAudioRecorder,
   requestRecordingPermissionsAsync,
-  setIsAudioActiveAsync,
 } from 'expo-audio';
 import { Directory, File, Paths } from 'expo-file-system';
 import * as Crypto from 'expo-crypto';
@@ -18,11 +17,6 @@ import {
   configureAudioSessionForPlayback,
   useAudioRecorderStateGated,
 } from '@/lib/audio';
-import { Sentry } from '@/lib/sentry';
-import {
-  suspendHostForRecording,
-  resumeHostAfterRecording,
-} from '../lib/chatMessagePlayer';
 
 export type ChatRecorderState = 'idle' | 'recording' | 'error';
 
@@ -122,14 +116,8 @@ export function useChatVoiceRecorder(): ChatVoiceRecorderHook {
         // Native recorder already released.
       }
       if (recordingSessionTouchedRef.current) {
-        setIsAudioActiveAsync(true)
-          .then(() => configureAudioSessionForPlayback())
-          .catch(() => null);
+        configureAudioSessionForPlayback().catch(() => null);
       }
-      // Always clear the suspension flag — if the hook unmounts while the
-      // host was suspended (e.g. the user backs out mid-recording), the next
-      // ConversationScreen mount must be able to remount its host.
-      resumeHostAfterRecording();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -144,40 +132,17 @@ export function useChatVoiceRecorder(): ChatVoiceRecorderHook {
       const uuid = Crypto.randomUUID();
       const destFile = new File(pendingDir, `${uuid}.m4a`);
       const srcFile = new File(tempUri);
-
-      const srcSize = srcFile.size ?? 0;
       srcFile.move(destFile);
-      const destSize = destFile.size ?? 0;
 
       const rawDuration = recorderState.durationMillis || durationMs;
       const finalDuration = Math.min(rawDuration, MAX_VOICE_DURATION_MS);
 
-      if (__DEV__) {
-        console.log('[ChatRecorder] finalize', { srcSize, destSize, finalDuration, tempUri });
-      }
-
-      // Flag suspiciously small recordings: at 32 kbps, even 1 second produces ~4 KB.
-      // A multi-second recording under 35 KB strongly suggests a corrupt M4A container
-      // where the AAC encoder didn't flush its samples (seen on some iOS builds).
-      if (destSize > 0 && destSize < 35_000 && finalDuration > 2_000) {
-        Sentry.captureMessage('Chat voice recording suspiciously small', {
-          level: 'warning',
-          extra: { srcSize, destSize, finalDuration, tempUri },
-        });
-      }
-
-      await setIsAudioActiveAsync(true);
       await configureAudioSessionForPlayback();
-      // Re-mount the chat host now that the recorder has released the session
-      // and we are back in playback mode. Safe to call when not suspended.
-      resumeHostAfterRecording();
       return { uri: destFile.uri, durationMs: finalDuration };
     } catch (err) {
       setState('error');
       setError(err instanceof Error ? err.message : 'stop_failed');
-      await setIsAudioActiveAsync(true).catch(() => null);
       await configureAudioSessionForPlayback();
-      resumeHostAfterRecording();
       return null;
     }
   }, [recorder, recorderState.durationMillis, durationMs]);
@@ -191,28 +156,10 @@ export function useChatVoiceRecorder(): ChatVoiceRecorderHook {
         return;
       }
 
-      // Tear down the chat host's native AVAudioPlayer first so it does not
-      // contend with the recorder for the iOS AVAudioSession. Without this,
-      // the AAC encoder occasionally receives zero samples and writes a
-      // ~32 KB silent .m4a (see docs/CHAT_AUDIO.md §9bis and Sentry
-      // LOVOICE-1). suspendHostForRecording awaits the React commit so the
-      // native player is actually released before we continue.
-      await suspendHostForRecording();
-
-      try {
-        // Belt-and-suspenders: deactivate the audio subsystem before swapping
-        // categories. Even with the host released, a foreground transition
-        // can momentarily reactivate playback mode (cf. expo/expo#39030).
-        await setIsAudioActiveAsync(false);
-        await configureAudioSessionForRecording();
-        recordingSessionTouchedRef.current = true;
-        await recorder.prepareToRecordAsync();
-        recorder.record();
-      } catch (setupErr) {
-        // Restore the host so the user can keep playing existing voices.
-        resumeHostAfterRecording();
-        throw setupErr;
-      }
+      await configureAudioSessionForRecording();
+      recordingSessionTouchedRef.current = true;
+      await recorder.prepareToRecordAsync();
+      recorder.record();
 
       hardCapFiredRef.current = false;
       setDurationMs(0);
@@ -264,9 +211,7 @@ export function useChatVoiceRecorder(): ChatVoiceRecorderHook {
     setMeteringDb([]);
     hardCapFiredRef.current = false;
     setState('idle');
-    await setIsAudioActiveAsync(true).catch(() => null);
     await configureAudioSessionForPlayback();
-    resumeHostAfterRecording();
   }, [recorder, result]);
 
   return {

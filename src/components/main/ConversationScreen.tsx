@@ -10,7 +10,7 @@ import { groupMessagesIntoBursts } from '@/features/chat/types';
 import MessageBubble from '@/features/chat/components/MessageBubble';
 import ConversationComposer from '@/features/chat/components/ConversationComposer';
 import ConversationHeader from '@/features/chat/components/ConversationHeader';
-import ChatMessagePlayerHostMount from '@/features/chat/components/ChatMessagePlayerHostMount';
+import { useChatMessagePlayerHost } from '@/features/chat/lib/chatMessagePlayer';
 import ActionsSheet from '@/features/moderation/components/ActionsSheet';
 import ReportSheet from '@/features/moderation/components/ReportSheet';
 import BlockConfirmModal from '@/features/moderation/components/BlockConfirmModal';
@@ -110,6 +110,11 @@ export default function ConversationScreen({
   const [blockVisible, setBlockVisible] = useState(false);
   const [profileVisible, setProfileVisible] = useState(false);
 
+  // Mounts the single AVAudioPlayer shared by every voice bubble in the screen.
+  // Must be called here (not inside MessageBubble) so the conversation owns one
+  // native player regardless of how many voice messages are visible.
+  useChatMessagePlayerHost();
+
   const burstMessages = useMemo(() => groupMessagesIntoBursts(messages), [messages]);
 
   const handlePressMore = useCallback(() => setActionsVisible(true), []);
@@ -142,11 +147,6 @@ export default function ConversationScreen({
 
   return (
     <View style={{ flex: 1, backgroundColor: COLORS.background }}>
-      {/* The host owns the single AVAudioPlayer shared by every voice bubble in
-          the screen. Wrapped so it can be unmounted while a voice message is
-          being recorded — see docs/CHAT_AUDIO.md §9bis. */}
-      <ChatMessagePlayerHostMount />
-
       <ConversationHeader
         displayName={details?.otherDisplayName ?? ''}
         subtitle={headerSubtitle}

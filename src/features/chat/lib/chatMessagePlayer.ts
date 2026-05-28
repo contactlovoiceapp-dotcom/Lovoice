@@ -25,7 +25,6 @@ import { useShallow } from 'zustand/react/shallow';
 
 import { configureAudioSessionForPlayback } from '@/lib/audio';
 import { getSupabaseClient } from '@/lib/supabase';
-import { Sentry } from '@/lib/sentry';
 
 const SIGNED_URL_TTL_SECONDS = 60 * 60;
 const SIGNED_URL_REFRESH_BUFFER_MS = 10 * 60 * 1000;
@@ -80,15 +79,7 @@ async function ensureSignedUrl(path: string): Promise<string> {
     .createSignedUrl(path, SIGNED_URL_TTL_SECONDS);
 
   if (error || !data?.signedUrl) {
-    const err = new Error(`chat_player.signed_url_failed:${error?.message ?? 'no_url'}`);
-    Sentry.addBreadcrumb({
-      category: 'audio.player',
-      message: 'createSignedUrl failed',
-      data: { path, errorMessage: error?.message },
-      level: 'error',
-    });
-    Sentry.captureException(err);
-    throw err;
+    throw new Error('chat_player.signed_url_failed');
   }
 
   rememberSignedUrl(path, { url: data.signedUrl, fetchedAt: now });
@@ -155,11 +146,6 @@ interface ChatPlayerStoreState {
   durationMs: number;
   isLoading: boolean;
   error: string | null;
-  // True while a recording is being captured. Drives ChatMessagePlayerHostMount
-  // to unmount the host so the native AVAudioPlayer is released and the iOS
-  // AVAudioSession is uncontested when the recorder configures `.playAndRecord`
-  // (see docs/CHAT_AUDIO.md §9bis — silent-M4A mitigation).
-  isHostSuspended: boolean;
 }
 
 const INITIAL_STORE_STATE: ChatPlayerStoreState = {
@@ -171,26 +157,9 @@ const INITIAL_STORE_STATE: ChatPlayerStoreState = {
   durationMs: 0,
   isLoading: false,
   error: null,
-  isHostSuspended: false,
 };
 
 const useChatPlayerStore = create<ChatPlayerStoreState>(() => INITIAL_STORE_STATE);
-
-// Resets every playback field but preserves `isHostSuspended`. Used by the host
-// lifecycle (mount, unmount, didJustFinish, etc.) so the host's normal cleanup
-// does not accidentally remount itself while a recording is in progress.
-function resetPlaybackState(): void {
-  useChatPlayerStore.setState({
-    activeMessageId: null,
-    activeSource: null,
-    activeIsLocal: false,
-    isPlaying: false,
-    positionMs: 0,
-    durationMs: 0,
-    isLoading: false,
-    error: null,
-  });
-}
 
 /** Test-only: reset the singleton store between tests. */
 export function __resetChatPlayerStoreForTests(): void {
@@ -304,14 +273,10 @@ async function startPlayback(args: {
     }
   } catch (err) {
     if (loadToken !== token) return;
-    const errorMsg = err instanceof Error ? err.message : 'play_failed';
-    Sentry.addBreadcrumb({
-      category: 'audio.player',
-      message: 'startPlayback URL resolution failed',
-      data: { messageId, source, isLocalFile, isRetry, error: errorMsg },
-      level: 'error',
+    useChatPlayerStore.setState({
+      isLoading: false,
+      error: err instanceof Error ? err.message : 'play_failed',
     });
-    useChatPlayerStore.setState({ isLoading: false, error: errorMsg });
     return;
   }
 
@@ -319,13 +284,6 @@ async function startPlayback(args: {
   // (e.g. user navigated to a different conversation mid-fetch).
   const hostAfterAwait = getActiveHost();
   if (loadToken !== token || !hostAfterAwait) return;
-
-  Sentry.addBreadcrumb({
-    category: 'audio.player',
-    message: 'startPlayback resolved URL',
-    data: { messageId, isRetry, isLocalFile, urlLength: url.length },
-    level: 'info',
-  });
 
   if (isRetry || loadedUrl !== url) {
     try {
@@ -346,10 +304,9 @@ async function startPlayback(args: {
     if (loadToken !== token) return;
     const stateNow = useChatPlayerStore.getState();
     if (stateNow.activeMessageId !== messageId || !stateNow.isLoading) return;
-    Sentry.captureMessage('Voice playback: 8s timeout reached', {
-      level: 'warning',
-      extra: { messageId, source, isLocalFile },
-    });
+    // Keep activeMessageId set so the bubble's snapshot can surface the error
+    // (the selector returns INACTIVE_SNAPSHOT — with no error — when active
+    // does not match).
     useChatPlayerStore.setState({
       isLoading: false,
       isPlaying: false,
@@ -402,7 +359,7 @@ export function useChatMessagePlayerHost(): void {
     loadedUrl = null;
     playConfirmedAt = 0;
     retried = false;
-    resetPlaybackState();
+    useChatPlayerStore.setState(INITIAL_STORE_STATE);
 
     return () => {
       safeNativeCall(() => player.pause());
@@ -412,7 +369,7 @@ export function useChatMessagePlayerHost(): void {
       loadedUrl = null;
       playConfirmedAt = 0;
       retried = false;
-      resetPlaybackState();
+      useChatPlayerStore.setState(INITIAL_STORE_STATE);
     };
   }, [player]);
 
@@ -476,16 +433,8 @@ export function useChatMessagePlayerHost(): void {
     retried = false;
 
     if (isSuspicious) {
-      Sentry.captureMessage('Voice playback: suspicious finish after retry', {
-        level: 'warning',
-        extra: {
-          messageId: state.activeMessageId,
-          source: state.activeSource,
-          isLocalFile: state.activeIsLocal,
-          timeSinceConfirmed,
-          playConfirmedAt,
-        },
-      });
+      // Keep activeMessageId so the bubble can surface 'play_failed' in its UI;
+      // INACTIVE_SNAPSHOT would hide the error otherwise.
       useChatPlayerStore.setState({
         isPlaying: false,
         isLoading: false,
@@ -494,74 +443,9 @@ export function useChatMessagePlayerHost(): void {
         error: 'play_failed',
       });
     } else {
-      resetPlaybackState();
+      useChatPlayerStore.setState(INITIAL_STORE_STATE);
     }
   }, [player, didJustFinish]);
-}
-
-// ---------------------------------------------------------------------------
-// Host suspension — temporarily releases the native AVAudioPlayer during
-// recording so iOS does not silently starve the recorder's AAC encoder.
-//
-// On iOS, an alive `AVAudioPlayer` instance (created by `useAudioPlayer` in
-// the host) competes with the recorder for the AVAudioSession even when the
-// player is idle. The recorder ends up producing a valid M4A container of
-// ~32 KB filled with silence (see docs/CHAT_AUDIO.md §9bis and Sentry issue
-// LOVOICE-1 "Chat voice recording suspiciously small"). Suspending the host
-// unmounts the wrapper component that owns `useAudioPlayer`, which triggers
-// expo-audio's cleanup and frees the native player before we touch the
-// session.
-// ---------------------------------------------------------------------------
-
-/** Subscribed selector for {@link ChatMessagePlayerHostMount}. */
-export function useIsHostSuspended(): boolean {
-  return useChatPlayerStore((state) => state.isHostSuspended);
-}
-
-/**
- * Flips the suspension flag and waits for the host wrapper component to
- * actually unmount before resolving. Callers can then safely reconfigure
- * the AVAudioSession knowing no live `AVAudioPlayer` is contesting it.
- *
- * The double `requestAnimationFrame` guarantees that React has committed
- * the conditional render and that expo-audio's cleanup effect has run; a
- * single `await Promise.resolve()` covers the test environment where
- * `requestAnimationFrame` is unavailable.
- */
-export async function suspendHostForRecording(): Promise<void> {
-  const host = getActiveHost();
-  if (host) safeNativeCall(() => host.pause());
-  clearPlayTimeout();
-  useChatPlayerStore.setState({
-    activeMessageId: null,
-    activeSource: null,
-    activeIsLocal: false,
-    isPlaying: false,
-    positionMs: 0,
-    durationMs: 0,
-    isLoading: false,
-    error: null,
-    isHostSuspended: true,
-  });
-  await waitForHostUnmount();
-}
-
-/** Cleared synchronously — the host re-mounts on the next React render. */
-export function resumeHostAfterRecording(): void {
-  if (!useChatPlayerStore.getState().isHostSuspended) return;
-  useChatPlayerStore.setState({ isHostSuspended: false });
-}
-
-async function waitForHostUnmount(): Promise<void> {
-  if (typeof requestAnimationFrame === 'undefined') {
-    await Promise.resolve();
-    return;
-  }
-  await new Promise<void>((resolve) => {
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => resolve());
-    });
-  });
 }
 
 // ---------------------------------------------------------------------------
@@ -620,7 +504,7 @@ export function useChatMessagePlayer({
       loadedUrl = null;
       playConfirmedAt = 0;
       retried = false;
-      resetPlaybackState();
+      useChatPlayerStore.setState(INITIAL_STORE_STATE);
     };
   }, [messageId]);
 
