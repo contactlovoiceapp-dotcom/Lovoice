@@ -19,6 +19,10 @@ import {
   useAudioRecorderStateGated,
 } from '@/lib/audio';
 import { Sentry } from '@/lib/sentry';
+import {
+  suspendHostForRecording,
+  resumeHostAfterRecording,
+} from '../lib/chatMessagePlayer';
 
 export type ChatRecorderState = 'idle' | 'recording' | 'error';
 
@@ -122,6 +126,10 @@ export function useChatVoiceRecorder(): ChatVoiceRecorderHook {
           .then(() => configureAudioSessionForPlayback())
           .catch(() => null);
       }
+      // Always clear the suspension flag — if the hook unmounts while the
+      // host was suspended (e.g. the user backs out mid-recording), the next
+      // ConversationScreen mount must be able to remount its host.
+      resumeHostAfterRecording();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -160,12 +168,16 @@ export function useChatVoiceRecorder(): ChatVoiceRecorderHook {
 
       await setIsAudioActiveAsync(true);
       await configureAudioSessionForPlayback();
+      // Re-mount the chat host now that the recorder has released the session
+      // and we are back in playback mode. Safe to call when not suspended.
+      resumeHostAfterRecording();
       return { uri: destFile.uri, durationMs: finalDuration };
     } catch (err) {
       setState('error');
       setError(err instanceof Error ? err.message : 'stop_failed');
       await setIsAudioActiveAsync(true).catch(() => null);
       await configureAudioSessionForPlayback();
+      resumeHostAfterRecording();
       return null;
     }
   }, [recorder, recorderState.durationMillis, durationMs]);
@@ -179,18 +191,28 @@ export function useChatVoiceRecorder(): ChatVoiceRecorderHook {
         return;
       }
 
-      // Deactivate the audio subsystem before reconfiguring for recording.
-      // The native AudioPlayer (running at 100ms updateInterval) can silently
-      // reconfigure the AVAudioSession back to playback-only between async calls,
-      // causing the recorder to produce valid-sized .m4a containers filled with
-      // silence (see expo/expo#39030 and expo-audio-video-conflict).
-      // Deactivating first forces all native audio components to release the
-      // session, then we configure for recording and prepare in tight sequence.
-      await setIsAudioActiveAsync(false);
-      await configureAudioSessionForRecording();
-      recordingSessionTouchedRef.current = true;
-      await recorder.prepareToRecordAsync();
-      recorder.record();
+      // Tear down the chat host's native AVAudioPlayer first so it does not
+      // contend with the recorder for the iOS AVAudioSession. Without this,
+      // the AAC encoder occasionally receives zero samples and writes a
+      // ~32 KB silent .m4a (see docs/CHAT_AUDIO.md §9bis and Sentry
+      // LOVOICE-1). suspendHostForRecording awaits the React commit so the
+      // native player is actually released before we continue.
+      await suspendHostForRecording();
+
+      try {
+        // Belt-and-suspenders: deactivate the audio subsystem before swapping
+        // categories. Even with the host released, a foreground transition
+        // can momentarily reactivate playback mode (cf. expo/expo#39030).
+        await setIsAudioActiveAsync(false);
+        await configureAudioSessionForRecording();
+        recordingSessionTouchedRef.current = true;
+        await recorder.prepareToRecordAsync();
+        recorder.record();
+      } catch (setupErr) {
+        // Restore the host so the user can keep playing existing voices.
+        resumeHostAfterRecording();
+        throw setupErr;
+      }
 
       hardCapFiredRef.current = false;
       setDurationMs(0);
@@ -244,6 +266,7 @@ export function useChatVoiceRecorder(): ChatVoiceRecorderHook {
     setState('idle');
     await setIsAudioActiveAsync(true).catch(() => null);
     await configureAudioSessionForPlayback();
+    resumeHostAfterRecording();
   }, [recorder, result]);
 
   return {

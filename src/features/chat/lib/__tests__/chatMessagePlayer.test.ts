@@ -9,8 +9,11 @@ import {
   __resetChatPlayerStoreForTests,
   generateBarHeights,
   pauseAllChatMessages,
+  resumeHostAfterRecording,
+  suspendHostForRecording,
   useChatMessagePlayer,
   useChatMessagePlayerHost,
+  useIsHostSuspended,
 } from '../chatMessagePlayer';
 
 jest.mock('@/lib/supabase', () => ({
@@ -253,6 +256,88 @@ describe('pauseAllChatMessages', () => {
     });
 
     expect(expoAudioMocks.player.pause).toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Host suspension — silent M4A mitigation (release native AVAudioPlayer
+// during recording so iOS does not starve the recorder's AAC encoder).
+// ---------------------------------------------------------------------------
+
+describe('host suspension', () => {
+  it('starts un-suspended', () => {
+    const { result } = renderHook(() => useIsHostSuspended());
+    expect(result.current).toBe(false);
+  });
+
+  it('suspendHostForRecording flips the flag and pauses any active playback', async () => {
+    mockSupabaseSignedUrls();
+
+    const { result } = renderHook(() => {
+      useChatMessagePlayerHost();
+      return {
+        bubble: useChatMessagePlayer({ messageId: 'msg-1', source: 'p.m4a', isLocalFile: false }),
+        suspended: useIsHostSuspended(),
+      };
+    });
+
+    await act(async () => {
+      result.current.bubble.controls.play();
+      await Promise.resolve();
+    });
+    expoAudioMocks.player.pause.mockClear();
+
+    await act(async () => {
+      await suspendHostForRecording();
+    });
+
+    expect(result.current.suspended).toBe(true);
+    expect(expoAudioMocks.player.pause).toHaveBeenCalled();
+    // Active playback state is cleared so the bubble UI returns to idle.
+    expect(result.current.bubble.snapshot.isPlaying).toBe(false);
+    expect(result.current.bubble.snapshot.isLoading).toBe(false);
+  });
+
+  it('resumeHostAfterRecording clears the flag', async () => {
+    await act(async () => {
+      await suspendHostForRecording();
+    });
+
+    const { result } = renderHook(() => useIsHostSuspended());
+    expect(result.current).toBe(true);
+
+    act(() => {
+      resumeHostAfterRecording();
+    });
+
+    expect(result.current).toBe(false);
+  });
+
+  it('host mount/unmount does NOT clear the suspension flag', async () => {
+    mockSupabaseSignedUrls();
+
+    await act(async () => {
+      await suspendHostForRecording();
+    });
+
+    const { unmount, result } = renderHook(() => {
+      useChatMessagePlayerHost();
+      return useIsHostSuspended();
+    });
+
+    // Mounting the host during suspension would normally call resetPlaybackState
+    // on mount AND on unmount; both must leave isHostSuspended untouched so the
+    // wrapper component stays unmounted until resumeHostAfterRecording is called.
+    expect(result.current).toBe(true);
+    unmount();
+    // After unmount we cannot read result.current; instead read the store directly.
+    const { result: probe } = renderHook(() => useIsHostSuspended());
+    expect(probe.current).toBe(true);
+
+    act(() => {
+      resumeHostAfterRecording();
+    });
+    expect(probe.current).toBe(false);
   });
 });
 

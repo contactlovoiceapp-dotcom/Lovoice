@@ -155,6 +155,11 @@ interface ChatPlayerStoreState {
   durationMs: number;
   isLoading: boolean;
   error: string | null;
+  // True while a recording is being captured. Drives ChatMessagePlayerHostMount
+  // to unmount the host so the native AVAudioPlayer is released and the iOS
+  // AVAudioSession is uncontested when the recorder configures `.playAndRecord`
+  // (see docs/CHAT_AUDIO.md §9bis — silent-M4A mitigation).
+  isHostSuspended: boolean;
 }
 
 const INITIAL_STORE_STATE: ChatPlayerStoreState = {
@@ -166,9 +171,26 @@ const INITIAL_STORE_STATE: ChatPlayerStoreState = {
   durationMs: 0,
   isLoading: false,
   error: null,
+  isHostSuspended: false,
 };
 
 const useChatPlayerStore = create<ChatPlayerStoreState>(() => INITIAL_STORE_STATE);
+
+// Resets every playback field but preserves `isHostSuspended`. Used by the host
+// lifecycle (mount, unmount, didJustFinish, etc.) so the host's normal cleanup
+// does not accidentally remount itself while a recording is in progress.
+function resetPlaybackState(): void {
+  useChatPlayerStore.setState({
+    activeMessageId: null,
+    activeSource: null,
+    activeIsLocal: false,
+    isPlaying: false,
+    positionMs: 0,
+    durationMs: 0,
+    isLoading: false,
+    error: null,
+  });
+}
 
 /** Test-only: reset the singleton store between tests. */
 export function __resetChatPlayerStoreForTests(): void {
@@ -380,7 +402,7 @@ export function useChatMessagePlayerHost(): void {
     loadedUrl = null;
     playConfirmedAt = 0;
     retried = false;
-    useChatPlayerStore.setState(INITIAL_STORE_STATE);
+    resetPlaybackState();
 
     return () => {
       safeNativeCall(() => player.pause());
@@ -390,7 +412,7 @@ export function useChatMessagePlayerHost(): void {
       loadedUrl = null;
       playConfirmedAt = 0;
       retried = false;
-      useChatPlayerStore.setState(INITIAL_STORE_STATE);
+      resetPlaybackState();
     };
   }, [player]);
 
@@ -472,9 +494,74 @@ export function useChatMessagePlayerHost(): void {
         error: 'play_failed',
       });
     } else {
-      useChatPlayerStore.setState(INITIAL_STORE_STATE);
+      resetPlaybackState();
     }
   }, [player, didJustFinish]);
+}
+
+// ---------------------------------------------------------------------------
+// Host suspension — temporarily releases the native AVAudioPlayer during
+// recording so iOS does not silently starve the recorder's AAC encoder.
+//
+// On iOS, an alive `AVAudioPlayer` instance (created by `useAudioPlayer` in
+// the host) competes with the recorder for the AVAudioSession even when the
+// player is idle. The recorder ends up producing a valid M4A container of
+// ~32 KB filled with silence (see docs/CHAT_AUDIO.md §9bis and Sentry issue
+// LOVOICE-1 "Chat voice recording suspiciously small"). Suspending the host
+// unmounts the wrapper component that owns `useAudioPlayer`, which triggers
+// expo-audio's cleanup and frees the native player before we touch the
+// session.
+// ---------------------------------------------------------------------------
+
+/** Subscribed selector for {@link ChatMessagePlayerHostMount}. */
+export function useIsHostSuspended(): boolean {
+  return useChatPlayerStore((state) => state.isHostSuspended);
+}
+
+/**
+ * Flips the suspension flag and waits for the host wrapper component to
+ * actually unmount before resolving. Callers can then safely reconfigure
+ * the AVAudioSession knowing no live `AVAudioPlayer` is contesting it.
+ *
+ * The double `requestAnimationFrame` guarantees that React has committed
+ * the conditional render and that expo-audio's cleanup effect has run; a
+ * single `await Promise.resolve()` covers the test environment where
+ * `requestAnimationFrame` is unavailable.
+ */
+export async function suspendHostForRecording(): Promise<void> {
+  const host = getActiveHost();
+  if (host) safeNativeCall(() => host.pause());
+  clearPlayTimeout();
+  useChatPlayerStore.setState({
+    activeMessageId: null,
+    activeSource: null,
+    activeIsLocal: false,
+    isPlaying: false,
+    positionMs: 0,
+    durationMs: 0,
+    isLoading: false,
+    error: null,
+    isHostSuspended: true,
+  });
+  await waitForHostUnmount();
+}
+
+/** Cleared synchronously — the host re-mounts on the next React render. */
+export function resumeHostAfterRecording(): void {
+  if (!useChatPlayerStore.getState().isHostSuspended) return;
+  useChatPlayerStore.setState({ isHostSuspended: false });
+}
+
+async function waitForHostUnmount(): Promise<void> {
+  if (typeof requestAnimationFrame === 'undefined') {
+    await Promise.resolve();
+    return;
+  }
+  await new Promise<void>((resolve) => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => resolve());
+    });
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -533,7 +620,7 @@ export function useChatMessagePlayer({
       loadedUrl = null;
       playConfirmedAt = 0;
       retried = false;
-      useChatPlayerStore.setState(INITIAL_STORE_STATE);
+      resetPlaybackState();
     };
   }, [messageId]);
 
