@@ -46,27 +46,16 @@ export const MAX_VOICE_FILE_SIZE_BYTES = 2_000_000;
 export const METERING_INTERVAL_MS = 50;
 
 /**
- * Configures the AVAudioSession for recording.
- * Category playAndRecord with mixWithOthers lets us record while background audio keeps playing
- * (e.g. the user has music running) and routes correctly through Bluetooth headsets.
+ * Configures the iOS AVAudioSession once at app boot to playAndRecord.
+ * This single call satisfies both recording and playback simultaneously — no
+ * runtime category swap needed. Swapping at runtime while AVAudioPlayer
+ * instances are alive starves the AAC encoder and produces silent M4A files.
+ * shouldRouteThroughEarpiece: false keeps output on the speaker (or the
+ * current external route), matching the UX model of WhatsApp / Telegram.
  */
-export async function configureAudioSessionForRecording(): Promise<void> {
+export async function configureAudioSession(): Promise<void> {
   await setAudioModeAsync({
     allowsRecording: true,
-    playsInSilentMode: true,
-    interruptionMode: 'mixWithOthers',
-    shouldPlayInBackground: false,
-    shouldRouteThroughEarpiece: false,
-  });
-}
-
-/**
- * Configures the AVAudioSession for playback only.
- * playsInSilentMode and shouldPlayInBackground satisfy README constraint #8 and ARCHITECTURE §4.4.
- */
-export async function configureAudioSessionForPlayback(): Promise<void> {
-  await setAudioModeAsync({
-    allowsRecording: false,
     playsInSilentMode: true,
     interruptionMode: 'mixWithOthers',
     shouldPlayInBackground: true,

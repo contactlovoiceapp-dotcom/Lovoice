@@ -7,7 +7,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 
-import { configureAudioSessionForPlayback } from '@/lib/audio';
 import { getSupabaseClient } from '@/lib/supabase';
 import type { FeedItem } from '@/features/feed/types';
 
@@ -139,7 +138,6 @@ export function useFeedPlayer({
   const player = useAudioPlayer(null, { updateInterval: 100 });
   const status = useAudioPlayerStatus(player);
 
-  const sessionConfiguredRef = useRef(false);
   // Tracks which voiceId the player currently holds. Null while idle or mid-swap.
   const loadedVoiceIdRef = useRef<string | null>(null);
   // Incremented on every load attempt. Only the latest token's resolution is applied;
@@ -175,16 +173,6 @@ export function useFeedPlayer({
   const currentPath = currentItem?.storagePath ?? null;
   const nextPath = nextItem?.storagePath ?? null;
   const nextNextPath = nextNextItem?.storagePath ?? null;
-
-  // Configure the audio session once on mount.
-  useEffect(() => {
-    if (sessionConfiguredRef.current) return;
-    sessionConfiguredRef.current = true;
-    configureAudioSessionForPlayback().catch((err: unknown) => {
-      sessionConfiguredRef.current = false;
-      console.error(err);
-    });
-  }, []);
 
   // Source-loading effect. Runs whenever the current voice changes (swipe up/down).
   // Pauses immediately for instant audio cutoff, then fetches the signed URL and

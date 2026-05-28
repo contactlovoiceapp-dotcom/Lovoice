@@ -7,8 +7,6 @@ import {
 } from 'expo-audio';
 import type { AudioSource } from 'expo-audio';
 
-import { configureAudioSessionForPlayback } from '@/lib/audio';
-
 export interface VoicePlayerHook {
   isPlaying: boolean;
   /** Total duration in milliseconds, 0 while not loaded. */
@@ -24,7 +22,6 @@ export interface VoicePlayerHook {
 }
 
 export function useVoicePlayer({ uri }: { uri: string | null }): VoicePlayerHook {
-  const sessionConfiguredRef = useRef(false);
   const isFirstRenderRef = useRef(true);
   // When stop() is called (tab switch), the next play() must seekTo(0) first.
   const needsRestartRef = useRef(false);
@@ -52,7 +49,6 @@ export function useVoicePlayer({ uri }: { uri: string | null }): VoicePlayerHook
     } catch {
       // Player wrapper outlived its native counterpart; expo-audio handles the source swap.
     }
-    sessionConfiguredRef.current = false;
   }, [uri]); // player reference is stable for the hook's lifetime
 
   // Handle system interruptions (e.g. incoming phone call): expo-audio's session will pause
@@ -77,11 +73,7 @@ export function useVoicePlayer({ uri }: { uri: string | null }): VoicePlayerHook
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const play = useCallback(async () => {
-    if (!sessionConfiguredRef.current) {
-      await configureAudioSessionForPlayback();
-      sessionConfiguredRef.current = true;
-    }
+  const play = useCallback(() => {
     // After stop() or when the track ended, seek back to 0 before playing.
     const shouldRestart =
       needsRestartRef.current ||
@@ -126,7 +118,6 @@ export function useVoicePlayer({ uri }: { uri: string | null }): VoicePlayerHook
     } catch {
       // Native player already gone — nothing to do.
     }
-    sessionConfiguredRef.current = false;
   }, [player]);
 
   return {

@@ -18,8 +18,6 @@ import {
   MAX_VOICE_DURATION_MS,
   MIN_VOICE_DURATION_MS,
   METERING_INTERVAL_MS,
-  configureAudioSessionForRecording,
-  configureAudioSessionForPlayback,
   useAudioRecorderStateGated,
 } from '@/lib/audio';
 
@@ -78,9 +76,6 @@ export function useVoiceRecorder(): VoiceRecorderHook {
   // We use refs (not state) to avoid re-renders on every 50ms tick.
   const totalSamplesRef = useRef(0);
   const voiceSamplesRef = useRef(0);
-  // Tracks whether the recording session was activated at least once so cleanup only
-  // restores the playback session when we actually swapped to recording mode.
-  const recordingSessionTouchedRef = useRef(false);
 
   const recorder = useAudioRecorder(VOICE_AUDIO_FORMAT);
   // Gated polling: 20 Hz only while actively recording or paused, zero otherwise.
@@ -128,14 +123,6 @@ export function useVoiceRecorder(): VoiceRecorderHook {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recorderState.durationMillis, state]);
 
-  // Restore playback session when the hook unmounts only if we actually swapped
-  // to recording mode during this hook's lifetime — see useChatVoiceRecorder for
-  // the same rationale. Skipping the redundant setAudioModeAsync call reduces
-  // native bridge pressure on every unmount.
-  //
-  // The recorder.isRecording getter and stop() can both throw
-  // NativeSharedObjectNotFoundException when expo-audio has already released the
-  // underlying native recorder; we treat those as no-ops.
   useEffect(() => {
     return () => {
       try {
@@ -145,11 +132,7 @@ export function useVoiceRecorder(): VoiceRecorderHook {
       } catch {
         // Native recorder already released — nothing to stop.
       }
-      if (recordingSessionTouchedRef.current) {
-        configureAudioSessionForPlayback().catch(() => null);
-      }
     };
-    // recorder reference is stable for the component lifetime.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -162,8 +145,6 @@ export function useVoiceRecorder(): VoiceRecorderHook {
         return;
       }
 
-      await configureAudioSessionForRecording();
-      recordingSessionTouchedRef.current = true;
       await recorder.prepareToRecordAsync();
       recorder.record();
 
@@ -224,7 +205,6 @@ export function useVoiceRecorder(): VoiceRecorderHook {
       setIsLikelySilent(voiceRatio < VOICE_SAMPLE_MIN_RATIO);
       setResult({ uri: finalUri, durationMs: finalDuration });
       setState('stopped');
-      await configureAudioSessionForPlayback();
     } catch (err) {
       setState('error');
       setError(err instanceof Error ? err.message : 'stop_failed');
@@ -258,7 +238,6 @@ export function useVoiceRecorder(): VoiceRecorderHook {
       totalSamplesRef.current = 0;
       voiceSamplesRef.current = 0;
       setState('idle');
-      await configureAudioSessionForPlayback();
     }
   }, [recorder, result]);
 

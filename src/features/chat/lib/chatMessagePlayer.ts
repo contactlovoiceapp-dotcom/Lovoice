@@ -23,7 +23,6 @@ import {
 import { create } from 'zustand';
 import { useShallow } from 'zustand/react/shallow';
 
-import { configureAudioSessionForPlayback } from '@/lib/audio';
 import { getSupabaseClient } from '@/lib/supabase';
 
 const SIGNED_URL_TTL_SECONDS = 60 * 60;
@@ -169,7 +168,6 @@ export function __resetChatPlayerStoreForTests(): void {
   loadedUrl = null;
   playConfirmedAt = 0;
   retried = false;
-  sessionConfigured = false;
   if (playTimeoutId !== null) {
     clearTimeout(playTimeoutId);
     playTimeoutId = null;
@@ -192,7 +190,6 @@ let loadToken = 0;
 let loadedUrl: string | null = null;
 let playConfirmedAt = 0;
 let retried = false;
-let sessionConfigured = false;
 let playTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
 function getActiveHost(): AudioPlayer | null {
@@ -251,15 +248,6 @@ async function startPlayback(args: {
     positionMs: 0,
     durationMs: 0,
   });
-
-  if (!sessionConfigured) {
-    try {
-      await configureAudioSessionForPlayback();
-      sessionConfigured = true;
-    } catch {
-      // Continue anyway — playback will likely fail, the timeout will surface.
-    }
-  }
 
   const token = ++loadToken;
 

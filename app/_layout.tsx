@@ -31,6 +31,7 @@ import AuthRedirector from '../src/features/auth/components/AuthRedirector';
 import { AuthProvider } from '../src/features/auth/hooks/useAuth';
 import { setupNotificationHandler } from '../src/lib/push';
 import { initSentry, Sentry } from '../src/lib/sentry';
+import { configureAudioSession } from '../src/lib/audio';
 import '../global.css';
 
 // Initialise Sentry first so any error during the rest of the boot is captured.
@@ -40,6 +41,10 @@ initSentry();
 // Register the foreground notification handler once at module load — idempotent
 // per Expo docs, so calling it here (before any component mounts) is safe.
 setupNotificationHandler();
+
+// Configure the AVAudioSession once at boot to playAndRecord. Never swap at
+// runtime — doing so while AVAudioPlayer instances are alive causes silent M4A.
+configureAudioSession().catch((err) => Sentry.captureException(err));
 
 // Keep native splash visible indefinitely
 SplashScreen.preventAutoHideAsync();

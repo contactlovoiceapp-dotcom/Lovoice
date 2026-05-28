@@ -37,40 +37,28 @@ describe('useVoicePlayer — initial state', () => {
 });
 
 describe('useVoicePlayer — play()', () => {
-  it('calls player.play() and configures the audio session on first call', async () => {
-    const { setAudioModeAsync } = jest.requireMock('expo-audio') as {
-      setAudioModeAsync: jest.Mock;
-    };
-
+  it('calls player.play()', () => {
     const { result } = renderHook(() =>
       useVoicePlayer({ uri: 'file:///document/pending/voice.m4a' }),
     );
 
-    await act(async () => {
-      await result.current.play();
+    act(() => {
+      result.current.play();
     });
 
     expect(mocks.player.play).toHaveBeenCalledTimes(1);
-    // setAudioModeAsync should be called once to configure the playback session.
-    expect(setAudioModeAsync).toHaveBeenCalledTimes(1);
   });
 
-  it('does not reconfigure the session on a second play()', async () => {
-    const { setAudioModeAsync } = jest.requireMock('expo-audio') as {
-      setAudioModeAsync: jest.Mock;
-    };
-
+  it('calls player.play() multiple times without session config', () => {
     const { result } = renderHook(() =>
       useVoicePlayer({ uri: 'file:///document/pending/voice.m4a' }),
     );
 
-    await act(async () => {
-      await result.current.play();
-      await result.current.play();
+    act(() => {
+      result.current.play();
+      result.current.play();
     });
 
-    // Session should only be configured once regardless of how many times play() is called.
-    expect(setAudioModeAsync).toHaveBeenCalledTimes(1);
     expect(mocks.player.play).toHaveBeenCalledTimes(2);
   });
 });
@@ -90,13 +78,13 @@ describe('useVoicePlayer — pause()', () => {
 });
 
 describe('useVoicePlayer — unload()', () => {
-  it('pauses without calling replace (expo-audio 0.5 rejects null sources)', async () => {
+  it('pauses without calling replace (expo-audio 0.5 rejects null sources)', () => {
     const { result } = renderHook(() =>
       useVoicePlayer({ uri: 'file:///document/pending/voice.m4a' }),
     );
 
-    await act(async () => {
-      await result.current.play();
+    act(() => {
+      result.current.play();
     });
 
     mocks.player.replace.mockClear();
@@ -109,27 +97,22 @@ describe('useVoicePlayer — unload()', () => {
     expect(mocks.player.replace).not.toHaveBeenCalled();
   });
 
-  it('resets the session flag so the next play() reconfigures the session', async () => {
-    const { setAudioModeAsync } = jest.requireMock('expo-audio') as {
-      setAudioModeAsync: jest.Mock;
-    };
-
+  it('allows play() after unload() without error', () => {
     const { result } = renderHook(() =>
       useVoicePlayer({ uri: 'file:///document/pending/voice.m4a' }),
     );
 
-    await act(async () => {
-      await result.current.play();
+    act(() => {
+      result.current.play();
     });
     act(() => {
       result.current.unload();
     });
-    await act(async () => {
-      await result.current.play();
+    act(() => {
+      result.current.play();
     });
 
-    // setAudioModeAsync should be called twice: once before each play() after an unload().
-    expect(setAudioModeAsync).toHaveBeenCalledTimes(2);
+    expect(mocks.player.play).toHaveBeenCalledTimes(2);
   });
 });
 
