@@ -17,9 +17,7 @@ jest.mock('@/lib/supabase', () => ({
   getSupabaseClient: jest.fn(),
 }));
 
-jest.mock('@/lib/audio', () => ({
-  configureAudioSession: jest.fn(() => Promise.resolve()),
-}));
+jest.mock('@/lib/audio', () => ({}));
 
 const expoAudioMocks = (global as Record<string, unknown>).__expoAudioMocks as {
   player: {
