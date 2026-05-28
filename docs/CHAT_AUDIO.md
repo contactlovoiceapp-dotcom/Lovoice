@@ -1,68 +1,59 @@
 <!--
-  Reference for the chat voice playback architecture (`src/features/chat/`).
-  Read this BEFORE touching `chatMessagePlayer.ts`, `MessageBubble.tsx`, or the
-  Realtime invalidation pipeline in `app/(main)/messages/[id].tsx`.
+  Reference for the chat voice playback and recording architecture
+  (`src/features/chat/`). Read this BEFORE touching `chatMessagePlayer.ts`,
+  `VoiceRecordingSession.tsx`, `MessageBubble.tsx`, `ConversationComposer.tsx`,
+  or the Realtime invalidation pipeline in `app/(main)/messages/[id].tsx`.
 
-  This subsystem was rewritten on 2026-05-27 after a `EXC_BAD_ACCESS` crash in
-  Hermes (TestFlight 0.8.0). Whoever is reading this is likely debugging
-  something else in the same area — the design choices here are not aesthetic,
-  they are crash-mitigations. Be very careful before reverting any of them.
+  Rewritten on 2026-05-28 after the silent-M4A refactor that replaced the
+  per-feature audio session swap with a single boot-time configuration and
+  the reusable recorder with a session-scoped VoiceRecordingSession component.
 -->
 
-# Chat audio — playback architecture
+# Chat audio — playback & recording architecture
 
 ## 1. Why this exists
 
 The original implementation instantiated **one `useAudioPlayer` per voice
-message bubble** rendered in the conversation FlatList. With 30 voice messages
-visible, 30 native `AVAudioPlayer` instances were alive, each polling status
-every 100 ms over the TurboModule bridge. Combined with FlatList remounts
-caused by an unstable `clientId` during the optimistic→confirmed message
-transition, this produced a torrent of native↔JS traffic that ended up
-corrupting the Hermes heap mid-conversation.
+message bubble** rendered in the conversation FlatList. With ~30 voice messages
+visible, 30 native `AVAudioPlayer` instances polled status every 100 ms over
+the TurboModule bridge. Combined with FlatList remounts caused by an unstable
+`clientId` during the optimistic→confirmed message transition, this produced a
+torrent of native↔JS traffic that corrupted the Hermes heap mid-conversation
+(TestFlight 0.8.0, `EXC_BAD_ACCESS` in `HiddenClass::findProperty`).
 
-Crash signature (kept for future grep):
-
-```
-EXC_BAD_ACCESS (SIGSEGV) at 0x6b636162   # "back" — UAF on a freed object
-HiddenClass::findProperty
-Runtime::drainJobs()
-JSMapIteratorImpl::nextElement
-RCTTurboModule convertNSExceptionToJSError
-```
-
-The rewrite collapses this to **one native player per `ConversationScreen`**.
-All bubbles read from a shared Zustand store; only the active bubble re-renders
-on every status tick.
+The rewrite collapses playback to **one native player per
+`ConversationScreen`** and recording to **one ephemeral recorder per
+recording session**.
 
 ## 2. Component map
 
 | File | Responsibility |
 | --- | --- |
-| `src/features/chat/lib/chatMessagePlayer.ts` | Singleton host player, store, bubble hook, public `pauseAllChatMessages`. **Do not duplicate state here in components.** |
+| `src/features/chat/lib/chatMessagePlayer.ts` | Singleton host player, Zustand store, per-bubble hook, public `pauseAllChatMessages`. **Do not duplicate state here in components.** |
 | `src/components/main/ConversationScreen.tsx` | Mounts the host once via `useChatMessagePlayerHost()`. Owns the only `useAudioPlayer` of the chat feature. |
 | `src/features/chat/components/MessageBubble.tsx` | Per-bubble UI. Calls `useChatMessagePlayer({ messageId: clientId, ... })` — note: `clientId`, not `id`. |
-| `src/features/chat/components/ConversationComposer.tsx` | Calls `pauseAllChatMessages()` before `recorder.start()`. |
-| `src/features/chat/api/messageMutations.ts` | Preserves `clientId` when replacing the optimistic message with the server row. Breaking this re-introduces FlatList remounts. |
+| `src/features/chat/components/VoiceRecordingSession.tsx` | Session-scoped recorder. Mounts fresh for each recording, owns the `useAudioRecorder`, handles permission / prepare / record / stop / file-move. Unmounts on send, cancel, hard-cap, or parent unmount. |
+| `src/features/chat/components/ConversationComposer.tsx` | Manages the recording state machine (`idle` / `recording` / `finalizing` / `cancelling`). Conditionally renders `VoiceRecordingSession` only during an active session. |
+| `src/features/chat/api/messageMutations.ts` | Upload pipeline + optimistic mutation. Preserves `clientId` when replacing the optimistic message with the server row. |
 | `app/(main)/messages/[id].tsx` | Realtime subscriptions + debouncers (`updateDebouncer`, `markReadDebouncer`). |
 | `src/features/chat/hooks/useRealtimeInbox.ts` | Global inbox Realtime listener + `updateDebouncer`. |
 | `src/features/chat/lib/throttle.ts` | `createThrottle` (typing pings) + `createDebouncer` (Realtime UPDATE bursts). |
 
-## 3. State machine
+## 3. State machine — player store
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│  useChatPlayerStore (Zustand, module-scope, singleton)          │
-│  ─────────────────────────────────────────────────────────────  │
-│  activeMessageId    : string | null   ← which bubble owns it    │
-│  activeSource       : string | null   ← url or local file path  │
-│  activeIsLocal      : boolean         ← optimistic message?     │
-│  isPlaying          : boolean                                   │
-│  positionMs         : number          ← mirrored from status    │
-│  durationMs         : number          ← mirrored from status    │
-│  isLoading          : boolean         ← url fetch / source swap │
-│  error              : 'play_timeout' | 'play_failed' | null     │
-└─────────────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────┐
+│  useChatPlayerStore (Zustand, module-scope, singleton)         │
+│  ───────────────────────────────────────────────────────────  │
+│  activeMessageId    : string | null   ← which bubble owns it  │
+│  activeSource       : string | null   ← url or local file path│
+│  activeIsLocal      : boolean         ← optimistic message?   │
+│  isPlaying          : boolean                                 │
+│  positionMs         : number          ← mirrored from status  │
+│  durationMs         : number          ← mirrored from status  │
+│  isLoading          : boolean         ← url fetch / source swp│
+│  error              : 'play_timeout' | 'play_failed' | null   │
+└───────────────────────────────────────────────────────────────┘
 
   Bubble snapshot selector:
     if (store.activeMessageId !== bubble.clientId) return INACTIVE_SNAPSHOT;
@@ -81,7 +72,6 @@ on every status tick.
 | `loadedUrl` | Last URL passed to `replace()`. Skip a redundant `replace()` if unchanged. | Reset on switch bubble, retry, host mount/unmount. |
 | `playConfirmedAt` | Timestamp of the first tick where `status.playing === true && isLoading`. Used to classify a `didJustFinish` as suspicious. | Reset on switch bubble, host mount/unmount. |
 | `retried` | Did we already retry the current bubble with a cache-busted URL? | Reset on switch bubble, host mount/unmount. |
-| `sessionConfigured` | Have we called `configureAudioSessionForPlayback()` yet? Idempotent helper, cached. | Module lifetime (only reset in tests). |
 | `playTimeoutId` | 8 s deadline. If `isLoading` is still true when it fires, surface `play_timeout`. | Cleared whenever playback confirms, errors, or a new attempt starts. |
 | `signedUrlCache: Map<path, entry>` | LRU of signed URLs (max 200 entries, ~60 KB). Entries valid for `SIGNED_URL_LIFETIME_MS` (50 min). | Per-entry invalidation on retry; oldest evicted past the cap; cleared in tests only. |
 
@@ -112,34 +102,10 @@ Inbox  ─tap Sophie─▶  ConversationScreen mounts
                        └─ expo-audio releases native player_S
 ```
 
-**Invariant**: 1 native `AVAudioPlayer` for the chat feature at any moment.
-Source is swapped via `replace()`; the player itself is never recycled
-within a single screen lifetime.
-
-### 4.2 Back-and-forth: Sophie → back → Micheline → back → Emilie
-
-Each conversation visit gets a brand-new native player. Players are created
-and destroyed sequentially, never concurrently.
-
-```
-t=0 Inbox                                          native chat players alive: 0
-t=1 push Sophie → ConvScreen mount → player_S      1
-t=2 play voice 1 → player_S.replace + play         1   (same player)
-t=3 play voice 2 → player_S.replace + play         1   (same player, source swap)
-t=4 back        → ConvScreen unmount → destroyed   0
-t=5 push Mich.  → ConvScreen mount → player_M      1   (fresh native instance)
-t=6 play voice  → player_M.replace + play          1
-t=7 back        → player_M destroyed               0
-t=8 push Emilie → player_E                         1
-```
-
-`signedUrlCache` persists across navigations: returning to Sophie 5 min later
-and replaying voice 1 skips the `createSignedUrl` round-trip.
-
-### 4.3 Nested conversations (push notification deep-link)
+### 4.2 Nested conversations (push-notification deep-link)
 
 User is in conversation A. Push notification for B arrives. They tap it.
-`router.push('/messages/B')` stacks the B screen on top of A — **both
+`router.push('/messages/B')` stacks B on top of A — **both
 ConversationScreens are mounted simultaneously**.
 
 ```
@@ -154,7 +120,6 @@ ConversationScreens are mounted simultaneously**.
        │
    [A, B]                  active=null
        ├─ user plays a voice in B
-       │
    [A, B]                  active=msg-B1, isPlaying=true (on player_B)
        ├─ user taps back, screen B unmounts
        │
@@ -164,38 +129,44 @@ ConversationScreens are mounted simultaneously**.
        │    3. reset store, clear timeouts
        │
    [A]                     active=null
-                            player_A is paused (was paused on B's mount).
-                            User can resume by tapping play on a bubble in A.
+                            player_A is paused. User can resume by tapping play.
 ```
 
 Two guards make this safe:
 
 1. **Status mirror and `didJustFinish` effects check `getActiveHost() === player`**.
-   The dormant host A still polls its own status (`useAudioPlayer` keeps
-   running while mounted), but its effects refuse to write into the shared
-   store unless it is the active top. Without this, A's idle ticks would
-   clobber B's active state.
+   The dormant host A still polls its own status, but its effects refuse to
+   write into the shared store unless it is the active top.
 2. **Mounting on top resets the store**. The incoming host starts from
    `INITIAL_STORE_STATE` so there is no stale `activeMessageId` from A
    leaking into B's bubble selectors.
 
-### 4.4 Recording
+### 4.3 Recording session lifecycle
 
 ```
 user taps mic in composer
-    ├─ pauseAllChatMessages()         ← public API, pauses store + native
-    ├─ configureAudioSessionForRecording()  ← session category swap
-    ├─ recorder.prepareToRecordAsync(); recorder.record()
+    ├─ ConversationComposer sets recordingState='recording'
+    ├─ VoiceRecordingSession mounts (fresh useAudioRecorder)
+    │   ├─ pauseAllChatMessages()
+    │   ├─ pauseFeedPlayer()
+    │   ├─ pauseProfileVoicePlayer()
+    │   ├─ requestRecordingPermissionsAsync()
+    │   ├─ recorder.prepareToRecordAsync()
+    │   ├─ recorder.record()
+    │   └─ onReady callback → composer shows waveform
     │
-user releases mic
-    ├─ recorder.stop()
-    ├─ move file to documentDirectory/pending/<uuid>.m4a
-    ├─ configureAudioSessionForPlayback()   ← swap back
-    ├─ mutation.mutate({uri, durationMs})   ← optimistic insert + upload
+user releases mic (or hard cap reached)
+    ├─ ConversationComposer sets mode='finalizing'
+    ├─ VoiceRecordingSession:
+    │   ├─ recorder.stop()
+    │   ├─ move file to documentDirectory/pending/<uuid>.m4a
+    │   ├─ onFinalized({ uri, durationMs })
+    │   └─ unmounts
+    ├─ mutation.mutate({uri, durationMs}) → optimistic insert + upload
     │
-optimistic message renders with `clientId = uuid`
+optimistic message renders with clientId = uuid
     └─ MessageBubble plays from the local file URI (no signed URL needed)
-       — `isLocalFile = true` in startPlayback args
+       — isLocalFile = true in startPlayback args
 ```
 
 When the server confirms, `replaceMessage` in `messageMutations.ts` swaps
@@ -240,9 +211,8 @@ INSERT received in conv:<id>
          invalidate conversation + inbox
 ```
 
-The "skip on own INSERT" branch is what prevents the FlatList from
-remounting our just-sent voice bubble (which would release and recreate
-its row in the singleton player's state machine).
+The "skip on own INSERT" branch prevents the FlatList from remounting our
+just-sent voice bubble.
 
 ### Why every debouncer matters
 
@@ -250,28 +220,32 @@ its row in the singleton player's state machine).
   to 1 refetch.
 - `updateDebouncer` (inbox): same, at the global level.
 - `markReadDebouncer`: N incoming INSERTs in a burst collapse to 1 SQL
-  UPDATE that marks them all read at once. The SQL is idempotent, but
-  each redundant call cost an HTTP round-trip **plus** triggered an
-  UPDATE Realtime event that re-entered the pipeline — the very kind
-  of self-amplifying loop that we are trying to kill.
-
-React Query also deduplicates concurrent refetches of the same query, so
-even if both the per-conv channel and the global inbox channel fire
-`invalidate(inbox)` simultaneously, only one network fetch hits.
+  UPDATE that marks them all read at once.
 
 ## 7. Error surfaces & retry policy
+
+### Playback errors
 
 | Condition | What the user sees | How the store reflects it |
 | --- | --- | --- |
 | Signed URL fetch fails | Red `AlertCircle` on the bubble + tap-to-retry | `{ activeMessageId stays, isLoading: false, error: 'play_failed' }` |
 | `player.replace()` throws | Same | Same |
 | Native player never starts within 8 s | Same with `error: 'play_timeout'` | `activeMessageId stays`, full position/duration reset |
-| `didJustFinish` < 400 ms after confirmed playback | First occurrence: silent retry with cache-busted URL. Second occurrence: red icon with `error: 'play_failed'` | `retried = true` after the first; reset on switch bubble |
+| `didJustFinish` < 400 ms after confirmed playback | First occurrence: silent retry with cache-busted URL. Second: red icon with `error: 'play_failed'` | `retried = true` after the first |
 | Natural end of track | UI returns to idle | Store fully reset to `INITIAL_STORE_STATE` |
 
-The "suspicious finish < 400 ms" branch defends against expired signed
-URLs that return HTTP 200 with an empty/short body — expo-audio plays
-"nothing" successfully then immediately reports completion.
+### Recording errors
+
+| Error code | Trigger | Handling |
+| --- | --- | --- |
+| `permission_denied` | Microphone permission not granted | Composer shows alert, session unmounts |
+| `prepare_failed` | `recorder.prepareToRecordAsync()` throws | `Sentry.captureException`, composer shows error, session unmounts |
+| `record_failed` | `recorder.record()` throws | Same |
+| `stop_failed` | `recorder.stop()` throws or file move fails | Same |
+| `no_uri` | `recorder.uri` is `null` after stop | Breadcrumb logged, composer shows error |
+
+All recording errors are instrumented with Sentry breadcrumbs (category
+`recording`) so failures are diagnosable from production without device access.
 
 ## 8. Memory & scale bounds
 
@@ -282,11 +256,12 @@ URLs that return HTTP 200 with an empty/short body — expo-audio plays
 | `signedUrlCache` | LRU cap `SIGNED_URL_CACHE_MAX_ENTRIES = 200` | ~60 KB ceiling regardless of session length |
 | Bubble subscriptions | 1 per visible voice bubble (FlatList virtualization) | Inactive bubbles return the stable `INACTIVE_SNAPSHOT` reference → `useShallow` skips re-render |
 | Native chat players alive | 1 (or 2 in the nested case for a brief moment) | One per mounted `ConversationScreen` |
+| Native recorders alive | 0 when idle, 1 during a recording session | `VoiceRecordingSession` mounts/unmounts per session; no persistent recorder |
 
 ## 9. Known invariants — break at your peril
 
-1. **One `useChatMessagePlayerHost()` per `ConversationScreen`, mounted at
-   the top of the screen** (not inside FlatList rendering, not inside a
+1. **One `useChatMessagePlayerHost()` per `ConversationScreen`**, mounted at
+   the top of the screen (not inside FlatList rendering, not inside a
    bubble, not conditionally).
 2. **`MessageBubble` passes `clientId` (not `id`) as the `messageId` arg**
    to `useChatMessagePlayer`.
@@ -295,81 +270,49 @@ URLs that return HTTP 200 with an empty/short body — expo-audio plays
 4. **No new `useAudioPlayer` call inside `MessageBubble`** or any per-row
    chat component. The host owns the only one.
 5. **All Realtime UPDATE handlers in chat must debounce.** INSERTs may be
-   immediate; UPDATEs must not. New event types should consider whether
-   they are bursty.
-6. **The status mirror and `didJustFinish` effects in `useChatMessagePlayerHost`
-   must early-return when `getActiveHost() !== player`.** Otherwise dormant
-   nested hosts will write into the shared store.
+   immediate; UPDATEs must not.
+6. **The status mirror and `didJustFinish` effects in
+   `useChatMessagePlayerHost` must early-return when
+   `getActiveHost() !== player`.** Otherwise dormant nested hosts will
+   write into the shared store.
 7. **`safeNativeCall(() => host.something())`** for any native call that
-   could race with expo-audio's internal recycling. expo-audio throws
-   `NativeSharedObjectNotFoundException` on transient race windows; these
-   are recoverable and must be swallowed.
+   could race with expo-audio's internal recycling.
 8. **Recorder polling must be gated.** Use `useAudioRecorderStateGated`
    (in `src/lib/audio.ts`) with `enabled` driven by recording state, not
-   the raw `useAudioRecorderState` from expo-audio. The latter polls at
-   the fixed interval forever and the interval arg cannot be changed
-   after mount — it would burn ~20 Hz of TurboModule traffic per mounted
-   conversation, even when nobody is recording.
-9. **Recorder cleanup must guard the `configureAudioSessionForPlayback`
-   call.** Only call it on unmount if recording was actually started at
-   least once during the hook's lifetime (`recordingSessionTouchedRef`).
-   Otherwise every navigation between conversations fires a redundant
-   `setAudioModeAsync` which races with iOS audio reactivation.
+   the raw `useAudioRecorderState` from expo-audio.
+9. **The AVAudioSession is configured once at app boot** to `playAndRecord`
+   in `app/_layout.tsx`. **Never swap it at runtime.** Adding a per-feature
+   `setAudioModeAsync` call regresses to the silent-M4A bug (swapping the
+   category while `AVAudioPlayer` instances are alive starves the AAC
+   encoder on the recorder).
+10. **The recorder lives inside `VoiceRecordingSession`**, which mounts only
+    for the duration of one recording. **Do not mount the recorder hook at
+    any higher scope.** Reusing the same `AVAudioRecorder` instance across
+    multiple recordings produces silent files on iOS
+    (expo/expo#41656, #36193).
 
-## 9bis. Native bridge pressure budget at notif-tap time
+## 10. Things this architecture deliberately does NOT do
 
-The chat audio crash family (`convertNSExceptionToJSError` × Hermes
-runtime race documented in §1 of the original rewrite) reproduces most
-reliably when:
+- **No `useAudioPlayer` inside the bubble.** Reverting to per-bubble players
+  re-introduces the crash.
+- **No `id`-based React keys for messages.** Always `clientId`.
+- **No undebounced Realtime UPDATE handlers** anywhere in the chat path.
+- **No multi-track playback in chat.** The product is one voice at a time;
+  the architecture enforces this by design (single store, single host).
+- **No session category swap.** The `AVAudioSession` stays at `playAndRecord`
+  for the entire app lifetime. No per-feature `setAudioModeAsync`.
+- **No reuse of a single recorder instance** across multiple recordings.
+  Each tap-to-record mounts a fresh `VoiceRecordingSession`.
 
-- the user has exchanged several messages (heap growth → longer GC pauses
-  → wider race window),
-- a push notification arrives, and
-- the user taps it from foreground or background.
-
-The tap triggers a synchronous burst of native module work in the same
-JS tick as iOS is reactivating AVAudioSession, replaying queued Realtime
-events, and animating the foreground transition. Any TurboModule that
-throws an NSException during this window can corrupt the Hermes runtime
-through the cross-thread error conversion path.
-
-Mitigations in the codebase:
-
-- `usePushDeepLink` defers `router.push` through
-  `InteractionManager.runAfterInteractions`, letting iOS settle the
-  foreground transition before React starts mounting the conversation
-  screen and its native audio resources.
-- `useAppIconBadge` debounces `setBadgeCountAsync` over a 300 ms window
-  so a burst of message exchanges collapses into a single native call
-  instead of 3–5 in flight at once.
-- `useChatVoiceRecorder` / `useVoiceRecorder` use the gated polling hook
-  (see invariant 8) so idle conversations stop hammering the bridge.
-- The chat `useChatVoiceRecorder` / `useVoiceRecorder` cleanups only call
-  `configureAudioSessionForPlayback` if recording was actually engaged
-  (see invariant 9).
-
-Do not add new synchronous native calls in the notification-tap or
-conversation-mount paths without considering this budget.
-
-## 10. Test map
+## 11. Test map
 
 | File | Covers |
 | --- | --- |
 | `src/features/chat/lib/__tests__/chatMessagePlayer.test.ts` | `generateBarHeights`, single-instance contract, switching bubbles, local file source, `pauseAllChatMessages`, nested-host scenario |
+| `src/features/chat/components/__tests__/VoiceRecordingSession.test.tsx` | Permission flow, prepare/record lifecycle, cancel, finalize, `no_uri` error path |
 | `src/features/chat/api/__tests__/messageMutations.test.ts` | `clientId` preservation on optimistic→confirmed |
 | `src/features/chat/lib/__tests__/throttle.test.ts` | `createThrottle` + `createDebouncer` |
 | `src/lib/__tests__/feedPlayer.test.tsx` | Sibling single-instance player (independent feature) — reference for a similar pattern |
-
-## 11. Things this architecture deliberately does NOT do
-
-- **No `useAudioPlayer` inside the bubble**. Reverting to per-bubble players
-  re-introduces the crash.
-- **No `id`-based React keys for messages**. Always `clientId`.
-- **No undebounced Realtime UPDATE handlers** anywhere in the chat path.
-- **No multi-track playback in chat**. The product is one voice at a time;
-  the architecture enforces this by design (single store, single host).
-- **No global pause-on-route-change** outside the host's own cleanup. The
-  host's unmount handles it; do not add app-level audio managers.
 
 ## 12. If you are debugging a chat audio bug…
 
@@ -389,10 +332,14 @@ Walk through this checklist in order:
    the bridge pressure that motivated the original rewrite.
 7. If memory grows over a long session: log `signedUrlCache.size`; it must
    never exceed `SIGNED_URL_CACHE_MAX_ENTRIES`.
-8. If the iOS `EXC_BAD_ACCESS` / Hermes race crash reappears after a
+8. If recordings are silent on iOS: check that `app/_layout.tsx` still calls
+   `configureAudioSession()` once at module load with `allowsRecording: true`.
+   Check that no other file calls `setAudioModeAsync`. Check that
+   `VoiceRecordingSession` is the only consumer of `useAudioRecorder` and
+   that the component unmounts between recordings (no instance reuse).
+9. If the iOS `EXC_BAD_ACCESS` / Hermes race crash reappears after a
    notification tap: check that `usePushDeepLink` still wraps `router.push`
    in `InteractionManager.runAfterInteractions`, that the recorders still
    use `useAudioRecorderStateGated`, and that `useAppIconBadge` still
-   debounces. Then enable Sentry (`EXPO_PUBLIC_SENTRY_DSN`) and read the
-   JS stack of the next event to identify the actual throwing
-   TurboModule (the iOS crashlog stacks do not preserve that information).
+   debounces. Then enable Sentry and read the breadcrumb trail for the
+   `recording.*` and `upload.*` categories to identify the failing step.
