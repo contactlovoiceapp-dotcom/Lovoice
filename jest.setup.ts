@@ -144,6 +144,7 @@ jest.mock('expo-audio', () => ({
 const mockFile = {
   uri: 'file:///document/pending/mock-uuid.m4a',
   exists: true,
+  size: 8000,
   copy: jest.fn(),
   move: jest.fn(),
   delete: jest.fn(),

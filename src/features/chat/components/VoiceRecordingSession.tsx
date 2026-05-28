@@ -14,6 +14,7 @@ import {
   MAX_VOICE_DURATION_MS,
   METERING_INTERVAL_MS,
   useAudioRecorderStateGated,
+  estimateBitrateOk,
 } from '@/lib/audio';
 import { Sentry } from '@/lib/sentry';
 import { pauseAllChatMessages } from '../lib/chatMessagePlayer';
@@ -89,30 +90,32 @@ export default function VoiceRecordingSession({
     let cancelled = false;
 
     async function boot() {
-      Sentry.addBreadcrumb({ category: 'recording', message: 'recording.session_mounted', level: 'info' });
+      console.warn('[REC] session_mounted');
 
       pauseAllChatMessages();
       pauseFeedPlayer();
       pauseProfileVoicePlayer();
-      Sentry.addBreadcrumb({ category: 'recording', message: 'recording.players_paused', level: 'info' });
+      console.warn('[REC] players_paused');
 
       const { granted } = await requestRecordingPermissionsAsync();
       if (cancelled) return;
       if (!granted) {
+        console.warn('[REC] permission_denied');
         onErrorRef.current('permission_denied');
         return;
       }
-      Sentry.addBreadcrumb({ category: 'recording', message: 'recording.permission_granted', level: 'info' });
+      console.warn('[REC] permission_granted');
 
       try {
         await recorder.prepareToRecordAsync();
       } catch (err) {
         if (cancelled) return;
+        console.warn('[REC] prepare THREW', err);
         Sentry.captureException(err, { extra: { step: 'prepare' } });
         onErrorRef.current('prepare_failed');
         return;
       }
-      Sentry.addBreadcrumb({ category: 'recording', message: 'recording.prepare_done', level: 'info' });
+      console.warn('[REC] prepare_done');
 
       if (cancelled) return;
 
@@ -120,12 +123,13 @@ export default function VoiceRecordingSession({
         recorder.record();
       } catch (err) {
         if (cancelled) return;
+        console.warn('[REC] record THREW', err);
         Sentry.captureException(err, { extra: { step: 'record' } });
         onErrorRef.current('record_failed');
         return;
       }
 
-      Sentry.addBreadcrumb({ category: 'recording', message: 'recording.record_started', level: 'info' });
+      console.warn('[REC] record_started');
       didStartRef.current = true;
       hardCapFiredRef.current = false;
       meteringRef.current = [];
@@ -200,23 +204,25 @@ export default function VoiceRecordingSession({
 
   async function doFinalize(requestedBy: 'send' | 'cap') {
     Sentry.addBreadcrumb({ category: 'recording', message: 'recording.stop_called', level: 'info', data: { requestedBy } });
+    console.warn('[REC] stop_called', { requestedBy });
 
     try {
       await recorder.stop();
     } catch (err) {
+      console.warn('[REC] stop THREW', err);
       Sentry.captureException(err, { extra: { step: 'stop', requestedBy } });
       onErrorRef.current('stop_failed');
       return;
     }
 
     const tempUri = recorder.uri;
+    console.warn('[REC] after stop', { tempUri, isRecording: recorder.isRecording });
     if (!tempUri) {
+      console.warn('[REC] NO URI after stop');
       Sentry.addBreadcrumb({ category: 'recording', message: 'recording.no_uri', level: 'warning' });
       onErrorRef.current('no_uri');
       return;
     }
-
-    Sentry.addBreadcrumb({ category: 'recording', message: 'recording.uri_resolved', level: 'info', data: { srcUri: tempUri } });
 
     try {
       const pendingDir = ensurePendingDirectory();
@@ -226,12 +232,19 @@ export default function VoiceRecordingSession({
       srcFile.move(destFile);
 
       const durationMs = Math.min(recorderState.durationMillis, MAX_VOICE_DURATION_MS);
+      const fileSize = destFile.size ?? 0;
+      const bitrateOk = estimateBitrateOk(fileSize, durationMs);
 
-      Sentry.addBreadcrumb({ category: 'recording', message: 'recording.file_moved', level: 'info', data: { durationMs } });
-      Sentry.addBreadcrumb({ category: 'recording', message: 'recording.finalized', level: 'info', data: { durationMs } });
+      console.warn('[REC] finalized', { durationMs, fileSize, bitrateOk, destUri: destFile.uri });
+
+      Sentry.captureMessage('recording.finalized', {
+        level: bitrateOk ? 'info' : 'warning',
+        extra: { durationMs, fileSize, bitrateOk, requestedBy, destUri: destFile.uri },
+      });
 
       onFinalizedRef.current({ uri: destFile.uri, durationMs });
     } catch (err) {
+      console.warn('[REC] file_move THREW', err);
       Sentry.captureException(err, { extra: { step: 'file_move' } });
       onErrorRef.current('stop_failed');
     }

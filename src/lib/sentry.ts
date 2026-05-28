@@ -37,7 +37,7 @@ export function initSentry(): void {
     // Dev builds: keep events local-only (Sentry SDK already disables uploads in dev,
     // but we mirror that to avoid surprises if the dev flag changes.)
     debug: false,
-    enabled: !__DEV__,
+    enabled: true,
   });
 
   initialized = true;

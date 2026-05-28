@@ -13,6 +13,7 @@ jest.mock('@/lib/sentry', () => ({
   Sentry: {
     addBreadcrumb: jest.fn(),
     captureException: jest.fn(),
+    captureMessage: jest.fn(),
   },
 }));
 
