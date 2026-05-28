@@ -1112,21 +1112,28 @@ export default function ProfileScreen({ isOnboarding = false, onOnboardingComple
 }
 
 function AppVersion() {
-  const version = Constants.expoConfig?.version ?? '—';
-  const build = Constants.platform?.android?.versionCode
-    ?? (Constants.platform?.ios as { buildNumber?: string } | undefined)?.buildNumber
+  // Constants.expoConfig is available in both development and production EAS builds.
+  // Constants.platform is unreliable for native build numbers in production —
+  // use the manifest nativeAppVersion / nativeBuildVersion fields instead.
+  const version = Constants.expoConfig?.version
+    ?? (Constants.manifest as { version?: string } | null)?.version
     ?? null;
-  const label = build != null ? `v${version} (${build})` : `v${version}`;
+
+  const buildVersion = (Constants as unknown as { nativeBuildVersion?: string | number }).nativeBuildVersion
+    ?? null;
+
+  if (!version) return null;
+
+  const label = buildVersion != null ? `v${version} (${buildVersion})` : `v${version}`;
 
   return (
     <Text
       style={{
         marginTop: 20,
         textAlign: 'center',
-        fontSize: 11,
+        fontSize: 12,
         fontFamily: FONT.regular,
-        color: COLORS.textTertiary,
-        opacity: 0.6,
+        color: COLORS.textSecondary,
       }}
     >
       {label}
