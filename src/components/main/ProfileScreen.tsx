@@ -1066,6 +1066,8 @@ export default function ProfileScreen({ isOnboarding = false, onOnboardingComple
               </Text>
             ) : null}
 
+            <AppVersion />
+
             {/* Save CTA */}
             <Pressable
               accessibilityRole="button"
@@ -1103,7 +1105,6 @@ export default function ProfileScreen({ isOnboarding = false, onOnboardingComple
                 </View>
               </LinearGradient>
             </Pressable>
-            <AppVersion />
           </ScrollView>
         </KeyboardAvoidingView>
       </LinearGradient>
