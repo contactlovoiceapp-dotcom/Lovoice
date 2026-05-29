@@ -105,8 +105,12 @@ Inbox  ─tap Sophie─▶  ConversationScreen mounts
 ### 4.2 Nested conversations (push-notification deep-link)
 
 User is in conversation A. Push notification for B arrives. They tap it.
-`router.push('/messages/B')` stacks B on top of A — **both
-ConversationScreens are mounted simultaneously**.
+`openConversation(B)` runs `router.navigate(inbox)` then `router.push(B)`
+(see `src/navigation/messagesNavigation.ts`), so A normally unmounts as the inbox
+pops before B mounts — the steady state is **one** ConversationScreen, not a deep
+stack. The `hostPlayerStack` below still tolerates a **brief transient** where both
+hosts overlap during the navigation commit; that is the case it guards, not a durable
+nesting.
 
 ```
    hostPlayerStack         store
@@ -370,6 +374,17 @@ Walk through this checklist in order:
     `useRealtimeInbox` and the conversation Realtime effect.
 
 ## 13. Known crash — foreground resume Hermes corruption (TestFlight 0.8.2)
+
+> **Update (0.9.1, 2026-05-29).** The resume guard below fixed the *foreground-resume*
+> variant. A **second variant survives**: the same fatal Hermes corruption fires on
+> **push-notification taps** (~1 in 3), and it is **audio-independent** — the 0.8.1 (32)
+> crashlog, taken *before* the expo-audio patch, has a byte-identical fatal stack with
+> no audio frames. The shared mechanism is an off-JS-thread `convertNSExceptionToJSError`
+> (a `void` TurboModule throwing an `NSException` on a background queue) racing the JS
+> thread's `drainMicrotasks`. The full analysis, the device test to identify the throwing
+> module, and the staged fix plan live in **`docs/REALTIME_STABILITY.md`** — read it before
+> touching the chat Realtime / invalidation pipeline. Do not attribute this crash to the
+> audio session.
 
 **Sentry event**: `44ef6ab8a4f24358a565592834c64072`, release `0.8.2 (33)`,
 2026-05-28 11:24 UTC.
