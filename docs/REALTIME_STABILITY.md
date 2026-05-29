@@ -200,12 +200,18 @@ from ~4× to 1×.
 
 ### Step 2 — Centralize the conversation Realtime channel (Option B). Medium risk.
 
-Decouple the `conv:<id>` channel lifecycle from `[id].tsx` mount/unmount. A
-session-scoped service owns at most one conversation channel and switches via
-`setActiveConversationId(id)`. Removes the re-subscribe churn on every navigation and
-makes the handlers unit-testable. See `docs/ARCHITECTURE.md` §5 and the original
-Option B write-up. Do **not** bundle the navigation `replace`/stack-reset changes that
-caused the recording regression — only the safe "no-op if already on this conv" guard.
+- **[DONE — Step 2] Session-scoped conversation channel.** The `conv:<id>` channel
+  lifecycle moved out of `[id].tsx` into `src/features/chat/lib/conversationRealtimeService.ts`,
+  a module-scoped singleton that owns at most one conversation channel.
+  `setActiveConversationId(id)` is idempotent: re-selecting the active conversation is a
+  no-op, so a screen remount during a navigation transition does NOT re-subscribe — the
+  churn guard. The service keeps the INSERT/UPDATE handlers, the typing/recording
+  broadcasts, the debouncers, and defers via `useResumeGuard`. React deps are wired in by
+  `useConversationRealtimeHost` (mounted once in `app/(main)/_layout.tsx`, beside
+  `useRealtimeInbox`); the screen binds via `useActiveConversation(id)` (focus → set
+  active; reads typing/recording from the service's Zustand store). No navigation
+  `replace`/stack-reset changes were introduced — only the safe "no-op if already on this
+  conv" guard. See `docs/ARCHITECTURE.md` §5.
 
 ### Step 3 — Fix ingredient (b) per the §4 finding. Risk depends on the module.
 
@@ -246,6 +252,23 @@ caused the recording regression — only the safe "no-op if already on this conv
   `handleCountdownExpired` (client timer). Expected effect: per-conversation-open query
   count drops from ~4x toward ~1x. 452/452 tests pass. _Sentry breadcrumb confirmation
   of the 4x→1x drop still pending on the next build._
+- **2026-05-29 — Step 2 shipped (Option B: session-scoped conversation channel):**
+  the `conv:<id>` channel lifecycle was extracted from `app/(main)/messages/[id].tsx`
+  into `src/features/chat/lib/conversationRealtimeService.ts` (module-scoped singleton +
+  Zustand store), wired by `src/features/chat/hooks/useConversationRealtimeHost.ts`
+  (mounted in `app/(main)/_layout.tsx`) and consumed by
+  `src/features/chat/hooks/useActiveConversation.ts`. `setActiveConversationId(id)` is
+  idempotent — re-selecting the active conversation is a no-op — so the repeated
+  `[RealtimeConv] conv:X subscribed` churn on notification taps is gone: a screen
+  remount no longer tears down + rebuilds the channel; the channel is only switched when
+  another conversation becomes active or on logout. INSERT/UPDATE handlers, typing/
+  recording broadcasts, debouncers, and the resume-guard defer all moved with it.
+  **No navigation change** (no `router.replace`/stack reset/`dismissAll`) — only the
+  "no-op if already active" guard. New unit tests mock the Supabase client and assert the
+  churn guard, switch/teardown, the INSERT fan-out (own no-op; incoming → messages +
+  conversation, never inbox; debounced mark-read), broadcast→store, and the emit helpers.
+  464/464 tests pass. _Device regression gate (record → immediate playback) and Sentry
+  confirmation of the gone churn still pending on the next build._
 - **Release validation (TestFlight + Sentry):** _TBD — must confirm no
   `convertNSExceptionToJSError` / `HadesGC` crash over several days (the prod fault is a
   race; dev no-repro is necessary but not sufficient)._
@@ -339,7 +362,11 @@ document why it is RN-internal). Run npm test. Propose a Conventional Commits me
 
 | File | Role |
 | --- | --- |
-| `app/(main)/messages/[id].tsx` | `conv:<id>` Realtime effect, INSERT/UPDATE handlers, double inbox invalidation |
+| `app/(main)/messages/[id].tsx` | Conversation route: queries + mutations; binds to the channel via `useActiveConversation` (no inline channel since Step 2) |
+| `src/features/chat/lib/conversationRealtimeService.ts` | Session-scoped owner of the `conv:<id>` channel; INSERT/UPDATE handlers, broadcasts, debouncers, `setActiveConversationId` churn guard (Step 2) |
+| `src/features/chat/hooks/useConversationRealtimeHost.ts` | Wires React deps into the service; mounted once in `(main)/_layout.tsx` (Step 2) |
+| `src/features/chat/hooks/useActiveConversation.ts` | Screen binding: focus → `setActiveConversationId`, reads typing/recording from the store (Step 2) |
+| `src/features/chat/lib/conversationInvalidations.ts` | Pure INSERT fan-out policy `handleConversationInsert` (Step 1b) |
 | `src/features/chat/hooks/useRealtimeInbox.ts` | Global inbox channel |
 | `src/features/chat/hooks/useResumeGuard.ts` | Defers INSERT invalidations on foreground resume (fixed the resume variant, not the tap-notif variant) |
 | `src/features/chat/api/conversationQueries.ts` | `useConversationDetails` (3 round-trips/refetch), `useConversations` (inbox), `chatQueryKeys` |
