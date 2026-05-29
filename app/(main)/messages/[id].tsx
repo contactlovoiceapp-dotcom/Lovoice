@@ -1,4 +1,9 @@
-/* Conversation route — wires Realtime subscriptions, queries, and mutations into ConversationScreen. */
+/* Conversation route — wires Realtime subscriptions, queries, and mutations into
+   ConversationScreen. The Realtime effect includes a foreground-resume guard (via
+   useResumeGuard) that defers INSERT invalidations until iOS has finished its
+   keyboard/navigation transition. Without it, Supabase Realtime's reconnection
+   burst + native UI transitions flood the bridge and corrupt the Hermes heap
+   (EXC_BAD_ACCESS / GCScope::_newChunkAndPHV — see docs/CHAT_AUDIO.md §13). */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BackHandler, KeyboardAvoidingView, Platform, View } from 'react-native';
@@ -23,6 +28,7 @@ import {
 import type { ChatMessage } from '../../../src/features/chat/types';
 import { getSupabaseClient } from '../../../src/lib/supabase';
 import { createDebouncer, createThrottle } from '../../../src/features/chat/lib/throttle';
+import { useResumeGuard } from '../../../src/features/chat/hooks/useResumeGuard';
 import ConversationScreen from '../../../src/components/main/ConversationScreen';
 import { closeConversation } from '../../../src/navigation/messagesNavigation';
 
@@ -96,6 +102,12 @@ export default function ConversationRoute() {
   const markReadRef = useRef(markRead);
   markReadRef.current = markRead;
 
+  // Defers INSERT invalidations during the foreground resume window to avoid
+  // flooding the bridge while iOS settles its keyboard/nav transition.
+  const { runAfterResume } = useResumeGuard();
+  const runAfterResumeRef = useRef(runAfterResume);
+  runAfterResumeRef.current = runAfterResume;
+
   useFocusEffect(
     useCallback(() => {
       markRead();
@@ -107,6 +119,18 @@ export default function ConversationRoute() {
   useEffect(() => {
     const supabase = getSupabaseClient();
     if (!supabase || !session || !id) return;
+
+    // Guard against concurrent-mode reconnect: React's
+    // recursivelyTraverseReconnectPassiveEffects can re-run the setup function
+    // without calling cleanup first. Removing a stale channel here prevents
+    // "cannot add 'postgres_changes' callbacks after subscribe()" errors that
+    // are the second symptom of the foreground-resume crash.
+    if (channelRef.current) {
+      const staleChannel = channelRef.current;
+      channelRef.current = null;
+      channelReadyRef.current = false;
+      void supabase.removeChannel(staleChannel);
+    }
 
     // Debounce UPDATE invalidations (read receipt bursts) into a single refetch.
     // INSERTs are not debounced — new messages must surface immediately.
@@ -138,12 +162,17 @@ export default function ConversationRoute() {
           const newRow = payload?.new as { sender_id?: string } | undefined;
           const isOwnMessage = newRow?.sender_id === currentUserId;
 
-          if (!isOwnMessage) {
-            void queryClient.invalidateQueries({ queryKey: chatQueryKeys.messages(id) });
-            markReadDebouncer.schedule();
-          }
-          void queryClient.invalidateQueries({ queryKey: chatQueryKeys.conversation(id) });
-          void queryClient.invalidateQueries({ queryKey: chatQueryKeys.inbox });
+          // Defer all invalidations during the foreground-resume window so the
+          // Realtime reconnection burst does not overlap with iOS keyboard/nav
+          // transitions. Outside the window this runs synchronously (no latency).
+          runAfterResumeRef.current(() => {
+            if (!isOwnMessage) {
+              void queryClient.invalidateQueries({ queryKey: chatQueryKeys.messages(id) });
+              markReadDebouncer.schedule();
+            }
+            void queryClient.invalidateQueries({ queryKey: chatQueryKeys.conversation(id) });
+            void queryClient.invalidateQueries({ queryKey: chatQueryKeys.inbox });
+          });
         },
       )
       .on(
@@ -198,6 +227,10 @@ export default function ConversationRoute() {
     channelRef.current = channel;
 
     return () => {
+      // Null the ref first so any racing Realtime callbacks that check
+      // channelRef.current / channelReadyRef.current become no-ops immediately.
+      channelRef.current = null;
+
       if (channelReadyRef.current) {
         void channel.send({
           type: 'broadcast',
@@ -212,7 +245,6 @@ export default function ConversationRoute() {
       }
       channelReadyRef.current = false;
       void supabase.removeChannel(channel);
-      channelRef.current = null;
 
       updateDebouncer.cancel();
       markReadDebouncer.cancel();

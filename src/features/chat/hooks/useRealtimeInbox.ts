@@ -5,9 +5,14 @@
 
    UPDATE events (read receipts mostly) are debounced into a single invalidation
    to avoid storms of React Query notifications when both participants are
-   exchanging messages — the original implementation invalidated the inbox on
-   every single read_at update, which contributed to the bridge pressure that
-   triggered the Hermes corruption crash. */
+   exchanging messages.
+
+   INSERT events are deferred via useResumeGuard during the foreground resume
+   window (~500 ms after background → active). On resume, Supabase Realtime
+   replays queued INSERT callbacks while iOS is still running keyboard and
+   navigation transitions; calling queryClient.invalidateQueries immediately
+   would add to the bridge load and risk the GCScope::_newChunkAndPHV Hermes
+   corruption (see docs/CHAT_AUDIO.md §13). */
 
 import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -17,6 +22,7 @@ import { getSupabaseClient } from '@/lib/supabase';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { chatQueryKeys } from '../api/conversationQueries';
 import { createDebouncer } from '../lib/throttle';
+import { useResumeGuard } from './useResumeGuard';
 
 const INBOX_UPDATE_DEBOUNCE_MS = 500;
 
@@ -25,9 +31,26 @@ export function useRealtimeInbox(): void {
   const queryClient = useQueryClient();
   const channelRef = useRef<RealtimeChannel | null>(null);
 
+  const { runAfterResume } = useResumeGuard();
+
+  // Stable ref so the effect closure captures the latest runAfterResume without
+  // needing it as a dependency (avoids unnecessary channel re-subscriptions).
+  const runAfterResumeRef = useRef(runAfterResume);
+  runAfterResumeRef.current = runAfterResume;
+
   useEffect(() => {
     const supabase = getSupabaseClient();
     if (!supabase || !session) return;
+
+    // Guard against concurrent-mode reconnect: React's
+    // recursivelyTraverseReconnectPassiveEffects can re-run the setup function
+    // without calling cleanup first. Removing a stale channel here prevents
+    // "cannot add 'postgres_changes' callbacks after subscribe()" errors.
+    if (channelRef.current) {
+      const staleChannel = channelRef.current;
+      channelRef.current = null;
+      void supabase.removeChannel(staleChannel);
+    }
 
     const updateDebouncer = createDebouncer(() => {
       void queryClient.invalidateQueries({ queryKey: chatQueryKeys.inbox });
@@ -39,7 +62,9 @@ export function useRealtimeInbox(): void {
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'messages' },
         () => {
-          void queryClient.invalidateQueries({ queryKey: chatQueryKeys.inbox });
+          runAfterResumeRef.current(() => {
+            void queryClient.invalidateQueries({ queryKey: chatQueryKeys.inbox });
+          });
         },
       )
       .on(
