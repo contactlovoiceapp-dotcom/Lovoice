@@ -28,6 +28,7 @@ import {
 import type { ChatMessage } from '../../../src/features/chat/types';
 import { getSupabaseClient } from '../../../src/lib/supabase';
 import { createDebouncer, createThrottle } from '../../../src/features/chat/lib/throttle';
+import { removeChannelsByName } from '../../../src/features/chat/lib/realtimeChannels';
 import { useResumeGuard } from '../../../src/features/chat/hooks/useResumeGuard';
 import ConversationScreen from '../../../src/components/main/ConversationScreen';
 import { closeConversation } from '../../../src/navigation/messagesNavigation';
@@ -122,15 +123,15 @@ export default function ConversationRoute() {
 
     // Guard against concurrent-mode reconnect: React's
     // recursivelyTraverseReconnectPassiveEffects can re-run the setup function
-    // without calling cleanup first. Removing a stale channel here prevents
-    // "cannot add 'postgres_changes' callbacks after subscribe()" errors that
-    // are the second symptom of the foreground-resume crash.
-    if (channelRef.current) {
-      const staleChannel = channelRef.current;
-      channelRef.current = null;
-      channelReadyRef.current = false;
-      void supabase.removeChannel(staleChannel);
-    }
+    // without calling cleanup first. Supabase caches channels by topic, so the
+    // channel() call below would otherwise return the already-subscribed instance and
+    // adding handlers would throw "cannot add 'postgres_changes' callbacks after
+    // subscribe()" (reproduced device crash — see docs/REALTIME_STABILITY.md §4.1).
+    // Removing only channelRef.current is not enough; remove every channel matching
+    // this topic so channel() returns a fresh, unsubscribed instance.
+    channelRef.current = null;
+    channelReadyRef.current = false;
+    removeChannelsByName(supabase, `conv:${id}`);
 
     // Debounce UPDATE invalidations (read receipt bursts) into a single refetch.
     // INSERTs are not debounced — new messages must surface immediately.

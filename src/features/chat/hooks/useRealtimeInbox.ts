@@ -22,6 +22,7 @@ import { getSupabaseClient } from '@/lib/supabase';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { chatQueryKeys } from '../api/conversationQueries';
 import { createDebouncer } from '../lib/throttle';
+import { removeChannelsByName } from '../lib/realtimeChannels';
 import { useResumeGuard } from './useResumeGuard';
 
 const INBOX_UPDATE_DEBOUNCE_MS = 500;
@@ -44,13 +45,13 @@ export function useRealtimeInbox(): void {
 
     // Guard against concurrent-mode reconnect: React's
     // recursivelyTraverseReconnectPassiveEffects can re-run the setup function
-    // without calling cleanup first. Removing a stale channel here prevents
-    // "cannot add 'postgres_changes' callbacks after subscribe()" errors.
-    if (channelRef.current) {
-      const staleChannel = channelRef.current;
-      channelRef.current = null;
-      void supabase.removeChannel(staleChannel);
-    }
+    // without calling cleanup first. Supabase caches channels by topic, so remove
+    // every channel matching this topic (not just channelRef.current) before
+    // subscribing, otherwise channel() returns the already-subscribed instance and
+    // adding handlers throws "cannot add 'postgres_changes' callbacks after
+    // subscribe()". See docs/REALTIME_STABILITY.md §4.1.
+    channelRef.current = null;
+    removeChannelsByName(supabase, `global-inbox:${session.user.id}`);
 
     const updateDebouncer = createDebouncer(() => {
       void queryClient.invalidateQueries({ queryKey: chatQueryKeys.inbox });
