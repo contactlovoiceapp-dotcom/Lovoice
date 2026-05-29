@@ -29,6 +29,7 @@ import type { ChatMessage } from '../../../src/features/chat/types';
 import { getSupabaseClient } from '../../../src/lib/supabase';
 import { createDebouncer, createThrottle } from '../../../src/features/chat/lib/throttle';
 import { removeChannelsByName } from '../../../src/features/chat/lib/realtimeChannels';
+import { handleConversationInsert } from '../../../src/features/chat/lib/conversationInvalidations';
 import { useResumeGuard } from '../../../src/features/chat/hooks/useResumeGuard';
 import ConversationScreen from '../../../src/components/main/ConversationScreen';
 import { closeConversation } from '../../../src/navigation/messagesNavigation';
@@ -154,25 +155,22 @@ export default function ConversationRoute() {
           filter: `conversation_id=eq.${id}`,
         },
         (payload) => {
-          // Skip the messages cache invalidation when this is our own INSERT:
-          // the mutation has already written the optimistic row with a stable
-          // clientId. A refetch here would overwrite that with rows whose
-          // clientId equals the server UUID, breaking the FlatList key
-          // continuity and forcing a remount of the voice bubble (which would
-          // recreate its native audio binding).
           const newRow = payload?.new as { sender_id?: string } | undefined;
           const isOwnMessage = newRow?.sender_id === currentUserId;
 
           // Defer all invalidations during the foreground-resume window so the
           // Realtime reconnection burst does not overlap with iOS keyboard/nav
           // transitions. Outside the window this runs synchronously (no latency).
+          // The fan-out policy (skip own messages, never invalidate the inbox here)
+          // lives in handleConversationInsert — see docs/REALTIME_STABILITY.md §5.
           runAfterResumeRef.current(() => {
-            if (!isOwnMessage) {
-              void queryClient.invalidateQueries({ queryKey: chatQueryKeys.messages(id) });
-              markReadDebouncer.schedule();
-            }
-            void queryClient.invalidateQueries({ queryKey: chatQueryKeys.conversation(id) });
-            void queryClient.invalidateQueries({ queryKey: chatQueryKeys.inbox });
+            handleConversationInsert(isOwnMessage, {
+              invalidateMessages: () =>
+                void queryClient.invalidateQueries({ queryKey: chatQueryKeys.messages(id) }),
+              invalidateConversation: () =>
+                void queryClient.invalidateQueries({ queryKey: chatQueryKeys.conversation(id) }),
+              scheduleMarkRead: () => markReadDebouncer.schedule(),
+            });
           });
         },
       )

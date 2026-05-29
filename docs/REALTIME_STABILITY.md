@@ -178,21 +178,22 @@ fix against and verify (redbox gone, console flood gone).
   `useRealtimeInbox.ts` (`global-inbox:<userId>`) before `subscribe()`. Removed the
   `after subscribe()` redbox / white screen. Awaiting release validation in Sentry.
 
-Remaining Step 1b targets (all in the chat data layer; no navigation, no audio):
+- **[DONE — Step 1b] Cut the redundant React Query fan-out.** The `conv:<id>` INSERT
+  fan-out policy now lives in the pure helper
+  `src/features/chat/lib/conversationInvalidations.ts` (`handleConversationInsert`),
+  applied in `[id].tsx`:
+  - **Removed the double inbox invalidation** — the conversation channel no longer
+    invalidates `chatQueryKeys.inbox`; the global channel (`useRealtimeInbox`) owns it.
+  - **Stopped invalidating `conversation(id)` on our own INSERT** — own messages are a
+    no-op in the handler; the send mutation's `onSettled` already refreshes it.
+  - **Collapsed the `conversation(id)` invalidation sources** to the minimum,
+    non-overlapping set: incoming INSERT (this handler), the two send mutations'
+    `onSettled` (own sends), and `handleCountdownExpired` (client timer).
 
-- **Remove the double inbox invalidation.** A single incoming INSERT invalidates
-  `chatQueryKeys.inbox` from **both** `useRealtimeInbox` (global channel) and the
-  `conv:<id>` handler in `[id].tsx`. The conversation channel should not invalidate
-  the global inbox — let the global channel own it.
-- **Stop invalidating `conversation(id)` on our own INSERT.** In `[id].tsx`, the INSERT
-  handler invalidates `chatQueryKeys.conversation(id)` even for our own message; the
-  mutation's `onSettled` already does it. De-duplicate.
-- **Collapse the `conversation(id)` invalidation sources.** It is currently triggered
-  by: the conv INSERT handler, both message mutations' `onSettled`, and
-  `handleCountdownExpired`. Audit and reduce to the minimum (these stack into the ~4×
-  refetch seen in the breadcrumbs).
-- Consider raising `staleTime` / debouncing the conversation-details refetch so a burst
-  of invalidations collapses to one network refetch.
+  Not needed: a dedicated debounce / `staleTime` bump for the conversation-details
+  refetch. With the de-dup above, a normal incoming message triggers exactly one
+  `conversation(id)` invalidation, so there is no burst left to collapse — adding a
+  debouncer would be over-engineering.
 
 Validation: re-run the §7 checklist; in Sentry, the per-open query count should drop
 from ~4× to 1×.
@@ -233,6 +234,18 @@ caused the recording regression — only the safe "no-op if already on this conv
   churn (`[RealtimeConv] conv:X subscribed` per tap) is still visible but now non-fatal
   — target for Step 2. No more `pause`/`NativeSharedObjectNotFoundException` flood in
   that run either.
+- **2026-05-29 — Step 1b shipped (cut the redundant React Query fan-out):** the
+  `conv:<id>` INSERT handler no longer invalidates `chatQueryKeys.inbox` (the global
+  inbox channel owns it) and no longer invalidates `chatQueryKeys.conversation(id)` on
+  our **own** message (the sending mutation's `onSettled` already does). The fan-out
+  policy was extracted into the pure, unit-tested helper
+  `src/features/chat/lib/conversationInvalidations.ts` (`handleConversationInsert`):
+  own message → no-op; incoming → messages + conversation(id) + debounced mark-read,
+  never inbox. Remaining `conversation(id)` sources are now minimal and non-overlapping:
+  incoming INSERT (this handler), the two send mutations' `onSettled` (own sends), and
+  `handleCountdownExpired` (client timer). Expected effect: per-conversation-open query
+  count drops from ~4x toward ~1x. 452/452 tests pass. _Sentry breadcrumb confirmation
+  of the 4x→1x drop still pending on the next build._
 - **Release validation (TestFlight + Sentry):** _TBD — must confirm no
   `convertNSExceptionToJSError` / `HadesGC` crash over several days (the prod fault is a
   race; dev no-repro is necessary but not sufficient)._
