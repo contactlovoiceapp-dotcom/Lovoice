@@ -2,6 +2,7 @@
 // and unmounts when the session ends (send, cancel, hard-cap, or parent unmount).
 
 import { useEffect, useRef } from 'react';
+import { AppState } from 'react-native';
 import {
   useAudioRecorder,
   requestRecordingPermissionsAsync,
@@ -73,6 +74,13 @@ export default function VoiceRecordingSession({
   const finalizingRef = useRef(false);
   const cancellingRef = useRef(false);
 
+  // Boot timestamps, attached to the recording.finalized Sentry event. The silent ~32KB
+  // capture (docs/CHAT_AUDIO.md §9.11) is suspected to come from the AVAudioSession
+  // deactivation (scheduled ~100ms after pausing players) firing before record() marks
+  // the recorder active — a window that widens when the JS thread is congested. A large
+  // msPauseToRecord on a silent finalize confirms that race without reproducing it live.
+  const bootRef = useRef({ playersPausedAt: 0, recordAt: 0, appState: 'unknown' as string });
+
   // Stable refs for callbacks to avoid re-running effects on identity change.
   const onReadyRef = useRef(onReady);
   onReadyRef.current = onReady;
@@ -92,9 +100,12 @@ export default function VoiceRecordingSession({
     async function boot() {
       if (__DEV__) console.warn('[REC] session_mounted');
 
+      bootRef.current.appState = AppState.currentState;
+
       pauseAllChatMessages();
       pauseFeedPlayer();
       pauseProfileVoicePlayer();
+      bootRef.current.playersPausedAt = Date.now();
       if (__DEV__) console.warn('[REC] players_paused');
 
       const { granted } = await requestRecordingPermissionsAsync();
@@ -129,6 +140,7 @@ export default function VoiceRecordingSession({
         return;
       }
 
+      bootRef.current.recordAt = Date.now();
       if (__DEV__) console.warn('[REC] record_started');
       didStartRef.current = true;
       hardCapFiredRef.current = false;
@@ -235,11 +247,25 @@ export default function VoiceRecordingSession({
       const fileSize = destFile.size ?? 0;
       const bitrateOk = estimateBitrateOk(fileSize, durationMs);
 
-      if (__DEV__) console.warn('[REC] finalized', { durationMs, fileSize, bitrateOk, destUri: destFile.uri });
+      const b = bootRef.current;
+      // Gap between pausing the players (which schedules the ~100ms AVAudioSession
+      // deactivation) and record() marking the recorder active. A large value on a
+      // silent finalize (bitrateOk false) confirms the §9.11 deactivation race.
+      const msPauseToRecord = b.recordAt && b.playersPausedAt ? b.recordAt - b.playersPausedAt : -1;
+
+      if (__DEV__) console.warn('[REC] finalized', { durationMs, fileSize, bitrateOk, msPauseToRecord, destUri: destFile.uri });
 
       Sentry.captureMessage('recording.finalized', {
         level: bitrateOk ? 'info' : 'warning',
-        extra: { durationMs, fileSize, bitrateOk, requestedBy, destUri: destFile.uri },
+        extra: {
+          durationMs,
+          fileSize,
+          bitrateOk,
+          requestedBy,
+          msPauseToRecord,
+          appStateAtBoot: b.appState,
+          destUri: destFile.uri,
+        },
       });
 
       onFinalizedRef.current({ uri: destFile.uri, durationMs });
