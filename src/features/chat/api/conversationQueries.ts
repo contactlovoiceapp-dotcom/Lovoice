@@ -3,6 +3,7 @@
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 
 import { getSupabaseClient } from '@/lib/supabase';
+import { fetchLastMessagePerConversation } from './inboxLastMessages';
 import {
   deriveLifecycle,
   formatLastMessagePreview,
@@ -44,14 +45,6 @@ interface RawConversationRow {
   } | null;
 }
 
-interface RawLastMessage {
-  conversation_id: string;
-  kind: string;
-  body_text: string | null;
-  voice_duration_ms: number | null;
-  sender_id: string;
-}
-
 export function useConversations(): UseQueryResult<InboxConversation[], Error> {
   return useQuery<InboxConversation[], Error>({
     queryKey: chatQueryKeys.inbox,
@@ -84,25 +77,7 @@ export function useConversations(): UseQueryResult<InboxConversation[], Error> {
 
       const convIds = convRows.map((c) => c.id);
 
-      // Fetch the latest message per conversation in one batched query.
-      // Results are DESC-sorted; we take the first occurrence per conversation_id in JS.
-      const { data: rawMsgs, error: msgError } = await supabase
-        .from('messages')
-        .select('conversation_id, kind, body_text, voice_duration_ms, sender_id')
-        .in('conversation_id', convIds)
-        .order('created_at', { ascending: false })
-        // Generous limit: assumes at most ~10 concurrent active convos; convIds.length covers MVP.
-        .limit(convIds.length * 5);
-
-      if (msgError) throw new Error(msgError.message);
-
-      // Build lastMessage map — first occurrence per conversation_id is the newest (sorted DESC).
-      const lastMsgMap = new Map<string, RawLastMessage>();
-      for (const msg of (rawMsgs ?? []) as RawLastMessage[]) {
-        if (!lastMsgMap.has(msg.conversation_id)) {
-          lastMsgMap.set(msg.conversation_id, msg);
-        }
-      }
+      const lastMsgMap = await fetchLastMessagePerConversation(supabase, convIds);
 
       // Count unread messages (sender != me AND read_at IS NULL) for all conversations at once.
       const { data: unreadRows, error: unreadError } = await supabase
@@ -126,7 +101,7 @@ export function useConversations(): UseQueryResult<InboxConversation[], Error> {
           const iAmA = conv.user_a === uid;
           const otherProfile = iAmA ? conv.profile_b : conv.profile_a;
           const otherUserId = iAmA ? conv.user_b : conv.user_a;
-          const lastMsg = lastMsgMap.get(conv.id) as RawLastMessage;
+          const lastMsg = lastMsgMap.get(conv.id)!;
 
           // Safe cast: row passed the filter so both profile joins must be non-null in valid data.
           const displayName = otherProfile?.display_name ?? '';
