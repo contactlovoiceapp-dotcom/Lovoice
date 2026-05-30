@@ -2,7 +2,9 @@
 // notifications row is inserted. Called by the pg_net trigger, NOT by clients.
 
 import { corsHeaders } from '../_shared/cors.ts';
-import { supabaseAdmin } from '../_shared/supabaseAdmin.ts';
+// supabaseAdmin is imported lazily inside the handler (see below) so that the pure helpers
+// exported by this module (buildExpoPushMessage / parseExpoPushResponse) can be unit-tested
+// under `deno test` without the Edge runtime environment variables that supabaseAdmin requires.
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -177,6 +179,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
   if (typeof notificationId !== 'string' || !UUID_RE.test(notificationId)) {
     return json({ error: 'notification_id_invalid' }, 400, req);
   }
+
+  // Lazy import keeps the pure helpers above testable without the Edge runtime env.
+  const { supabaseAdmin } = await import('../_shared/supabaseAdmin.ts');
 
   // --- Load notification ---
 
