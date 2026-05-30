@@ -164,6 +164,16 @@ export const COPY = {
     signOutConfirmCta: 'Me déconnecter',
     signOutError: 'Impossible de te déconnecter pour le moment. Réessaie dans quelques instants.',
 
+    deleteAccountCta: 'Supprimer mon compte',
+    deleteAccountConfirmTitle: 'Supprimer ton compte ?',
+    deleteAccountConfirmBody:
+      'Cette action est définitive. Ton profil, ta voix, tes messages, tes likes et tes notifications seront supprimés. Les messages que tu as envoyés disparaîtront des conversations. Tu pourras créer un nouveau compte plus tard avec le même numéro.',
+    deleteAccountConfirmCta: 'Supprimer définitivement',
+    deleteAccountFinalTitle: 'Confirmer la suppression',
+    deleteAccountFinalBody: 'Dernière étape : confirme que tu veux supprimer ton compte. Cette action ne peut pas être annulée.',
+    deleteAccountFinalCta: 'Oui, supprimer',
+    deleteAccountError: 'Impossible de supprimer ton compte pour le moment. Réessaie dans quelques instants.',
+
     editSectionInfo: 'Mes informations',
     editSectionPreferences: 'Je cherche',
     editSectionCity: 'Ma ville',
