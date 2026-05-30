@@ -308,7 +308,14 @@ All recording errors are instrumented with Sentry breadcrumbs (category
       When `pause()` was called before recording, the 100ms-delayed
       deactivation killed the microphone input mid-recording, producing
       ~32KB silent M4A files with correct container structure but empty
-      AAC frames.
+      AAC frames. **The patch's `hasActiveRecorders` guard only protects
+      once `record()` has set `isRecording=true`.** If the 100ms deactivation
+      fires *before* that — e.g. a slow `prepareToRecordAsync` under thermal
+      throttling — the session is torn down anyway and the file is silent.
+      Confirmed in prod 2026-05-30: a finalize with a 576 ms pause→record gap,
+      `mediaServicesDidReset` false, `fileSize` 32 792 for `durationMs` 2660.
+      The boot order in `VoiceRecordingSession` closes this residual window
+      (invariant 13).
 12. **Do not remove the `messages` query invalidation/refetch during an active
     conversation as a "fan-out optimization".** It is load-bearing for voice
     playback correctness: it reconciles the optimistic voice row (whose
@@ -321,6 +328,18 @@ All recording errors are instrumented with Sentry breadcrumbs (category
     **This exact change shipped as Step 1c (0.9.4) and was rolled back to 0.9.2.**
     If you want to cut the refetch count, first build a device repro (record →
     send → replay, then a burst of 3+ voices) and gate the change behind it.
+13. **`VoiceRecordingSession` boot order is load-bearing: permission →
+    `prepareToRecordAsync` → `record()` → pause players.** Pausing a player
+    schedules the 100ms-delayed AVAudioSession deactivation (see invariant 11),
+    which the patch skips only while a recorder is active. Calling `record()`
+    *before* pausing guarantees the recorder is already active when that timer
+    fires, so the session can never be torn down — independent of how long
+    `record()` takes under thermal throttling. The orders shipped through 0.9.3
+    paused first and raced the 100ms timer (a slow `prepareToRecordAsync` or a
+    slow `record()` landed after it) → silent ~32KB M4A under load. The
+    `recording.finalized` Sentry event carries `msRecordToPause` as the
+    regression guard: it must stay positive. A short bleed of a still-playing
+    voice into the first tens of ms of the recording is the accepted trade-off.
 
 ## 10. Things this architecture deliberately does NOT do
 

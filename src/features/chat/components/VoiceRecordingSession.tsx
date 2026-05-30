@@ -74,11 +74,12 @@ export default function VoiceRecordingSession({
   const finalizingRef = useRef(false);
   const cancellingRef = useRef(false);
 
-  // Boot timestamps, attached to the recording.finalized Sentry event. The silent ~32KB
-  // capture (docs/CHAT_AUDIO.md §9.11) is suspected to come from the AVAudioSession
-  // deactivation (scheduled ~100ms after pausing players) firing before record() marks
-  // the recorder active — a window that widens when the JS thread is congested. A large
-  // msPauseToRecord on a silent finalize confirms that race without reproducing it live.
+  // Boot timestamps, attached to the recording.finalized Sentry event. Pausing a player
+  // schedules a ~100ms-delayed AVAudioSession deactivation that expo-audio's patch only
+  // skips while a recorder is already active. The boot now calls record() *before* pausing
+  // (docs/CHAT_AUDIO.md §9.11), so the recorder is always active when that timer fires.
+  // msRecordToPause = how long the recorder was active before the pause scheduled the timer;
+  // it must stay positive. A negative value would mean record() ran after the pause again.
   const bootRef = useRef({ playersPausedAt: 0, recordAt: 0, appState: 'unknown' as string });
 
   // Stable refs for callbacks to avoid re-running effects on identity change.
@@ -93,7 +94,15 @@ export default function VoiceRecordingSession({
   const onErrorRef = useRef(onError);
   onErrorRef.current = onError;
 
-  // Mount: pause all players, request permission, prepare, record.
+  // Mount: request permission, prepare, start recording, then pause the players.
+  // The order is load-bearing (docs/CHAT_AUDIO.md §9.11). Pausing a player schedules a
+  // ~100ms-delayed AVAudioSession deactivation that expo-audio's patch skips only while a
+  // recorder is active (registry-wide hasActiveRecorders check). Starting record() *before*
+  // pausing guarantees the recorder is already active when any pause timer fires, so the
+  // session can never be torn down mid-start — no matter how long record() takes under
+  // thermal throttling. The earlier orders (pause→…→record) raced that 100ms timer and
+  // produced silent ~32KB M4A files when record() landed late. A short bleed of a still-
+  // playing voice into the first tens of ms is the accepted trade-off vs. losing audio.
   useEffect(() => {
     let cancelled = false;
 
@@ -101,12 +110,6 @@ export default function VoiceRecordingSession({
       if (__DEV__) console.warn('[REC] session_mounted');
 
       bootRef.current.appState = AppState.currentState;
-
-      pauseAllChatMessages();
-      pauseFeedPlayer();
-      pauseProfileVoicePlayer();
-      bootRef.current.playersPausedAt = Date.now();
-      if (__DEV__) console.warn('[REC] players_paused');
 
       const { granted } = await requestRecordingPermissionsAsync();
       if (cancelled) return;
@@ -126,9 +129,8 @@ export default function VoiceRecordingSession({
         onErrorRef.current('prepare_failed');
         return;
       }
-      if (__DEV__) console.warn('[REC] prepare_done');
-
       if (cancelled) return;
+      if (__DEV__) console.warn('[REC] prepare_done');
 
       try {
         recorder.record();
@@ -139,9 +141,17 @@ export default function VoiceRecordingSession({
         onErrorRef.current('record_failed');
         return;
       }
-
       bootRef.current.recordAt = Date.now();
-      if (__DEV__) console.warn('[REC] record_started');
+
+      // Pause players only after the recorder is active. The deactivation timer this
+      // schedules can no longer tear the session down — hasActiveRecorders is now true.
+      pauseAllChatMessages();
+      pauseFeedPlayer();
+      pauseProfileVoicePlayer();
+      bootRef.current.playersPausedAt = Date.now();
+
+      // Torture-test signal: must stay positive (recorder active before the pause timer).
+      if (__DEV__) console.warn('[REC] record_started', { msRecordToPause: bootRef.current.playersPausedAt - bootRef.current.recordAt });
       didStartRef.current = true;
       hardCapFiredRef.current = false;
       meteringRef.current = [];
@@ -215,7 +225,7 @@ export default function VoiceRecordingSession({
   }, []);
 
   // Snapshot the recorder's native state plus the boot timing for a finalize. This is
-  // temporary diagnostic scaffolding (docs/CHAT_AUDIO.md §9.11): a large msPauseToRecord
+  // temporary diagnostic scaffolding (docs/CHAT_AUDIO.md §9.11): a non-positive msRecordToPause
   // points at the AVAudioSession deactivation race, while mediaServicesDidReset / a false
   // isRecording point at the alternative interruption / media-reset hypotheses. getStatus()
   // is read-only and may throw if the native recorder was already released, so it is guarded.
@@ -244,9 +254,10 @@ export default function VoiceRecordingSession({
     }
 
     return {
-      // Gap between pausing the players (which schedules the ~100ms AVAudioSession
-      // deactivation) and record() marking the recorder active.
-      msPauseToRecord: b.recordAt && b.playersPausedAt ? b.recordAt - b.playersPausedAt : -1,
+      // How long the recorder was active before pausing the players scheduled the ~100ms
+      // AVAudioSession deactivation. Positive = the §9.11 race is structurally closed;
+      // a negative value would mean record() ran after the pause (regression).
+      msRecordToPause: b.recordAt && b.playersPausedAt ? b.playersPausedAt - b.recordAt : -1,
       appStateAtBoot: b.appState,
       ...recorderSnapshot,
     };
@@ -301,7 +312,7 @@ export default function VoiceRecordingSession({
       // can be distinguished from a truly empty ~32KB capture.
       const bytesPerMs = durationMs > 0 ? fileSize / durationMs : -1;
 
-      if (__DEV__) console.warn('[REC] finalized', { durationMs, fileSize, bitrateOk, bytesPerMs, msPauseToRecord: diagnostics.msPauseToRecord, destUri: destFile.uri });
+      if (__DEV__) console.warn('[REC] finalized', { durationMs, fileSize, bitrateOk, bytesPerMs, msRecordToPause: diagnostics.msRecordToPause, destUri: destFile.uri });
 
       Sentry.captureMessage('recording.finalized', {
         level: bitrateOk ? 'info' : 'warning',

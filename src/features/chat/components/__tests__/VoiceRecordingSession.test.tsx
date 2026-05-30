@@ -6,6 +6,7 @@ import { View } from 'react-native';
 import { render, act, waitFor } from '@testing-library/react-native';
 import { requestRecordingPermissionsAsync } from 'expo-audio';
 
+import { pauseAllChatMessages } from '@/features/chat/lib/chatMessagePlayer';
 import VoiceRecordingSession from '../VoiceRecordingSession';
 import type { RecordingSessionMode } from '../VoiceRecordingSession';
 
@@ -91,6 +92,35 @@ describe('VoiceRecordingSession — mount', () => {
     expect(requestRecordingPermissionsAsync).toHaveBeenCalledTimes(1);
     expect(mocks.recorder.prepareToRecordAsync).toHaveBeenCalledTimes(1);
     expect(mocks.recorder.record).toHaveBeenCalledTimes(1);
+  });
+
+  it('prepares and records before pausing players', async () => {
+    const onReady = jest.fn();
+
+    render(
+      <SessionWrapper
+        mode="recording"
+        onReady={onReady}
+        onTick={jest.fn()}
+        onFinalized={jest.fn()}
+        onCancelled={jest.fn()}
+        onError={jest.fn()}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(onReady).toHaveBeenCalledTimes(1);
+    });
+
+    // §9.11 ordering invariant: record() must run before the player pause schedules the
+    // ~100ms AVAudioSession deactivation, so the recorder is already active when the timer
+    // fires (the patch's hasActiveRecorders guard then keeps the session alive).
+    const prepareOrder = mocks.recorder.prepareToRecordAsync.mock.invocationCallOrder[0];
+    const recordOrder = mocks.recorder.record.mock.invocationCallOrder[0];
+    const pauseOrder = (pauseAllChatMessages as jest.Mock).mock.invocationCallOrder[0];
+
+    expect(prepareOrder).toBeLessThan(recordOrder);
+    expect(recordOrder).toBeLessThan(pauseOrder);
   });
 
   it('calls onError with permission_denied when permission is not granted', async () => {
