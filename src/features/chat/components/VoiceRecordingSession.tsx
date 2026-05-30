@@ -306,7 +306,10 @@ export default function VoiceRecordingSession({
       Sentry.captureMessage('recording.finalized', {
         level: bitrateOk ? 'info' : 'warning',
         // Tags are filterable in Sentry (unlike extra) so warnings can be isolated.
+        // voice.sourceUuid is the searchable join key: a broken file (playback.failed →
+        // recording.uploaded → sourceUuid) resolves to this exact event and its diagnostics.
         tags: {
+          'voice.sourceUuid': uuid,
           'recording.bitrateOk': String(bitrateOk),
           'recording.appStateAtBoot': diagnostics.appStateAtBoot,
           'recording.mediaServicesDidReset': String(diagnostics.mediaServicesDidReset),

@@ -48,6 +48,15 @@ function makeSyntheticId(): string {
   return `optimistic-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
+// A voice file changes identity three times: the recorder writes pending/<sourceUuid>.m4a
+// (logged as destUri in recording.finalized), the upload renames it to the server-generated
+// <conversationId>/<objectUuid>.m4a in the bucket, and the row gets its own messageId. None of
+// these share a value, which is why a Sentry recording event cannot be matched to a bucket file.
+// This strips a path down to its bare uuid so the upload step can emit the missing join.
+function basenameUuid(path: string): string {
+  return path.split('/').pop()?.replace(/\.m4a$/i, '') ?? path;
+}
+
 // ---------------------------------------------------------------------------
 // Optimistic cache helpers
 // ---------------------------------------------------------------------------
@@ -290,7 +299,15 @@ export function useSendVoiceMessage(): UseMutationResult<
         throw new Error(`chat.request_upload_failed:${code}`);
       }
 
-      Sentry.addBreadcrumb({ category: 'upload', message: 'upload.request_signed_ok', level: 'info', data: { objectPath: requestData.objectPath } });
+      // sourceUuid is the pending-file uuid logged as destUri in recording.finalized;
+      // pairing it with objectPath here is the link that lets a Sentry event resolve to a bucket file.
+      const sourceUuid = basenameUuid(input.uri);
+      Sentry.addBreadcrumb({
+        category: 'upload',
+        message: 'upload.request_signed_ok',
+        level: 'info',
+        data: { objectPath: requestData.objectPath, sourceUuid, conversationId: input.conversationId },
+      });
 
       await putAudioWithRetry(input.uri, requestData.signedUrl);
 
@@ -312,7 +329,26 @@ export function useSendVoiceMessage(): UseMutationResult<
         throw new Error(`chat.commit_upload_failed:${code}`);
       }
 
-      Sentry.addBreadcrumb({ category: 'upload', message: 'upload.commit_ok', level: 'info', data: { messageId: commitData.message.id } });
+      Sentry.addBreadcrumb({
+        category: 'upload',
+        message: 'upload.commit_ok',
+        level: 'info',
+        data: { messageId: commitData.message.id, objectPath: requestData.objectPath, conversationId: input.conversationId },
+      });
+
+      // The single queryable artifact that joins the whole voice pipeline. Searchable by tag in
+      // Sentry: a broken file spotted on the recipient side (playback.failed → objectUuid) traces
+      // back to the sender's recording.finalized (destUri → sourceUuid) and to the bucket path
+      // messages/<conversationId>/<objectUuid>.m4a, while messageId ties it to playback events.
+      Sentry.captureMessage('recording.uploaded', {
+        level: 'info',
+        tags: {
+          'voice.sourceUuid': sourceUuid,
+          'voice.objectUuid': basenameUuid(requestData.objectPath),
+          'voice.conversationId': input.conversationId,
+          'voice.messageId': commitData.message.id,
+        },
+      });
 
       safeDelete(input.uri);
 
