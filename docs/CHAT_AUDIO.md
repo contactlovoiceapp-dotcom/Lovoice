@@ -309,6 +309,18 @@ All recording errors are instrumented with Sentry breadcrumbs (category
       deactivation killed the microphone input mid-recording, producing
       ~32KB silent M4A files with correct container structure but empty
       AAC frames.
+12. **Do not remove the `messages` query invalidation/refetch during an active
+    conversation as a "fan-out optimization".** It is load-bearing for voice
+    playback correctness: it reconciles the optimistic voice row (whose
+    `voicePath` points at the *local* file that `messageMutations` deletes via
+    `safeDelete` once the upload commits) with the confirmed server row + signed
+    URL. Replacing those invalidations with pure cache patching (markRead patch,
+    Realtime INSERT prepend, UPDATE suppression) leaves stale optimistic/local
+    sources in the cache; after 2-3 voice messages the bubbles point at deleted
+    local files and playback fails with "Impossible de lire ce vocal".
+    **This exact change shipped as Step 1c (0.9.4) and was rolled back to 0.9.2.**
+    If you want to cut the refetch count, first build a device repro (record →
+    send → replay, then a burst of 3+ voices) and gate the change behind it.
 
 ## 10. Things this architecture deliberately does NOT do
 
@@ -322,6 +334,8 @@ All recording errors are instrumented with Sentry breadcrumbs (category
   for the entire app lifetime. No per-feature `setAudioModeAsync`.
 - **No reuse of a single recorder instance** across multiple recordings.
   Each tap-to-record mounts a fresh `VoiceRecordingSession`.
+- **No removal of the active-conversation `messages` refetch** for fan-out
+  optimization — it reconciles optimistic voice rows with the server (see §9.12).
 
 ## 11. Test map
 
