@@ -1,16 +1,16 @@
-// Edge Function: admin-initiated soft-delete of a user account (ban + deleted_at + session revoke).
+// Edge Function: admin-initiated GDPR account deletion.
 //
-// V1 MVP: soft-delete (deleted_at + is_banned + session revoke). The full hard-purge
-// of voices/storage/messages/likes/notifications/blocks/reports/auth.users lives in
-// Phase 10's user-initiated delete_account Edge Function.
-// TODO(phase-10): swap the body for a call to the shared hard-purge helper.
+// Phase 9: full hard-purge. Shares the exact same purge path as the user-initiated
+// `delete_account` Edge Function (ARCHITECTURE §9) via the purgeAccount helper — voices,
+// messages, likes, notifications, blocks, reports and the auth.users row are removed,
+// shared conversations are anonymized onto the tombstone, and the action is written to
+// audit_log. Differs from the user flow only in the caller (an admin) and the required
+// `reason`, which is audited. Idempotent. Refuses to delete another admin.
 
 import { corsHeaders } from '../_shared/cors.ts';
 import { requireAdmin } from '../_shared/admin.ts';
 import { supabaseAdmin } from '../_shared/supabaseAdmin.ts';
-import { writeAuditLog } from '../_shared/auditLog.ts';
-
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+import { purgeAccount, isUuid, isTombstone } from '../_shared/purgeAccount.ts';
 
 function json(body: unknown, status: number, req: Request): Response {
   return new Response(JSON.stringify(body), {
@@ -46,7 +46,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
   const { user_id, reason } = rawBody as { user_id: unknown; reason: unknown };
 
-  if (typeof user_id !== 'string' || !UUID_RE.test(user_id)) {
+  if (!isUuid(user_id)) {
     return json({ error: 'user_id_invalid' }, 400, req);
   }
 
@@ -54,7 +54,11 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return json({ error: 'reason_invalid' }, 400, req);
   }
 
-  // Safety guard: refuse to delete another admin
+  if (isTombstone(user_id)) {
+    return json({ error: 'cannot_delete_tombstone' }, 403, req);
+  }
+
+  // Safety guard: refuse to delete another admin.
   const { data: adminCheck } = await supabaseAdmin
     .from('admin_users')
     .select('id')
@@ -65,49 +69,15 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return json({ error: 'cannot_delete_admin' }, 403, req);
   }
 
-  const { data: profile, error: profileError } = await supabaseAdmin
-    .from('profiles')
-    .select('id, is_banned, deleted_at')
-    .eq('id', user_id)
-    .maybeSingle();
-
-  if (profileError) {
-    console.error('delete_account_admin: profile lookup failed', { error: profileError.message });
-    return json({ error: 'internal_server_error' }, 500, req);
-  }
-
-  if (!profile) {
-    return json({ error: 'user_not_found' }, 404, req);
-  }
-
-  if (profile.deleted_at !== null && profile.is_banned) {
-    return json({ ok: true, idempotent: true }, 200, req);
-  }
-
-  const { error: updateError } = await supabaseAdmin
-    .from('profiles')
-    .update({ is_banned: true, deleted_at: new Date().toISOString() })
-    .eq('id', user_id);
-
-  if (updateError) {
-    console.error('delete_account_admin: update failed', { error: updateError.message });
-    return json({ error: 'internal_server_error' }, 500, req);
-  }
-
-  // Best-effort session revocation
   try {
-    await supabaseAdmin.auth.admin.signOut(user_id, 'global');
-  } catch (e) {
-    console.error('delete_account_admin: signOut failed (non-blocking)', e);
+    const result = await purgeAccount(user_id, {
+      actorId: adminCtx.admin.id,
+      action: 'user.delete',
+      reason,
+    });
+    return json({ ok: true, ...result }, 200, req);
+  } catch (err) {
+    console.error('delete_account_admin: purge failed', { userId: user_id, error: (err as Error).message });
+    return json({ error: 'internal_server_error' }, 500, req);
   }
-
-  await writeAuditLog({
-    actorId: adminCtx.admin.id,
-    action: 'user.delete',
-    targetKind: 'profile',
-    targetId: user_id,
-    reason: reason as string,
-  });
-
-  return json({ ok: true, user_id, hard_purge: false }, 200, req);
 });
