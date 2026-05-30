@@ -214,15 +214,57 @@ export default function VoiceRecordingSession({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Snapshot the recorder's native state plus the boot timing for a finalize. This is
+  // temporary diagnostic scaffolding (docs/CHAT_AUDIO.md §9.11): a large msPauseToRecord
+  // points at the AVAudioSession deactivation race, while mediaServicesDidReset / a false
+  // isRecording point at the alternative interruption / media-reset hypotheses. getStatus()
+  // is read-only and may throw if the native recorder was already released, so it is guarded.
+  function collectFinalizeDiagnostics() {
+    const b = bootRef.current;
+    const recorderSnapshot: {
+      isRecording: boolean | null;
+      mediaServicesDidReset: boolean | null;
+      recorderDurationMs: number | null;
+      recorderUrl: string | null;
+    } = {
+      isRecording: null,
+      mediaServicesDidReset: null,
+      recorderDurationMs: null,
+      recorderUrl: null,
+    };
+
+    try {
+      const status = recorder.getStatus();
+      recorderSnapshot.isRecording = status.isRecording;
+      recorderSnapshot.mediaServicesDidReset = status.mediaServicesDidReset;
+      recorderSnapshot.recorderDurationMs = status.durationMillis;
+      recorderSnapshot.recorderUrl = status.url;
+    } catch {
+      // Native recorder already released — keep the null fallbacks above.
+    }
+
+    return {
+      // Gap between pausing the players (which schedules the ~100ms AVAudioSession
+      // deactivation) and record() marking the recorder active.
+      msPauseToRecord: b.recordAt && b.playersPausedAt ? b.recordAt - b.playersPausedAt : -1,
+      appStateAtBoot: b.appState,
+      ...recorderSnapshot,
+    };
+  }
+
   async function doFinalize(requestedBy: 'send' | 'cap') {
     Sentry.addBreadcrumb({ category: 'recording', message: 'recording.stop_called', level: 'info', data: { requestedBy } });
     if (__DEV__) console.warn('[REC] stop_called', { requestedBy });
+
+    // Capture the recorder state before stopping so silent/oversized/no-uri captures
+    // can be told apart from a mediaServicesDidReset interruption.
+    const diagnostics = collectFinalizeDiagnostics();
 
     try {
       await recorder.stop();
     } catch (err) {
       if (__DEV__) console.warn('[REC] stop THREW', err);
-      Sentry.captureException(err, { extra: { step: 'stop', requestedBy } });
+      Sentry.captureException(err, { extra: { step: 'stop', requestedBy, ...diagnostics } });
       onErrorRef.current('stop_failed');
       return;
     }
@@ -231,7 +273,16 @@ export default function VoiceRecordingSession({
     if (__DEV__) console.warn('[REC] after stop', { tempUri, isRecording: recorder.isRecording });
     if (!tempUri) {
       if (__DEV__) console.warn('[REC] NO URI after stop');
-      Sentry.addBreadcrumb({ category: 'recording', message: 'recording.no_uri', level: 'warning' });
+      // Promoted from a breadcrumb to a standalone event: a null uri leaves no other
+      // trace, so it was previously invisible in Sentry.
+      Sentry.captureMessage('recording.no_uri', {
+        level: 'error',
+        tags: {
+          'recording.appStateAtBoot': diagnostics.appStateAtBoot,
+          'recording.mediaServicesDidReset': String(diagnostics.mediaServicesDidReset),
+        },
+        extra: { requestedBy, ...diagnostics },
+      });
       onErrorRef.current('no_uri');
       return;
     }
@@ -246,32 +297,35 @@ export default function VoiceRecordingSession({
       const durationMs = Math.min(recorderState.durationMillis, MAX_VOICE_DURATION_MS);
       const fileSize = destFile.size ?? 0;
       const bitrateOk = estimateBitrateOk(fileSize, durationMs);
+      // Raw ratio so an oversized-but-playable file (false positive of the ±15% band)
+      // can be distinguished from a truly empty ~32KB capture.
+      const bytesPerMs = durationMs > 0 ? fileSize / durationMs : -1;
 
-      const b = bootRef.current;
-      // Gap between pausing the players (which schedules the ~100ms AVAudioSession
-      // deactivation) and record() marking the recorder active. A large value on a
-      // silent finalize (bitrateOk false) confirms the §9.11 deactivation race.
-      const msPauseToRecord = b.recordAt && b.playersPausedAt ? b.recordAt - b.playersPausedAt : -1;
-
-      if (__DEV__) console.warn('[REC] finalized', { durationMs, fileSize, bitrateOk, msPauseToRecord, destUri: destFile.uri });
+      if (__DEV__) console.warn('[REC] finalized', { durationMs, fileSize, bitrateOk, bytesPerMs, msPauseToRecord: diagnostics.msPauseToRecord, destUri: destFile.uri });
 
       Sentry.captureMessage('recording.finalized', {
         level: bitrateOk ? 'info' : 'warning',
+        // Tags are filterable in Sentry (unlike extra) so warnings can be isolated.
+        tags: {
+          'recording.bitrateOk': String(bitrateOk),
+          'recording.appStateAtBoot': diagnostics.appStateAtBoot,
+          'recording.mediaServicesDidReset': String(diagnostics.mediaServicesDidReset),
+        },
         extra: {
           durationMs,
           fileSize,
+          bytesPerMs,
           bitrateOk,
           requestedBy,
-          msPauseToRecord,
-          appStateAtBoot: b.appState,
           destUri: destFile.uri,
+          ...diagnostics,
         },
       });
 
       onFinalizedRef.current({ uri: destFile.uri, durationMs });
     } catch (err) {
       if (__DEV__) console.warn('[REC] file_move THREW', err);
-      Sentry.captureException(err, { extra: { step: 'file_move' } });
+      Sentry.captureException(err, { extra: { step: 'file_move', requestedBy, ...diagnostics } });
       onErrorRef.current('stop_failed');
     }
   }
