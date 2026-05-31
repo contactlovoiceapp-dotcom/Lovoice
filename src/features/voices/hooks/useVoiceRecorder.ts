@@ -20,6 +20,7 @@ import {
   METERING_INTERVAL_MS,
   useAudioRecorderStateGated,
 } from '@/lib/audio';
+import { pauseProfileVoicePlayer } from '@/features/voices/hooks/useVoicePlayer';
 
 export type RecorderState = 'idle' | 'recording' | 'paused' | 'stopped' | 'error';
 
@@ -145,6 +146,10 @@ export function useVoiceRecorder(): VoiceRecorderHook {
         return;
       }
 
+      // Release any profile-tab preview player so Android does not keep audio
+      // focus while the recorder is active.
+      pauseProfileVoicePlayer();
+
       await recorder.prepareToRecordAsync();
       recorder.record();
 
@@ -202,7 +207,17 @@ export function useVoiceRecorder(): VoiceRecorderHook {
       const voiceRatio = totalSamplesRef.current > 0
         ? voiceSamplesRef.current / totalSamplesRef.current
         : 0;
-      setIsLikelySilent(voiceRatio < VOICE_SAMPLE_MIN_RATIO);
+      const likelySilent = voiceRatio < VOICE_SAMPLE_MIN_RATIO;
+      if (__DEV__) {
+        console.warn('[REC] recorder_stopped', {
+          durationMs: finalDuration,
+          fileSize: destFile.size ?? 0,
+          voiceRatio,
+          isLikelySilent: likelySilent,
+          uri: finalUri,
+        });
+      }
+      setIsLikelySilent(likelySilent);
       setResult({ uri: finalUri, durationMs: finalDuration });
       setState('stopped');
     } catch (err) {

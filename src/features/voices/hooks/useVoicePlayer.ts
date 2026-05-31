@@ -6,8 +6,9 @@ import { useCallback, useEffect, useRef } from 'react';
 import {
   useAudioPlayer,
   useAudioPlayerStatus,
+  type AudioPlayer,
+  type AudioSource,
 } from 'expo-audio';
-import type { AudioPlayer, AudioSource } from 'expo-audio';
 
 // Module-scoped ref to the active profile voice player. Allows
 // VoiceRecordingSession to pause this player before recording.
@@ -29,7 +30,7 @@ export interface VoicePlayerHook {
   durationMs: number;
   /** Current playback position in milliseconds. */
   positionMs: number;
-  play: () => void;
+  play: () => Promise<void>;
   pause: () => void;
   /** Pause + seek to 0 so the next play() restarts from the beginning. */
   stop: () => void;
@@ -37,45 +38,66 @@ export interface VoicePlayerHook {
   unload: () => void;
 }
 
+// After replace() or a fresh source swap, ExoPlayer on Android needs a moment
+// before play() actually starts — calling play() too early is a silent no-op.
+const PLAYER_READY_TIMEOUT_MS = 2_000;
+const PLAYER_READY_POLL_MS = 50;
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isPlayerLoaded(player: AudioPlayer): boolean {
+  try {
+    return player.isLoaded === true;
+  } catch {
+    return false;
+  }
+}
+
+async function waitForPlayerReady(player: AudioPlayer): Promise<boolean> {
+  const deadline = Date.now() + PLAYER_READY_TIMEOUT_MS;
+  while (!isPlayerLoaded(player) && Date.now() < deadline) {
+    await delay(PLAYER_READY_POLL_MS);
+  }
+  return isPlayerLoaded(player);
+}
+
+function devLog(label: string, payload?: Record<string, unknown>): void {
+  if (!__DEV__) return;
+  if (payload) {
+    console.warn(`[voicePlayer] ${label}`, payload);
+  } else {
+    console.warn(`[voicePlayer] ${label}`);
+  }
+}
+
+function safeReplace(player: AudioPlayer, uri: string): void {
+  try {
+    devLog('replace', { uri });
+    player.replace(uri);
+  } catch (err) {
+    devLog('replace_threw', { uri, err: String(err) });
+  }
+}
+
 export function useVoicePlayer({ uri }: { uri: string | null }): VoicePlayerHook {
-  const isFirstRenderRef = useRef(true);
   // When stop() is called (tab switch), the next play() must seekTo(0) first.
   const needsRestartRef = useRef(false);
 
   const source: AudioSource = uri ?? null;
-  // updateInterval at 100ms gives smooth progress bars without excessive JS bridge traffic.
   const player = useAudioPlayer(source, { updateInterval: 100 });
   const status = useAudioPlayerStatus(player);
 
-  // When the URI changes after the initial mount, pause the current track and swap the source.
-  // pause() and replace() can throw NativeSharedObjectNotFoundException when expo-audio is in
-  // the middle of recycling the player for a source change — both are recoverable.
-  // We only call replace() with a non-null URI: expo-audio 0.5 rejects `null` (ArgumentCastException),
-  // so when the consumer hands us null we simply pause and let the next non-null replace happen later.
+  // Keep the native source in sync whenever the URI changes. Consumers that
+  // mount this hook with a file URI already set (e.g. profile preview after
+  // stop) rely on the constructor; consumers that swap null→uri rely on this
+  // effect. Android ExoPlayer can silently ignore play() until replace() lands.
   useEffect(() => {
-    if (isFirstRenderRef.current) {
-      isFirstRenderRef.current = false;
-      return;
-    }
-    try {
-      player.pause();
-      if (uri) {
-        player.replace(uri);
-      }
-    } catch {
-      // Player wrapper outlived its native counterpart; expo-audio handles the source swap.
-    }
-  }, [uri]); // player reference is stable for the hook's lifetime
+    if (!uri) return;
+    safeReplace(player, uri);
+  }, [uri, player]);
 
-  // Handle system interruptions (e.g. incoming phone call): expo-audio's session will pause
-  // automatically; we track it via `status.playing` so the UI stays in sync.
-  // If the system resumes after the interruption ends, `status.playing` will flip back to true.
-  // No manual resume is needed here — OS handles it when interruptionMode is 'mixWithOthers'.
-
-  // Release audio resources when the component unmounts.
-  // We swallow errors because expo-audio recreates the native player whenever the source
-  // changes; calling pause() on a wrapper whose native counterpart has already been released
-  // throws NativeSharedObjectNotFoundException, which is harmless in cleanup.
   useEffect(() => {
     activeProfilePlayer = player;
     return () => {
@@ -86,11 +108,21 @@ export function useVoicePlayer({ uri }: { uri: string | null }): VoicePlayerHook
         // Native object already released by expo-audio — nothing to do.
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [player]);
 
-  const play = useCallback(() => {
-    // After stop() or when the track ended, seek back to 0 before playing.
+  const play = useCallback(async () => {
+    devLog('play_requested', {
+      uri,
+      isLoaded: isPlayerLoaded(player),
+      playing: status.playing,
+      duration: status.duration,
+    });
+
+    if (!uri) {
+      devLog('play_aborted_no_uri');
+      return;
+    }
+
     const shouldRestart =
       needsRestartRef.current ||
       status.didJustFinish ||
@@ -99,13 +131,28 @@ export function useVoicePlayer({ uri }: { uri: string | null }): VoicePlayerHook
     if (shouldRestart) {
       try {
         player.seekTo(0);
-      } catch {
-        // Native player recycled — the subsequent play() will handle it.
+      } catch (err) {
+        devLog('seekTo_threw', { err: String(err) });
       }
       needsRestartRef.current = false;
     }
-    player.play();
-  }, [player, status.didJustFinish, status.duration, status.currentTime]);
+
+    let ready = await waitForPlayerReady(player);
+    if (!ready) {
+      devLog('play_retry_replace', { uri });
+      safeReplace(player, uri);
+      ready = await waitForPlayerReady(player);
+    }
+
+    devLog('play_firing', { uri, isLoaded: ready });
+
+    try {
+      player.play();
+    } catch (err) {
+      devLog('play_threw', { err: String(err) });
+      throw err;
+    }
+  }, [player, uri, status.didJustFinish, status.duration, status.currentTime, status.playing]);
 
   const pause = useCallback(() => {
     try {
@@ -121,14 +168,10 @@ export function useVoicePlayer({ uri }: { uri: string | null }): VoicePlayerHook
     } catch {
       // Native player already released by expo-audio — nothing to do.
     }
-    // Don't seekTo here — defer to the next play() call where the player is
-    // guaranteed to be in a stable loaded state.
     needsRestartRef.current = true;
   }, [player]);
 
   const unload = useCallback(() => {
-    // expo-audio 0.5 doesn't accept null in replace(), so we just pause to release the audio
-    // session. The next replace() with a real URI will reuse the same native player.
     try {
       player.pause();
     } catch {
@@ -137,7 +180,6 @@ export function useVoicePlayer({ uri }: { uri: string | null }): VoicePlayerHook
   }, [player]);
 
   return {
-    // AudioStatus.currentTime and .duration are in seconds; convert to ms for consumers.
     isPlaying: status.playing,
     durationMs: Math.round(status.duration * 1000),
     positionMs: Math.round(status.currentTime * 1000),

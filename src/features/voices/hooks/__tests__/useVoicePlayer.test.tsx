@@ -22,6 +22,7 @@ const mocks = (global as Record<string, unknown>).__expoAudioMocks as {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  mocks.player.isLoaded = true;
   mocks.playerStatus.playing = false;
   mocks.playerStatus.currentTime = 0;
   mocks.playerStatus.duration = 0;
@@ -37,29 +38,62 @@ describe('useVoicePlayer — initial state', () => {
 });
 
 describe('useVoicePlayer — play()', () => {
-  it('calls player.play()', () => {
+  it('calls player.play()', async () => {
     const { result } = renderHook(() =>
       useVoicePlayer({ uri: 'file:///document/pending/voice.m4a' }),
     );
 
-    act(() => {
-      result.current.play();
+    await act(async () => {
+      await result.current.play();
     });
 
     expect(mocks.player.play).toHaveBeenCalledTimes(1);
   });
 
-  it('calls player.play() multiple times without session config', () => {
+  it('calls player.play() multiple times without session config', async () => {
     const { result } = renderHook(() =>
       useVoicePlayer({ uri: 'file:///document/pending/voice.m4a' }),
     );
 
-    act(() => {
-      result.current.play();
-      result.current.play();
+    await act(async () => {
+      await result.current.play();
+      await result.current.play();
     });
 
     expect(mocks.player.play).toHaveBeenCalledTimes(2);
+  });
+
+  it('waits for isLoaded and retries replace() when the native player stays unloaded', async () => {
+    jest.useFakeTimers();
+    mocks.player.isLoaded = false;
+
+    const { result } = renderHook(() =>
+      useVoicePlayer({ uri: 'file:///document/pending/voice.m4a' }),
+    );
+
+    mocks.player.replace.mockClear();
+
+    let playPromise: Promise<void> | undefined;
+    act(() => {
+      playPromise = result.current.play();
+    });
+
+    expect(mocks.player.play).not.toHaveBeenCalled();
+
+    await act(async () => {
+      jest.advanceTimersByTime(2_000);
+    });
+
+    expect(mocks.player.replace).toHaveBeenCalledTimes(1);
+
+    mocks.player.isLoaded = true;
+    await act(async () => {
+      jest.advanceTimersByTime(50);
+      await playPromise;
+    });
+
+    expect(mocks.player.play).toHaveBeenCalledTimes(1);
+    jest.useRealTimers();
   });
 });
 
@@ -84,7 +118,7 @@ describe('useVoicePlayer — unload()', () => {
     );
 
     act(() => {
-      result.current.play();
+      void result.current.play();
     });
 
     mocks.player.replace.mockClear();
@@ -97,19 +131,19 @@ describe('useVoicePlayer — unload()', () => {
     expect(mocks.player.replace).not.toHaveBeenCalled();
   });
 
-  it('allows play() after unload() without error', () => {
+  it('allows play() after unload() without error', async () => {
     const { result } = renderHook(() =>
       useVoicePlayer({ uri: 'file:///document/pending/voice.m4a' }),
     );
 
-    act(() => {
-      result.current.play();
+    await act(async () => {
+      await result.current.play();
     });
     act(() => {
       result.current.unload();
     });
-    act(() => {
-      result.current.play();
+    await act(async () => {
+      await result.current.play();
     });
 
     expect(mocks.player.play).toHaveBeenCalledTimes(2);

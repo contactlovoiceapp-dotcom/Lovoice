@@ -27,7 +27,7 @@ import { COLORS, CTA_GRADIENT, FONT, ONBOARDING_GRADIENT, RADIUS, SHADOW } from 
 import { COPY } from '../../copy';
 import { formatTime } from '../../lib/formatTime';
 import { MAX_VOICE_DURATION_MS, MIN_VOICE_DURATION_MS } from '../../lib/audio';
-import { useVoiceRecorder } from '../../features/voices/hooks/useVoiceRecorder';
+import { useVoiceRecorder, type VoiceRecorderResult } from '../../features/voices/hooks/useVoiceRecorder';
 import { useVoicePlayer } from '../../features/voices/hooks/useVoicePlayer';
 import { useUploadVoice } from '../../features/voices/api/voiceMutations';
 
@@ -218,10 +218,285 @@ function LiveMeteringWaveform({ meteringDb }: { meteringDb: number[] }) {
   );
 }
 
+/**
+ * Preview phase after stop — mounts useVoicePlayer with the file URI from birth so
+ * Android never has to swap null → local file via replace() (silent play() no-op).
+ */
+function RecordVoicePreviewBody({
+  result,
+  isLikelySilent,
+  uploadVoice,
+  onNext,
+  onSkip,
+  onRestartCapture,
+  contentMaxWidth,
+  onRegisterUnload,
+}: {
+  result: VoiceRecorderResult;
+  isLikelySilent: boolean;
+  uploadVoice: ReturnType<typeof useUploadVoice>;
+  onNext: () => void;
+  onSkip?: () => void;
+  onRestartCapture: () => Promise<void>;
+  contentMaxWidth: number;
+  onRegisterUnload: (unload: () => void) => void;
+}) {
+  const player = useVoicePlayer({ uri: result.uri });
+
+  useEffect(() => {
+    onRegisterUnload(player.unload);
+    return () => onRegisterUnload(() => {});
+  }, [onRegisterUnload, player.unload]);
+
+  const isUploading = uploadVoice.isPending;
+  const uploadFailed = uploadVoice.isError && !isUploading;
+  const isSilent = isLikelySilent;
+  const isPreviewPlaying = player.isPlaying;
+
+  const recordedSeconds = Math.floor(result.durationMs / 1000);
+  const playbackPositionSeconds = Math.floor(player.positionMs / 1000);
+
+  let statusText: string;
+  if (isUploading) {
+    statusText = COPY.record.uploadingStatus;
+  } else if (uploadFailed) {
+    statusText = COPY.record.uploadErrorStatus;
+  } else if (isSilent) {
+    statusText = COPY.record.silenceWarningStatus;
+  } else {
+    statusText = isPreviewPlaying ? COPY.record.previewPlayingStatus : COPY.record.recordedStatus;
+  }
+
+  let continueLabel: string;
+  if (isUploading) {
+    continueLabel = COPY.record.ctaUploading;
+  } else if (uploadFailed) {
+    continueLabel = COPY.record.ctaRetry;
+  } else if (isSilent) {
+    continueLabel = COPY.record.ctaReRecord;
+  } else {
+    continueLabel = COPY.common.continue;
+  }
+
+  const handlePlayPress = useCallback(async () => {
+    if (isUploading) return;
+    if (player.isPlaying) {
+      player.pause();
+    } else {
+      await player.play();
+    }
+  }, [isUploading, player]);
+
+  const handleRestart = useCallback(async () => {
+    player.unload();
+    await onRestartCapture();
+  }, [onRestartCapture, player]);
+
+  const handleUploadAndProceed = useCallback(async () => {
+    try {
+      player.unload();
+      await uploadVoice.mutateAsync({
+        uri: result.uri,
+        durationMs: result.durationMs,
+      });
+      onNext();
+    } catch {
+      // Error surfaces via uploadVoice.error and the retry CTA.
+    }
+  }, [onNext, player, result.durationMs, result.uri, uploadVoice]);
+
+  const handleContinue = useCallback(async () => {
+    if (isUploading) return;
+    if (isSilent) {
+      await handleRestart();
+      return;
+    }
+    await handleUploadAndProceed();
+  }, [handleRestart, handleUploadAndProceed, isSilent, isUploading]);
+
+  const handleSkip = useCallback(async () => {
+    player.unload();
+    await onRestartCapture();
+    onSkip?.();
+  }, [onRestartCapture, onSkip, player]);
+
+  const micAccessibilityLabel = isPreviewPlaying ? COPY.a11y.pause : COPY.a11y.play;
+
+  return (
+    <>
+      <View style={{ flexDirection: 'column', alignItems: 'center' }}>
+        <View style={{ position: 'relative', alignItems: 'center', justifyContent: 'center', width: 220, height: 220 }}>
+          <View style={{ position: 'absolute' }}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={micAccessibilityLabel}
+              onPress={handlePlayPress}
+              disabled={isUploading}
+              style={{
+                width: MIC_SIZE,
+                height: MIC_SIZE,
+                borderRadius: MIC_SIZE / 2,
+                overflow: 'hidden',
+                opacity: isUploading ? 0.6 : 1,
+              }}
+            >
+              <LinearGradient
+                colors={[...CTA_GRADIENT]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={{
+                  width: MIC_SIZE,
+                  height: MIC_SIZE,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                {isUploading ? (
+                  <ActivityIndicator color={COLORS.surface} size="large" />
+                ) : isPreviewPlaying ? (
+                  <Pause size={40} color={COLORS.surface} fill={COLORS.surface} />
+                ) : (
+                  <Play size={40} color={COLORS.surface} fill={COLORS.surface} style={{ marginLeft: 4 }} />
+                )}
+              </LinearGradient>
+            </Pressable>
+          </View>
+        </View>
+
+        <View style={{ marginTop: 24, minHeight: 92, flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start' }}>
+          <Text
+            style={{
+              fontSize: 28,
+              fontFamily: FONT.semibold,
+              color: COLORS.dark,
+              fontVariant: ['tabular-nums'],
+            }}
+          >
+            {isPreviewPlaying
+              ? formatTime(playbackPositionSeconds)
+              : formatTime(recordedSeconds)}{' '}
+            <Text style={{ fontSize: 18, fontFamily: FONT.regular, color: COLORS.textTertiary }}>
+              {isPreviewPlaying
+                ? `/ ${formatTime(recordedSeconds)}`
+                : COPY.record.maxDuration}
+            </Text>
+          </Text>
+
+          <Text
+            style={{
+              marginTop: 6,
+              textAlign: 'center',
+              fontSize: 14,
+              fontFamily: FONT.medium,
+              color: uploadFailed || isSilent ? COLORS.primary : COLORS.textSecondary,
+            }}
+          >
+            {statusText}
+          </Text>
+
+          {isSilent && (
+            <Text
+              style={{
+                marginTop: 4,
+                textAlign: 'center',
+                fontSize: 12,
+                fontFamily: FONT.medium,
+                color: COLORS.textTertiary,
+              }}
+            >
+              {COPY.record.silenceWarningHint}
+            </Text>
+          )}
+
+          {!isUploading && (
+            <Pressable
+              accessibilityRole="button"
+              onPress={handleRestart}
+              style={{ marginTop: 8 }}
+            >
+              <Text
+                style={{ fontSize: 14, fontFamily: FONT.medium, color: COLORS.textTertiary, textDecorationLine: 'underline' }}
+              >
+                {COPY.record.restart}
+              </Text>
+            </Pressable>
+          )}
+        </View>
+      </View>
+
+      <View style={{ width: '100%', alignSelf: 'center', gap: 12, maxWidth: contentMaxWidth }}>
+        <View
+          style={{
+            borderRadius: RADIUS.lg,
+            borderWidth: 1,
+            borderColor: COLORS.border,
+            backgroundColor: COLORS.surfaceMuted,
+            padding: 16,
+          }}
+        >
+          <Text style={{ fontSize: 14, lineHeight: 20, fontFamily: FONT.regular, color: COLORS.textSecondary }}>
+            {COPY.record.previewHint}
+          </Text>
+        </View>
+
+        <Pressable
+          accessibilityRole="button"
+          disabled={isUploading}
+          onPress={handleContinue}
+          style={{
+            width: '100%',
+            borderRadius: RADIUS.full,
+            overflow: 'hidden',
+            opacity: isUploading ? 0.4 : 1,
+            ...SHADOW.button,
+          }}
+        >
+          <LinearGradient
+            colors={[...CTA_GRADIENT]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 16 }}>
+              {isUploading ? (
+                <ActivityIndicator color={COLORS.surface} size="small" />
+              ) : null}
+              <Text style={{ fontFamily: FONT.bold, color: 'white' }}>{continueLabel}</Text>
+              {!isUploading ? <ArrowRight size={20} color={COLORS.surface} /> : null}
+            </View>
+          </LinearGradient>
+        </Pressable>
+
+        {isSilent && onSkip && (
+          <Pressable
+            accessibilityRole="button"
+            onPress={handleSkip}
+            style={{ alignSelf: 'center', paddingVertical: 8 }}
+          >
+            <Text
+              style={{ fontSize: 14, fontFamily: FONT.medium, color: COLORS.textTertiary, textDecorationLine: 'underline' }}
+            >
+              {COPY.record.ctaContinueWithoutVoice}
+            </Text>
+          </Pressable>
+        )}
+      </View>
+    </>
+  );
+}
+
 const RecordVoiceScreen: React.FC<Props> = ({ onNext, onSkip, onCancel }) => {
   const recorder = useVoiceRecorder();
-  const player = useVoicePlayer({ uri: recorder.result?.uri ?? null });
   const uploadVoice = useUploadVoice();
+  const previewUnloadRef = useRef<(() => void) | null>(null);
+
+  const registerPreviewUnload = useCallback((unload: () => void) => {
+    previewUnloadRef.current = unload;
+  }, []);
+
+  const handleRestartCapture = useCallback(async () => {
+    await recorder.reset();
+    uploadVoice.reset();
+  }, [recorder, uploadVoice]);
 
   const [showInspiration, setShowInspiration] = useState(false);
   const [currentQuestion, setCurrentQuestion] = useState(0);
@@ -250,28 +525,14 @@ const RecordVoiceScreen: React.FC<Props> = ({ onNext, onSkip, onCancel }) => {
 
   const isRecording = recorder.state === 'recording';
   const isStopped = recorder.state === 'stopped' && recorder.result !== null;
-  const isPreviewPlaying = isStopped && player.isPlaying;
-  const isUploading = uploadVoice.isPending;
-  const uploadFailed = uploadVoice.isError && !isUploading;
   const permissionDenied = recorder.state === 'error' && recorder.error === 'permission_denied';
-  const isSilent = isStopped && recorder.isLikelySilent;
 
-  // Display in seconds: durationMs updates at 50ms granularity but formatTime only renders m:ss,
-  // so the visible value still ticks once per second.
   const durationSeconds = Math.floor(recorder.durationMs / 1000);
   const minimumRemaining = Math.max(MIN_RECORDING_SECONDS - durationSeconds, 0);
 
   let statusText: string;
   if (permissionDenied) {
     statusText = COPY.record.permissionDeniedStatus;
-  } else if (isUploading) {
-    statusText = COPY.record.uploadingStatus;
-  } else if (uploadFailed) {
-    statusText = COPY.record.uploadErrorStatus;
-  } else if (isSilent) {
-    statusText = COPY.record.silenceWarningStatus;
-  } else if (isStopped) {
-    statusText = isPreviewPlaying ? COPY.record.previewPlayingStatus : COPY.record.recordedStatus;
   } else if (isRecording) {
     statusText = COPY.record.recordingStatus;
   } else {
@@ -282,14 +543,8 @@ const RecordVoiceScreen: React.FC<Props> = ({ onNext, onSkip, onCancel }) => {
     isRecording && minimumRemaining > 0 ? COPY.record.minimumRemaining(minimumRemaining) : '';
 
   let continueLabel: string;
-  if (isUploading) {
-    continueLabel = COPY.record.ctaUploading;
-  } else if (uploadFailed) {
-    continueLabel = COPY.record.ctaRetry;
-  } else if (isSilent) {
-    continueLabel = COPY.record.ctaReRecord;
-  } else if (isStopped) {
-    continueLabel = COPY.common.continue;
+  if (permissionDenied) {
+    continueLabel = COPY.record.ctaOpenSettings;
   } else if (isRecording) {
     continueLabel = recorder.canStop
       ? COPY.record.ctaStopRecording
@@ -298,56 +553,25 @@ const RecordVoiceScreen: React.FC<Props> = ({ onNext, onSkip, onCancel }) => {
     continueLabel = COPY.record.ctaRecord;
   }
 
-  const continueDisabled = isUploading || permissionDenied;
+  const continueDisabled = permissionDenied;
 
   const handleMicPress = useCallback(async () => {
-    if (isUploading) return;
     if (permissionDenied) {
       void Linking.openSettings();
-      return;
-    }
-    if (isStopped) {
-      if (player.isPlaying) {
-        player.pause();
-      } else {
-        await player.play();
-      }
       return;
     }
     if (isRecording) {
       if (recorder.canStop) {
         await recorder.stop();
       } else {
-        // Under minimum duration: discard and go back to idle so the user can retry immediately.
         await recorder.reset();
       }
       return;
     }
     await recorder.start();
-  }, [isRecording, isStopped, isUploading, permissionDenied, player, recorder]);
-
-  const handleUploadAndProceed = useCallback(async () => {
-    if (!recorder.result) return;
-    try {
-      player.unload();
-      await uploadVoice.mutateAsync({
-        uri: recorder.result.uri,
-        durationMs: recorder.result.durationMs,
-      });
-      onNext();
-    } catch {
-      // Error surfaces via uploadVoice.error and the retry CTA.
-    }
-  }, [onNext, player, recorder.result, uploadVoice]);
-
-  const handleRestart = useCallback(async () => {
-    player.unload();
-    await recorder.reset();
-    uploadVoice.reset();
-  }, [player, recorder, uploadVoice]);
+  }, [isRecording, permissionDenied, recorder]);
 
   const handleContinue = useCallback(async () => {
-    if (isUploading) return;
     if (permissionDenied) {
       void Linking.openSettings();
       return;
@@ -360,39 +584,26 @@ const RecordVoiceScreen: React.FC<Props> = ({ onNext, onSkip, onCancel }) => {
       }
       return;
     }
-    if (!isRecording && !isStopped) {
-      await recorder.start();
-      return;
-    }
-    // Silent recording: the primary CTA triggers a re-record instead of uploading.
-    if (isSilent) {
-      await handleRestart();
-      return;
-    }
-    await handleUploadAndProceed();
-  }, [handleRestart, handleUploadAndProceed, isRecording, isSilent, isStopped, isUploading, permissionDenied, recorder]);
+    await recorder.start();
+  }, [isRecording, permissionDenied, recorder]);
 
   const handleCancel = useCallback(async () => {
-    player.unload();
+    previewUnloadRef.current?.();
     await recorder.reset();
+    uploadVoice.reset();
     onCancel?.();
-  }, [onCancel, player, recorder]);
+  }, [onCancel, recorder, uploadVoice]);
 
   const handleSkip = useCallback(async () => {
-    player.unload();
     await recorder.reset();
     onSkip?.();
-  }, [onSkip, player, recorder]);
+  }, [onSkip, recorder]);
 
   const micAccessibilityLabel = (() => {
     if (permissionDenied) return COPY.record.ctaOpenSettings;
     if (isRecording) return COPY.a11y.stopRecording;
-    if (isStopped) return isPreviewPlaying ? COPY.a11y.pause : COPY.a11y.play;
     return COPY.a11y.record;
   })();
-
-  const showTimer = isRecording || isStopped;
-  const hintText = isStopped ? COPY.record.previewHint : COPY.record.hint;
 
   return (
     <LinearGradient
@@ -435,242 +646,207 @@ const RecordVoiceScreen: React.FC<Props> = ({ onNext, onSkip, onCancel }) => {
             </Text>
           </View>
 
-          <View style={{ flexDirection: 'column', alignItems: 'center' }}>
-            <View style={{ position: 'relative', alignItems: 'center', justifyContent: 'center', width: 220, height: 220 }}>
-              {isRecording && (
-                <>
-                  <PingRing
-                    delayMs={0}
-                    diameter={MIC_SIZE + 32}
-                    fillColor={COLORS.primaryMuted}
-                  />
-                  <PingRing
-                    delayMs={500}
-                    diameter={MIC_SIZE + 64}
-                    fillColor={COLORS.border}
-                  />
-                </>
-              )}
-              <View style={{ position: 'absolute' }}>
+          {isStopped && recorder.result ? (
+            <RecordVoicePreviewBody
+              result={recorder.result}
+              isLikelySilent={recorder.isLikelySilent}
+              uploadVoice={uploadVoice}
+              onNext={onNext}
+              onSkip={onSkip}
+              onRestartCapture={handleRestartCapture}
+              contentMaxWidth={contentMaxWidth}
+              onRegisterUnload={registerPreviewUnload}
+            />
+          ) : (
+            <>
+              <View style={{ flexDirection: 'column', alignItems: 'center' }}>
+                <View style={{ position: 'relative', alignItems: 'center', justifyContent: 'center', width: 220, height: 220 }}>
+                  {isRecording && (
+                    <>
+                      <PingRing
+                        delayMs={0}
+                        diameter={MIC_SIZE + 32}
+                        fillColor={COLORS.primaryMuted}
+                      />
+                      <PingRing
+                        delayMs={500}
+                        diameter={MIC_SIZE + 64}
+                        fillColor={COLORS.border}
+                      />
+                    </>
+                  )}
+                  <View style={{ position: 'absolute' }}>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={micAccessibilityLabel}
+                      onPress={handleMicPress}
+                      style={{
+                        width: MIC_SIZE,
+                        height: MIC_SIZE,
+                        borderRadius: MIC_SIZE / 2,
+                        overflow: 'hidden',
+                        opacity: isRecording ? 0.9 : 1,
+                      }}
+                    >
+                      <LinearGradient
+                        colors={[...CTA_GRADIENT]}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={{
+                          width: MIC_SIZE,
+                          height: MIC_SIZE,
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        {permissionDenied ? (
+                          <Settings size={36} color={COLORS.surface} />
+                        ) : isRecording ? (
+                          <Square size={32} color={COLORS.surface} fill={COLORS.surface} />
+                        ) : (
+                          <Mic size={44} color={COLORS.surface} />
+                        )}
+                      </LinearGradient>
+                    </Pressable>
+                  </View>
+                </View>
+
+                {isRecording ? (
+                  <View style={{ marginTop: 16 }}>
+                    <LiveMeteringWaveform meteringDb={recorder.meteringDb} />
+                  </View>
+                ) : null}
+
+                <View style={{ marginTop: 24, minHeight: 92, flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start' }}>
+                  {isRecording && (
+                    <Text
+                      style={{
+                        fontSize: 28,
+                        fontFamily: FONT.semibold,
+                        color: COLORS.dark,
+                        fontVariant: ['tabular-nums'],
+                      }}
+                    >
+                      {formatTime(durationSeconds)}{' '}
+                      <Text style={{ fontSize: 18, fontFamily: FONT.regular, color: COLORS.textTertiary }}>
+                        {COPY.record.maxDuration}
+                      </Text>
+                    </Text>
+                  )}
+
+                  <Text
+                    style={{
+                      marginTop: isRecording ? 6 : 0,
+                      textAlign: 'center',
+                      fontSize: 14,
+                      fontFamily: FONT.medium,
+                      color: permissionDenied ? COLORS.primary : COLORS.textSecondary,
+                    }}
+                  >
+                    {statusText}
+                  </Text>
+
+                  {minimumGuidanceText !== '' && (
+                    <Text
+                      style={{
+                        marginTop: 4,
+                        textAlign: 'center',
+                        fontSize: 12,
+                        fontFamily: FONT.medium,
+                        color: COLORS.textTertiary,
+                      }}
+                    >
+                      {minimumGuidanceText}
+                    </Text>
+                  )}
+                </View>
+              </View>
+
+              <View style={{ width: '100%', alignSelf: 'center', gap: 12, maxWidth: contentMaxWidth }}>
+                <View
+                  style={{
+                    borderRadius: RADIUS.lg,
+                    borderWidth: 1,
+                    borderColor: COLORS.border,
+                    backgroundColor: COLORS.surfaceMuted,
+                    padding: 16,
+                  }}
+                >
+                  <Text style={{ fontSize: 14, lineHeight: 20, fontFamily: FONT.regular, color: COLORS.textSecondary }}>
+                    {COPY.record.hint}
+                  </Text>
+
+                  {!isRecording && !permissionDenied && (
+                    <Pressable
+                      accessibilityRole="button"
+                      onPress={() => setShowInspiration(true)}
+                      style={{
+                        marginTop: 12,
+                        width: '100%',
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: 8,
+                        borderRadius: RADIUS.md,
+                        backgroundColor: COLORS.border,
+                        paddingVertical: 10,
+                      }}
+                    >
+                      <Lightbulb size={16} color="#f59e0b" />
+                      <Text style={{ fontSize: 14, fontFamily: FONT.medium, color: COLORS.textSecondary }}>
+                        {COPY.record.needInspiration}
+                      </Text>
+                    </Pressable>
+                  )}
+                </View>
+
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel={micAccessibilityLabel}
-                  onPress={handleMicPress}
-                  disabled={isUploading}
+                  disabled={continueDisabled}
+                  onPress={handleContinue}
                   style={{
-                    width: MIC_SIZE,
-                    height: MIC_SIZE,
-                    borderRadius: MIC_SIZE / 2,
+                    width: '100%',
+                    borderRadius: RADIUS.full,
                     overflow: 'hidden',
-                    opacity: isUploading ? 0.6 : isRecording ? 0.9 : 1,
+                    opacity: continueDisabled ? 0.4 : 1,
+                    ...SHADOW.button,
                   }}
                 >
                   <LinearGradient
                     colors={[...CTA_GRADIENT]}
                     start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={{
-                      width: MIC_SIZE,
-                      height: MIC_SIZE,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
+                    end={{ x: 1, y: 0 }}
                   >
-                    {permissionDenied ? (
-                      <Settings size={36} color={COLORS.surface} />
-                    ) : isUploading ? (
-                      <ActivityIndicator color={COLORS.surface} size="large" />
-                    ) : isRecording ? (
-                      <Square size={32} color={COLORS.surface} fill={COLORS.surface} />
-                    ) : isStopped && isPreviewPlaying ? (
-                      <Pause size={40} color={COLORS.surface} fill={COLORS.surface} />
-                    ) : isStopped ? (
-                      <Play size={40} color={COLORS.surface} fill={COLORS.surface} style={{ marginLeft: 4 }} />
-                    ) : (
-                      <Mic size={44} color={COLORS.surface} />
-                    )}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 16 }}>
+                      <Text style={{ fontFamily: FONT.bold, color: 'white' }}>{continueLabel}</Text>
+                      <ArrowRight size={20} color={COLORS.surface} />
+                    </View>
                   </LinearGradient>
                 </Pressable>
-              </View>
-            </View>
 
-            {isRecording ? (
-              <View style={{ marginTop: 16 }}>
-                <LiveMeteringWaveform meteringDb={recorder.meteringDb} />
-              </View>
-            ) : null}
-
-            <View style={{ marginTop: 24, minHeight: 92, flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start' }}>
-              {showTimer && (
-                <Text
-                  style={{
-                    fontSize: 28,
-                    fontFamily: FONT.semibold,
-                    color: COLORS.dark,
-                    fontVariant: ['tabular-nums'],
-                  }}
-                >
-                  {formatTime(durationSeconds)}{' '}
-                  <Text style={{ fontSize: 18, fontFamily: FONT.regular, color: COLORS.textTertiary }}>{COPY.record.maxDuration}</Text>
-                </Text>
-              )}
-
-              <Text
-                style={{
-                  marginTop: showTimer ? 6 : 0,
-                  textAlign: 'center',
-                  fontSize: 14,
-                  fontFamily: FONT.medium,
-                  color: uploadFailed || permissionDenied || isSilent ? COLORS.primary : COLORS.textSecondary,
-                }}
-              >
-                {statusText}
-              </Text>
-
-              {isSilent && (
-                <Text
-                  style={{
-                    marginTop: 4,
-                    textAlign: 'center',
-                    fontSize: 12,
-                    fontFamily: FONT.medium,
-                    color: COLORS.textTertiary,
-                  }}
-                >
-                  {COPY.record.silenceWarningHint}
-                </Text>
-              )}
-
-              {minimumGuidanceText !== '' && (
-                <Text
-                  style={{
-                    marginTop: 4,
-                    textAlign: 'center',
-                    fontSize: 12,
-                    fontFamily: FONT.medium,
-                    color: COLORS.textTertiary,
-                  }}
-                >
-                  {minimumGuidanceText}
-                </Text>
-              )}
-
-              {(isStopped || uploadFailed) && !isUploading && (
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={handleRestart}
-                  style={{ marginTop: 8 }}
-                >
-                  <Text
-                    style={{ fontSize: 14, fontFamily: FONT.medium, color: COLORS.textTertiary, textDecorationLine: 'underline' }}
+                {!isRecording && onSkip ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={handleSkip}
+                    style={({ pressed }) => ({
+                      width: '100%',
+                      borderRadius: RADIUS.cta,
+                      borderWidth: 1.5,
+                      borderColor: COLORS.darkMuted,
+                      backgroundColor: pressed ? COLORS.surfaceLight : 'transparent',
+                      paddingVertical: 14,
+                      opacity: pressed ? 0.75 : 1,
+                      transform: [{ scale: pressed ? 0.98 : 1 }],
+                    })}
                   >
-                    {COPY.record.restart}
-                  </Text>
-                </Pressable>
-              )}
-            </View>
-          </View>
-
-          <View style={{ width: '100%', alignSelf: 'center', gap: 12, maxWidth: contentMaxWidth }}>
-            <View
-              style={{
-                borderRadius: RADIUS.lg,
-                borderWidth: 1,
-                borderColor: COLORS.border,
-                backgroundColor: COLORS.surfaceMuted,
-                padding: 16,
-              }}
-            >
-              <Text style={{ fontSize: 14, lineHeight: 20, fontFamily: FONT.regular, color: COLORS.textSecondary }}>
-                {hintText}
-              </Text>
-
-              {!isStopped && !isRecording && !permissionDenied && !isUploading && (
-                <Pressable
-                  accessibilityRole="button"
-                  onPress={() => setShowInspiration(true)}
-                  style={{
-                    marginTop: 12,
-                    width: '100%',
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 8,
-                    borderRadius: RADIUS.md,
-                    backgroundColor: COLORS.border,
-                    paddingVertical: 10,
-                  }}
-                >
-                  <Lightbulb size={16} color="#f59e0b" />
-                  <Text style={{ fontSize: 14, fontFamily: FONT.medium, color: COLORS.textSecondary }}>
-                    {COPY.record.needInspiration}
-                  </Text>
-                </Pressable>
-              )}
-            </View>
-
-            <Pressable
-              accessibilityRole="button"
-              disabled={continueDisabled}
-              onPress={handleContinue}
-              style={{
-                width: '100%',
-                borderRadius: RADIUS.full,
-                overflow: 'hidden',
-                opacity: continueDisabled ? 0.4 : 1,
-                ...SHADOW.button,
-              }}
-            >
-              <LinearGradient
-                colors={[...CTA_GRADIENT]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-              >
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 16 }}>
-                  {isUploading ? (
-                    <ActivityIndicator color={COLORS.surface} size="small" />
-                  ) : null}
-                  <Text style={{ fontFamily: FONT.bold, color: 'white' }}>{continueLabel}</Text>
-                  {!isUploading ? <ArrowRight size={20} color={COLORS.surface} /> : null}
-                </View>
-              </LinearGradient>
-            </Pressable>
-
-            {isSilent && onSkip && (
-              <Pressable
-                accessibilityRole="button"
-                onPress={handleSkip}
-                style={{ alignSelf: 'center', paddingVertical: 8 }}
-              >
-                <Text
-                  style={{ fontSize: 14, fontFamily: FONT.medium, color: COLORS.textTertiary, textDecorationLine: 'underline' }}
-                >
-                  {COPY.record.ctaContinueWithoutVoice}
-                </Text>
-              </Pressable>
-            )}
-
-            {!isStopped && !isRecording && !isUploading && onSkip ? (
-              <Pressable
-                accessibilityRole="button"
-                onPress={handleSkip}
-                style={({ pressed }) => ({
-                  width: '100%',
-                  borderRadius: RADIUS.cta,
-                  borderWidth: 1.5,
-                  borderColor: COLORS.darkMuted,
-                  backgroundColor: pressed ? COLORS.surfaceLight : 'transparent',
-                  paddingVertical: 14,
-                  opacity: pressed ? 0.75 : 1,
-                  transform: [{ scale: pressed ? 0.98 : 1 }],
-                })}
-              >
-                <Text style={{ textAlign: 'center', fontSize: 14, fontFamily: FONT.semibold, color: COLORS.textSecondary }}>
-                  {COPY.record.skip}
-                </Text>
-              </Pressable>
-            ) : null}
-          </View>
+                    <Text style={{ textAlign: 'center', fontSize: 14, fontFamily: FONT.semibold, color: COLORS.textSecondary }}>
+                      {COPY.record.skip}
+                    </Text>
+                  </Pressable>
+                ) : null}
+              </View>
+            </>
+          )}
         </View>
       </SafeAreaView>
 
