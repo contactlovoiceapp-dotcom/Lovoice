@@ -31,9 +31,14 @@ export default function MessagesRoute() {
     setIsRefreshing(false);
   }, [refetch]);
 
-  const handleOpenConversation = useCallback((id: string) => {
-    router.push(`/messages/${id}` as Href);
-  }, []);
+  const handleOpenConversation = useCallback(
+    (id: string) => {
+      const conv = conversations.find((c) => c.conversationId === id);
+      if (conv?.isOtherAccountDeleted) return;
+      router.push(`/messages/${id}` as Href);
+    },
+    [conversations],
+  );
 
   return (
     <View style={{ flex: 1, backgroundColor: COLORS.background }}>

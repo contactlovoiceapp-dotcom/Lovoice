@@ -23,6 +23,7 @@ const baseConversation: InboxConversation = {
   lastMessageSenderIsMe: false,
   unreadCount: 0,
   lifecycle: { state: 'open' },
+  isOtherAccountDeleted: false,
 };
 
 const defaultProps = {
@@ -140,5 +141,23 @@ describe('MessagesScreen', () => {
     const props = { ...defaultProps, conversations: [convo] };
     const { getByText } = render(<MessagesScreen {...props} />);
     expect(getByText(COPY.chat.inbox.voiceOnlyBadge)).toBeTruthy();
+  });
+
+  it('renders a non-interactive row for a deleted correspondent', () => {
+    const deleted: InboxConversation = {
+      ...baseConversation,
+      displayName: COPY.chat.inbox.deletedAccountName,
+      lastMessagePreview: COPY.chat.inbox.deletedAccountPreview,
+      lifecycle: { state: 'awaiting_reply', initiatorId: 'me' },
+      isOtherAccountDeleted: true,
+    };
+    const onOpenConversation = jest.fn();
+    const props = { ...defaultProps, conversations: [deleted], onOpenConversation };
+    const { getByLabelText, queryByText, queryAllByRole } = render(<MessagesScreen {...props} />);
+
+    expect(getByLabelText(COPY.chat.inbox.deletedAccountA11y)).toBeTruthy();
+    expect(queryByText(COPY.chat.inbox.awaitingBadge)).toBeNull();
+    expect(queryAllByRole('button')).toHaveLength(0);
+    expect(onOpenConversation).not.toHaveBeenCalled();
   });
 });

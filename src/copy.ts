@@ -292,6 +292,9 @@ export const COPY = {
       errorTitle: 'Impossible de charger les conversations.',
       retry: 'Réessayer',
       openConversationHint: 'Ouvre la conversation',
+      deletedAccountName: 'Compte supprimé',
+      deletedAccountPreview: 'Conversation terminée',
+      deletedAccountA11y: 'Compte supprimé, conversation indisponible',
     },
     conversation: {
       voiceOnlyCountdown: (h: number, m: number) =>

@@ -28,6 +28,8 @@ export interface InboxConversation {
   lastMessageSenderIsMe: boolean;
   unreadCount: number;
   lifecycle: ConversationLifecycle;
+  /** Correspondent account was purged — inbox row is display-only. */
+  isOtherAccountDeleted: boolean;
 }
 
 // View model used by ConversationScreen.
@@ -43,6 +45,7 @@ export interface ConversationDetails {
   lifecycle: ConversationLifecycle;
   initiatorId: string;
   iAmInitiator: boolean;
+  isOtherAccountDeleted: boolean;
 }
 
 // Domain object exposed to the UI for a single message.

@@ -60,23 +60,12 @@ function ConversationRow({
   conversation: InboxConversation;
   onPress: () => void;
 }) {
-  const isUnread = conversation.unreadCount > 0;
-  const firstEmoji = conversation.avatarEmojis[0] ?? '💬';
+  const isDeleted = conversation.isOtherAccountDeleted;
+  const isUnread = !isDeleted && conversation.unreadCount > 0;
+  const firstEmoji = isDeleted ? '💬' : (conversation.avatarEmojis[0] ?? '💬');
 
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityHint={COPY.chat.inbox.openConversationHint}
-      onPress={onPress}
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingVertical: 12,
-        gap: 12,
-        borderBottomWidth: 1,
-        borderBottomColor: COLORS.border,
-      }}
-    >
+  const rowContent = (
+    <>
       <View
         style={{
           width: 56,
@@ -85,12 +74,13 @@ function ConversationRow({
           backgroundColor: COLORS.primaryMuted,
           alignItems: 'center',
           justifyContent: 'center',
+          opacity: isDeleted ? 0.55 : 1,
         }}
       >
         <Text style={{ fontSize: 26 }}>{firstEmoji}</Text>
       </View>
 
-      <View style={{ flex: 1 }}>
+      <View style={{ flex: 1, opacity: isDeleted ? 0.55 : 1 }}>
         <Text
           style={{
             fontFamily: isUnread ? FONT.bold : FONT.semibold,
@@ -103,7 +93,7 @@ function ConversationRow({
           {conversation.displayName}
         </Text>
 
-        <LifecyclePill lifecycle={conversation.lifecycle} />
+        {!isDeleted && <LifecyclePill lifecycle={conversation.lifecycle} />}
 
         <Text
           style={{
@@ -117,10 +107,12 @@ function ConversationRow({
         </Text>
       </View>
 
-      <View style={{ alignItems: 'flex-end', gap: 4 }}>
-        <Text style={{ fontFamily: FONT.regular, fontSize: 12, color: COLORS.textTertiary }}>
-          {formatRelativeTime(conversation.lastMessageAt)}
-        </Text>
+      <View style={{ alignItems: 'flex-end', gap: 4, opacity: isDeleted ? 0.55 : 1 }}>
+        {!isDeleted && (
+          <Text style={{ fontFamily: FONT.regular, fontSize: 12, color: COLORS.textTertiary }}>
+            {formatRelativeTime(conversation.lastMessageAt)}
+          </Text>
+        )}
 
         {isUnread && (
           <View
@@ -141,6 +133,43 @@ function ConversationRow({
           </View>
         )}
       </View>
+    </>
+  );
+
+  if (isDeleted) {
+    return (
+      <View
+        accessibilityRole="text"
+        accessibilityLabel={COPY.chat.inbox.deletedAccountA11y}
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingVertical: 12,
+          gap: 12,
+          borderBottomWidth: 1,
+          borderBottomColor: COLORS.border,
+        }}
+      >
+        {rowContent}
+      </View>
+    );
+  }
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityHint={COPY.chat.inbox.openConversationHint}
+      onPress={onPress}
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 12,
+        gap: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: COLORS.border,
+      }}
+    >
+      {rowContent}
     </Pressable>
   );
 }

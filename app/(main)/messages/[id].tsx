@@ -109,6 +109,13 @@ export default function ConversationRoute() {
   }, []);
 
   useEffect(() => {
+    if (isLoadingDetails || !details) return;
+    if (details.isOtherAccountDeleted) {
+      closeConversation();
+    }
+  }, [isLoadingDetails, details]);
+
+  useEffect(() => {
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
       closeConversation();
       return true;

@@ -3,7 +3,9 @@
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 
 import { getSupabaseClient } from '@/lib/supabase';
+import { COPY } from '@/copy';
 import { fetchLastMessagePerConversation } from './inboxLastMessages';
+import { isDeletedOtherAccount } from '../constants';
 import {
   deriveLifecycle,
   formatLastMessagePreview,
@@ -35,6 +37,7 @@ interface RawConversationRow {
     bio_emojis: string[];
     birthdate: string;
     city: string;
+    deleted_at: string | null;
   } | null;
   profile_b: {
     id: string;
@@ -42,6 +45,7 @@ interface RawConversationRow {
     bio_emojis: string[];
     birthdate: string;
     city: string;
+    deleted_at: string | null;
   } | null;
 }
 
@@ -62,8 +66,8 @@ export function useConversations(): UseQueryResult<InboxConversation[], Error> {
         .from('conversations')
         .select(
           'id, user_a, user_b, initiator_id, first_reply_at, last_message_at, ' +
-          'profile_a:profiles!conversations_user_a_fkey(id, display_name, bio_emojis, birthdate, city), ' +
-          'profile_b:profiles!conversations_user_b_fkey(id, display_name, bio_emojis, birthdate, city)',
+          'profile_a:profiles!conversations_user_a_fkey(id, display_name, bio_emojis, birthdate, city, deleted_at), ' +
+          'profile_b:profiles!conversations_user_b_fkey(id, display_name, bio_emojis, birthdate, city, deleted_at)',
         )
         .or(`user_a.eq.${uid},user_b.eq.${uid}`)
         .not('last_message_at', 'is', null)
@@ -102,11 +106,12 @@ export function useConversations(): UseQueryResult<InboxConversation[], Error> {
           const otherProfile = iAmA ? conv.profile_b : conv.profile_a;
           const otherUserId = iAmA ? conv.user_b : conv.user_a;
           const lastMsg = lastMsgMap.get(conv.id)!;
+          const otherAccountDeleted = isDeletedOtherAccount(otherUserId, otherProfile);
 
-          // otherProfile is null when the other participant's account was deleted and the
-          // tombstone RLS policy is not yet applied — fall back to a safe display label.
-          const displayName = otherProfile?.display_name ?? 'Compte supprimé';
-          const avatarEmojis = otherProfile?.bio_emojis ?? [];
+          const displayName = otherAccountDeleted
+            ? COPY.chat.inbox.deletedAccountName
+            : (otherProfile?.display_name ?? COPY.chat.inbox.deletedAccountName);
+          const avatarEmojis = otherAccountDeleted ? [] : (otherProfile?.bio_emojis ?? []);
 
           const convRow: ConversationRow = {
             id: conv.id,
@@ -124,15 +129,18 @@ export function useConversations(): UseQueryResult<InboxConversation[], Error> {
             displayName,
             avatarEmojis,
             lastMessageAt: conv.last_message_at as string,
-            lastMessagePreview: formatLastMessagePreview({
-              kind: lastMsg.kind,
-              body_text: lastMsg.body_text,
-              voice_duration_ms: lastMsg.voice_duration_ms,
-            }),
+            lastMessagePreview: otherAccountDeleted
+              ? COPY.chat.inbox.deletedAccountPreview
+              : formatLastMessagePreview({
+                  kind: lastMsg.kind,
+                  body_text: lastMsg.body_text,
+                  voice_duration_ms: lastMsg.voice_duration_ms,
+                }),
             lastMessageKind: lastMsg.kind as MessageKind,
             lastMessageSenderIsMe: lastMsg.sender_id === uid,
-            unreadCount: unreadCountMap.get(conv.id) ?? 0,
+            unreadCount: otherAccountDeleted ? 0 : (unreadCountMap.get(conv.id) ?? 0),
             lifecycle: deriveLifecycle(convRow, true),
+            isOtherAccountDeleted: otherAccountDeleted,
           };
         });
     },
@@ -197,8 +205,8 @@ export function useConversationDetails(
         .from('conversations')
         .select(
           'id, user_a, user_b, initiator_id, first_reply_at, last_message_at, created_at, ' +
-          'profile_a:profiles!conversations_user_a_fkey(id, display_name, bio_emojis, birthdate, city), ' +
-          'profile_b:profiles!conversations_user_b_fkey(id, display_name, bio_emojis, birthdate, city)',
+          'profile_a:profiles!conversations_user_a_fkey(id, display_name, bio_emojis, birthdate, city, deleted_at), ' +
+          'profile_b:profiles!conversations_user_b_fkey(id, display_name, bio_emojis, birthdate, city, deleted_at)',
         )
         .eq('id', conversationId as string)
         .single();
@@ -210,6 +218,7 @@ export function useConversationDetails(
       const iAmA = conv.user_a === uid;
       const otherProfile = iAmA ? conv.profile_b : conv.profile_a;
       const otherUserId = iAmA ? conv.user_b : conv.user_a;
+      const otherAccountDeleted = isDeletedOtherAccount(otherUserId, otherProfile);
 
       // Count messages to distinguish 'empty' from the other states in deriveLifecycle.
       const { count: msgCount, error: countError } = await supabase
@@ -242,14 +251,17 @@ export function useConversationDetails(
       return {
         conversationId: conv.id,
         otherUserId,
-        otherDisplayName: otherProfile?.display_name ?? 'Compte supprimé',
-        otherCity: otherProfile?.city ?? '',
-        otherEmojis: otherProfile?.bio_emojis ?? [],
-        otherBirthdate: otherProfile?.birthdate ?? '',
+        otherDisplayName: otherAccountDeleted
+          ? COPY.chat.inbox.deletedAccountName
+          : (otherProfile?.display_name ?? COPY.chat.inbox.deletedAccountName),
+        otherCity: otherAccountDeleted ? '' : (otherProfile?.city ?? ''),
+        otherEmojis: otherAccountDeleted ? [] : (otherProfile?.bio_emojis ?? []),
+        otherBirthdate: otherAccountDeleted ? '' : (otherProfile?.birthdate ?? ''),
         otherActiveVoiceId: voiceRow?.id ?? null,
         lifecycle: deriveLifecycle(convRow, (msgCount ?? 0) > 0),
         initiatorId: conv.initiator_id,
         iAmInitiator: conv.initiator_id === uid,
+        isOtherAccountDeleted: otherAccountDeleted,
       };
     },
   });
