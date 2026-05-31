@@ -86,19 +86,19 @@ function VoiceOnlyHintBanner({
   const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 30_000);
+    const id = setInterval(() => setNow(new Date()), 1_000);
     return () => clearInterval(id);
   }, []);
 
-  const { hours, minutes, expired } = formatVoiceOnlyCountdown(voiceOnlyUntil, now);
+  const { hours, minutes, seconds, expired } = formatVoiceOnlyCountdown(voiceOnlyUntil, now);
 
   useEffect(() => {
     if (expired) onExpired?.();
   }, [expired, onExpired]);
 
   const text = expired
-    ? COPY.chat.conversation.composerHintVoiceOnly(0, 0)
-    : COPY.chat.conversation.composerHintVoiceOnly(hours, minutes);
+    ? COPY.chat.conversation.composerHintVoiceOnly(0, 0, 0)
+    : COPY.chat.conversation.composerHintVoiceOnly(hours, minutes, seconds);
 
   return <HintBanner text={text} />;
 }

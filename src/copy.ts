@@ -297,15 +297,14 @@ export const COPY = {
       deletedAccountA11y: 'Compte supprimé, conversation indisponible',
     },
     conversation: {
-      voiceOnlyCountdown: (h: number, m: number) =>
-        `Mode chat débloqué dans ${h}h${m.toString().padStart(2, '0')}`,
-      voiceOnlyCountdownPrefix: 'Mode chat dans',
+      voiceOnlyCountdown: (h: number, m: number, s: number) =>
+        `Mode chat dans ${h}h${m.toString().padStart(2, '0')}m${s.toString().padStart(2, '0')}s`,
       composerHintAwaiting: (name: string) => `En attente de la réponse de ${name}…`,
       composerHintInitial: 'Envoie un vocal — tu n\'as qu\'une chance.',
       composerHintRecipientReply: 'À ton tour — réponds avec un vocal.',
       composerHintEmptyDefensive: 'Cette conversation n\'est pas disponible.',
-      composerHintVoiceOnly: (h: number, m: number) =>
-        `Messagerie texte disponible dans ${h}h${m.toString().padStart(2, '0')}`,
+      composerHintVoiceOnly: (h: number, m: number, s: number) =>
+        `Messagerie texte disponible dans ${h}h${m.toString().padStart(2, '0')}m${s.toString().padStart(2, '0')}s`,
       conversationInfoBanner: (name: string) =>
         `Si tu réponds à ${name}, ${name} pourra te répondre librement.`,
       sendError: {

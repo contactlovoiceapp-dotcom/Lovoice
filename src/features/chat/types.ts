@@ -158,6 +158,7 @@ export function groupMessagesIntoBursts(messages: ChatMessage[]): BurstMessage[]
 export interface VoiceOnlyCountdownResult {
   hours: number;
   minutes: number;
+  seconds: number;
   expired: boolean;
 }
 
@@ -168,12 +169,13 @@ export function formatVoiceOnlyCountdown(
   const target = new Date(voiceOnlyUntil).getTime();
   const diff = target - now.getTime();
 
-  if (diff <= 0) return { hours: 0, minutes: 0, expired: true };
+  if (diff <= 0) return { hours: 0, minutes: 0, seconds: 0, expired: true };
 
-  const totalMinutes = Math.floor(diff / 60_000);
+  const totalSeconds = Math.floor(diff / 1000);
   return {
-    hours: Math.floor(totalMinutes / 60),
-    minutes: totalMinutes % 60,
+    hours: Math.floor(totalSeconds / 3600),
+    minutes: Math.floor((totalSeconds % 3600) / 60),
+    seconds: totalSeconds % 60,
     expired: false,
   };
 }
