@@ -7,6 +7,27 @@ import ConversationComposer from '../ConversationComposer';
 import type { ConversationLifecycle } from '../../types';
 import { COPY } from '@/copy';
 
+jest.mock('../VoiceRecordingSession', () => {
+  const { useEffect: mockUseEffect } = require('react');
+  return function MockVoiceRecordingSession({
+    mode,
+    onReady,
+    onFinalized,
+  }: {
+    mode: string;
+    onReady?: () => void;
+    onFinalized?: (result: { uri: string; durationMs: number }) => void;
+  }) {
+    mockUseEffect(() => {
+      if (mode === 'recording') onReady?.();
+      if (mode === 'finalizing') {
+        onFinalized?.({ uri: 'file:///tmp/voice.m4a', durationMs: 5_000 });
+      }
+    }, [mode, onReady, onFinalized]);
+    return null;
+  };
+});
+
 function renderComposer(overrides: {
   lifecycle?: ConversationLifecycle;
   iAmInitiator?: boolean;
@@ -125,5 +146,50 @@ describe('ConversationComposer', () => {
     await waitFor(() => {
       expect(onTextChange).toHaveBeenCalledWith('Salut');
     });
+  });
+
+  it('keeps the sending overlay through finalize and upload without flashing the idle form', async () => {
+    const onSendVoice = jest.fn(() => Promise.resolve());
+    const { getByTestId, queryByTestId, rerender } = renderComposer({
+      lifecycle: { state: 'open' },
+      onSendVoice,
+    });
+
+    fireEvent.press(getByTestId('voice-button'));
+    await waitFor(() => expect(getByTestId('recording-send-button')).toBeTruthy());
+
+    fireEvent.press(getByTestId('recording-send-button'));
+
+    await waitFor(() => {
+      expect(queryByTestId('composer-input')).toBeNull();
+    });
+    expect(onSendVoice).toHaveBeenCalledWith('file:///tmp/voice.m4a', 5_000);
+
+    rerender(
+      <ConversationComposer
+        lifecycle={{ state: 'open' }}
+        iAmInitiator
+        otherDisplayName="Marie"
+        onSendText={jest.fn()}
+        onSendVoice={onSendVoice}
+        isSending={false}
+        isSendingVoice
+      />,
+    );
+    expect(queryByTestId('composer-input')).toBeNull();
+
+    rerender(
+      <ConversationComposer
+        lifecycle={{ state: 'open' }}
+        iAmInitiator
+        otherDisplayName="Marie"
+        onSendText={jest.fn()}
+        onSendVoice={onSendVoice}
+        isSending={false}
+        isSendingVoice={false}
+      />,
+    );
+
+    await waitFor(() => expect(getByTestId('composer-input')).toBeTruthy());
   });
 });

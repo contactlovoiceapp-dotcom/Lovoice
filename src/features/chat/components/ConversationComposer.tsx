@@ -1,6 +1,6 @@
 /* Composer bar — text input + tap-to-record voice, adapts to the 4-state conversation lifecycle. */
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -122,6 +122,10 @@ export default function ConversationComposer({
 
   const [recordingState, setRecordingState] = useState<ComposerRecordingState>('idle');
   const [durationMs, setDurationMs] = useState(0);
+  // Tracks a voice upload kicked off from handleSessionFinalized so we keep the
+  // "Envoi…" overlay until the mutation settles — never flash the idle form in between.
+  const voiceUploadPendingRef = useRef(false);
+  const voiceUploadSeenPendingRef = useRef(false);
 
   const isSessionActive = recordingState !== 'idle';
   const isRecording = recordingState === 'recording';
@@ -174,9 +178,9 @@ export default function ConversationComposer({
   const handleSessionFinalized = useCallback(
     (result: { uri: string; durationMs: number }) => {
       onRecordingStateChange?.(false);
-      setRecordingState('idle');
 
       if (result.durationMs < MIN_VOICE_MESSAGE_DURATION_MS) {
+        setRecordingState('idle');
         try {
           new File(result.uri).delete();
         } catch { /* non-fatal */ }
@@ -185,10 +189,25 @@ export default function ConversationComposer({
         return;
       }
 
+      voiceUploadPendingRef.current = true;
       void onSendVoice(result.uri, result.durationMs);
+      // Stay in 'finalizing' — the composer keeps showing "Envoi…" until the
+      // upload mutation settles (see voice-upload effect below).
     },
     [onSendVoice, onRecordingStateChange],
   );
+
+  useEffect(() => {
+    if (!voiceUploadPendingRef.current) return;
+    if (isSendingVoice) {
+      voiceUploadSeenPendingRef.current = true;
+      return;
+    }
+    if (!voiceUploadSeenPendingRef.current) return;
+    voiceUploadPendingRef.current = false;
+    voiceUploadSeenPendingRef.current = false;
+    setRecordingState('idle');
+  }, [isSendingVoice]);
 
   const handleSessionCancelled = useCallback(() => {
     setRecordingState('idle');
