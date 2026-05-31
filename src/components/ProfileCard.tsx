@@ -24,7 +24,6 @@ import Animated, {
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Circle, Defs, RadialGradient, Stop } from 'react-native-svg';
 import {
-  ChevronDown,
   Heart,
   Lock,
   MessageCircle,
@@ -184,19 +183,6 @@ function GlowLayer({
   );
 }
 
-/* Fades children in/out on 250ms when `visible` changes. Local to this file for the feed advance cue. */
-function FadeWhen({ visible, children }: { visible: boolean; children: React.ReactNode }) {
-  const opacity = useSharedValue(visible ? 1 : 0);
-
-  useEffect(() => {
-    opacity.value = withTiming(visible ? 1 : 0, { duration: 250 });
-  }, [visible]);
-
-  const animStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
-
-  return <Animated.View style={animStyle}>{children}</Animated.View>;
-}
-
 function PlayGlyph({ size = 34, color = 'white' }: { size?: number; color?: string }) {
   return (
     <View
@@ -279,7 +265,6 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
   const playScale = useSharedValue(1);
   // Controls the ambient glow visibility — fades in on play, fades out slowly on pause.
   const glowOpacity = useSharedValue(0);
-  const chevronY = useSharedValue(0);
 
   const likeAnimStyle = useAnimatedStyle(() => ({
     transform: [{ scale: likeScale.value }],
@@ -300,21 +285,6 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
   const ctaGlowStyle = useAnimatedStyle(() => ({
     opacity: intensity.value,
   }));
-  const chevronAnimStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: chevronY.value }],
-  }));
-
-  useEffect(() => {
-    chevronY.value = withRepeat(
-      withSequence(
-        withTiming(4, { duration: 900, easing: Easing.inOut(Easing.sin) }),
-        withTiming(0, { duration: 900, easing: Easing.inOut(Easing.sin) }),
-      ),
-      -1,
-      false,
-    );
-    return () => cancelAnimation(chevronY);
-  }, []);
 
   // Tracks whether the user has heard the track through to the end.
   // Reset to false when positionMs drops back near 0 (i.e. after a seekTo(0) replay)
@@ -732,15 +702,6 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
                 </Text>
               </View>
             </View>
-
-            {/* Feed advance cue — only shown after listening is done and not during playback */}
-            <FadeWhen visible={hasListened && !isPlaying}>
-              <View style={{ alignItems: 'center', marginTop: 4 }}>
-                <Animated.View style={chevronAnimStyle}>
-                  <ChevronDown size={20} color="rgba(255,255,255,0.4)" strokeWidth={2.4} />
-                </Animated.View>
-              </View>
-            </FadeWhen>
           </View>
         </View>
       </LinearGradient>
