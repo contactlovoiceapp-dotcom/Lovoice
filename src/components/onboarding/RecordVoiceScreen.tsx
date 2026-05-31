@@ -721,11 +721,17 @@ const RecordVoiceScreen: React.FC<Props> = ({ onNext, onSkip, onCancel }) => {
               <Lightbulb size={24} color="#f59e0b" />
             </View>
 
-            <Text style={{ marginBottom: 16, fontSize: 20, fontFamily: FONT.bold, color: COLORS.dark }}>{COPY.record.inspirationTitle}</Text>
             <Text
-              style={{ marginBottom: 32, fontFamily: FONT.serifItalic, fontSize: 18, color: COLORS.textSecondary, minHeight: 80 }}
+              style={{
+                marginBottom: 32,
+                fontFamily: FONT.medium,
+                fontSize: 20,
+                lineHeight: 28,
+                color: COLORS.dark,
+                minHeight: 80,
+              }}
             >
-              {`\u201C${COPY.record.inspirationQuestions[currentQuestion]}\u201D`}
+              {COPY.record.inspirationQuestions[currentQuestion]}
             </Text>
 
             <Pressable
