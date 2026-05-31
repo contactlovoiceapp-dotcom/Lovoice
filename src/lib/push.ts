@@ -33,6 +33,26 @@ async function ensureAndroidDefaultChannel(): Promise<void> {
 }
 
 /**
+ * Clears the last notification tap stored by the OS so it is not replayed on the
+ * next unrelated navigation (e.g. finishing onboarding and entering the main tabs).
+ */
+export async function clearPendingNotificationDeepLink(): Promise<void> {
+  try {
+    const clear = (
+      Notifications as typeof Notifications & {
+        clearLastNotificationResponseAsync?: () => Promise<void>;
+      }
+    ).clearLastNotificationResponseAsync;
+
+    if (typeof clear === 'function') {
+      await clear();
+    }
+  } catch (error: unknown) {
+    console.warn('[push] Failed to clear last notification response:', error);
+  }
+}
+
+/**
  * Requests permission and returns the Expo Push Token string, or null if:
  * - the user denied permission (and canAskAgain is false)
  * - the Expo project ID is missing from app config

@@ -7,6 +7,11 @@ import type * as NotificationsTypes from 'expo-notifications';
 jest.mock('expo-notifications', () => ({
   getLastNotificationResponseAsync: jest.fn(),
   addNotificationResponseReceivedListener: jest.fn(),
+  clearLastNotificationResponseAsync: jest.fn(),
+}));
+
+jest.mock('@/lib/push', () => ({
+  clearPendingNotificationDeepLink: jest.fn(() => Promise.resolve()),
 }));
 
 jest.mock('expo-router', () => ({
@@ -20,6 +25,7 @@ jest.mock('@/navigation/messagesNavigation', () => ({
 import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import { openConversation } from '@/navigation/messagesNavigation';
+import { clearPendingNotificationDeepLink } from '@/lib/push';
 import { usePushDeepLink } from '../usePushDeepLink';
 
 const VALID_UUID = '123e4567-e89b-12d3-a456-426614174000';
@@ -82,6 +88,10 @@ describe('usePushDeepLink', () => {
     await waitFor(() => {
       expect(router.push).toHaveBeenCalledWith('/likes');
     });
+
+    await waitFor(() => {
+      expect(clearPendingNotificationDeepLink).toHaveBeenCalled();
+    });
   });
 
   it('navigates to /messages/<uuid> on cold-start for a message notification', async () => {
@@ -93,6 +103,10 @@ describe('usePushDeepLink', () => {
 
     await waitFor(() => {
       expect(openConversation).toHaveBeenCalledWith(VALID_UUID);
+    });
+
+    await waitFor(() => {
+      expect(clearPendingNotificationDeepLink).toHaveBeenCalled();
     });
   });
 

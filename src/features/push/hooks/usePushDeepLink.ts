@@ -18,6 +18,7 @@ import * as Notifications from 'expo-notifications';
 import type { Href } from 'expo-router';
 
 import { openConversation } from '@/navigation/messagesNavigation';
+import { clearPendingNotificationDeepLink } from '@/lib/push';
 
 // Only accept internal routes we explicitly dispatch — defence against a
 // compromised notification payload containing an external URL.
@@ -60,9 +61,10 @@ export function usePushDeepLink(): void {
       InteractionManager.runAfterInteractions(() => {
         if (deepLink.startsWith('/messages/')) {
           openConversation(deepLink.slice('/messages/'.length));
-          return;
+        } else {
+          router.push(deepLink as Href);
         }
-        router.push(deepLink as Href);
+        void clearPendingNotificationDeepLink();
       });
     }
 

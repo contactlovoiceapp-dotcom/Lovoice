@@ -13,6 +13,7 @@ import React, {
 import type { Session } from '@supabase/supabase-js';
 
 import { getSupabaseClient } from '@/lib/supabase';
+import { clearPendingNotificationDeepLink } from '@/lib/push';
 import type { Database } from '@/types/database';
 
 type Profile = Database['public']['Tables']['profiles']['Row'];
@@ -106,6 +107,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (signOutError) {
       throw new Error(signOutError.message);
     }
+
+    await clearPendingNotificationDeepLink();
     // onAuthStateChange('SIGNED_OUT') fires next and clears all auth state.
   }, []);
 
@@ -148,6 +151,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         if (!isMounted) return;
+
+        if (event === 'SIGNED_OUT') {
+          void clearPendingNotificationDeepLink();
+        }
 
         setSession(nextSession);
         const applied = await loadProfile(nextSession);

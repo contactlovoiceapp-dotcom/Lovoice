@@ -3,6 +3,7 @@
 import { useMutation, useQueryClient, type UseMutationResult } from '@tanstack/react-query';
 
 import { getSupabaseClient } from '@/lib/supabase';
+import { clearPendingNotificationDeepLink } from '@/lib/push';
 
 // Calls the `delete_account` Edge Function (server-side hard purge of the caller's data and
 // auth.users row, see ARCHITECTURE §9), then clears the now-invalid local session so the app
@@ -28,6 +29,7 @@ export function useDeleteAccount(): UseMutationResult<void, Error, void> {
       // Clear the local session (the JWT is now orphaned). onAuthStateChange('SIGNED_OUT')
       // fires next and AuthRedirector navigates back to the auth stack.
       await supabase.auth.signOut({ scope: 'local' }).catch(() => null);
+      await clearPendingNotificationDeepLink();
     },
     onSuccess: () => {
       // Drop every cached query so no stale profile/feed/conversation data lingers for the
