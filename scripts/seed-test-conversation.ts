@@ -1,6 +1,9 @@
 // Dev-only script — seeds a conversation where someone sent a voice and awaits your reply.
 // Useful for testing the recipient reply flow in Messages without a second device.
 //
+// ⚠ Bootstrap only — deletes and recreates the conversation each run.
+// For follow-up messages on an active thread, use send-test-voice-message.ts instead.
+//
 // Usage:
 //   npx tsx scripts/seed-test-conversation.ts +33786532098
 //   npx tsx scripts/seed-test-conversation.ts +33786532098 --sender +33099900001

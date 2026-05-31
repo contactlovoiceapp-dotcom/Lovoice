@@ -11,6 +11,7 @@ import { useFocusEffect } from 'expo-router';
 import {
   useConversationRealtimeStore,
   setActiveConversationId,
+  setConversationScreenFocused,
   emitTyping,
   emitRecording,
 } from '../lib/conversationRealtimeService';
@@ -28,7 +29,9 @@ export function useActiveConversation(conversationId: string | null): ActiveConv
       if (conversationId) {
         setActiveConversationId(conversationId);
       }
+      setConversationScreenFocused(true);
       return () => {
+        setConversationScreenFocused(false);
         // Clear our own typing/recording state on the other side when leaving the
         // screen. The channel itself is intentionally NOT torn down here — that is
         // what avoids the re-subscribe churn; it is switched when another

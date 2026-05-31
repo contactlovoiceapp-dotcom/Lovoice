@@ -16,17 +16,20 @@ export interface ConversationInsertActions {
  * - Our own confirmed INSERT is a no-op here: the optimistic row already renders
  *   it with a stable clientId, and the sending mutation's onSettled refreshes the
  *   conversation details + inbox. Re-invalidating would stack into the ~4x burst.
- * - An incoming message refreshes this conversation's messages + lifecycle and
- *   schedules the debounced mark-read. The inbox is intentionally NOT invalidated:
- *   the global inbox channel (useRealtimeInbox) owns that, so doing it here would
- *   double-invalidate the inbox on every incoming message.
+ * - An incoming message refreshes this conversation's messages + lifecycle. Mark-read
+ *   runs only while the conversation screen is focused — otherwise unread badges
+ *   would clear as soon as the user leaves the thread. The inbox is intentionally
+ *   NOT invalidated here: useRealtimeInbox owns that.
  */
 export function handleConversationInsert(
   isOwnMessage: boolean,
+  isScreenFocused: boolean,
   actions: ConversationInsertActions,
 ): void {
   if (isOwnMessage) return;
   actions.invalidateMessages();
-  actions.scheduleMarkRead();
+  if (isScreenFocused) {
+    actions.scheduleMarkRead();
+  }
   actions.invalidateConversation();
 }

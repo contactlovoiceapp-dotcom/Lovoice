@@ -11,6 +11,7 @@ import { chatQueryKeys } from '../../api/conversationQueries';
 import {
   configureConversationRealtime,
   setActiveConversationId,
+  setConversationScreenFocused,
   emitTyping,
   emitRecording,
   useConversationRealtimeStore,
@@ -209,11 +210,12 @@ describe('INSERT fan-out', () => {
     expect(markConversationRead).not.toHaveBeenCalled();
   });
 
-  it('refreshes messages + conversation and schedules mark-read for an incoming message, never the inbox', () => {
+  it('refreshes messages + conversation and schedules mark-read for an incoming message while focused', () => {
     const sb = makeSupabaseMock();
     const { deps, invalidateQueries, markConversationRead } = makeDeps(sb.client);
     configureConversationRealtime(deps);
     setActiveConversationId('A');
+    setConversationScreenFocused(true);
 
     sb.last().handlers.insert?.({ new: { sender_id: 'other' } });
 
@@ -226,6 +228,20 @@ describe('INSERT fan-out', () => {
     expect(markConversationRead).not.toHaveBeenCalled();
     jest.advanceTimersByTime(400);
     expect(markConversationRead).toHaveBeenCalledWith('A');
+  });
+
+  it('does not schedule mark-read for an incoming message when the screen is not focused', () => {
+    const sb = makeSupabaseMock();
+    const { deps, invalidateQueries, markConversationRead } = makeDeps(sb.client);
+    configureConversationRealtime(deps);
+    setActiveConversationId('A');
+    setConversationScreenFocused(false);
+
+    sb.last().handlers.insert?.({ new: { sender_id: 'other' } });
+
+    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: chatQueryKeys.messages('A') });
+    jest.advanceTimersByTime(400);
+    expect(markConversationRead).not.toHaveBeenCalled();
   });
 
   it('debounces UPDATE bursts into a single messages invalidation', () => {

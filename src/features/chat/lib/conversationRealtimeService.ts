@@ -68,6 +68,8 @@ export interface ConversationRealtimeDeps {
 
 let deps: ConversationRealtimeDeps | null = null;
 let activeConversationId: string | null = null;
+// True only while the conversation route is focused — gates auto mark-read on INSERT.
+let isConversationScreenFocused = false;
 let channel: RealtimeChannel | null = null;
 let channelClient: SupabaseClient<Database> | null = null;
 let channelReady = false;
@@ -163,7 +165,7 @@ function subscribeChannel(supabase: SupabaseClient<Database>, conversationId: st
         // The fan-out policy (skip own messages, never invalidate the inbox here)
         // lives in handleConversationInsert — see docs/REALTIME_STABILITY.md §5.
         d.runAfterResume(() => {
-          handleConversationInsert(isOwnMessage, {
+          handleConversationInsert(isOwnMessage, isConversationScreenFocused, {
             invalidateMessages: () =>
               void d.queryClient.invalidateQueries({
                 queryKey: chatQueryKeys.messages(conversationId),
@@ -258,6 +260,12 @@ export function configureConversationRealtime(next: ConversationRealtimeDeps): v
   ensureSubscribed();
 }
 
+/** Tracks whether the conversation route is focused. Mark-read on INSERT is gated
+    on this flag so leaving a thread does not silently clear unread badges. */
+export function setConversationScreenFocused(focused: boolean): void {
+  isConversationScreenFocused = focused;
+}
+
 /** Declares which conversation owns the Realtime channel. Idempotent: selecting the
     already-active conversation is a no-op (the churn guard). Pass null to tear down. */
 export function setActiveConversationId(conversationId: string | null): void {
@@ -298,6 +306,7 @@ export function __resetConversationRealtimeForTests(): void {
   teardownChannel();
   deps = null;
   activeConversationId = null;
+  isConversationScreenFocused = false;
   useConversationRealtimeStore.setState({
     activeConversationId: null,
     otherIsTyping: false,

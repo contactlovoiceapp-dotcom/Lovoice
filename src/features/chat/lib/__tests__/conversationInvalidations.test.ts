@@ -16,27 +16,37 @@ describe('handleConversationInsert', () => {
   it('does nothing for our own INSERT (optimistic row + onSettled already cover it)', () => {
     const actions = makeActions();
 
-    handleConversationInsert(true, actions);
+    handleConversationInsert(true, true, actions);
 
     expect(actions.invalidateMessages).not.toHaveBeenCalled();
     expect(actions.invalidateConversation).not.toHaveBeenCalled();
     expect(actions.scheduleMarkRead).not.toHaveBeenCalled();
   });
 
-  it('refreshes messages + conversation and schedules mark-read for an incoming message', () => {
+  it('refreshes messages + conversation and schedules mark-read when the screen is focused', () => {
     const actions = makeActions();
 
-    handleConversationInsert(false, actions);
+    handleConversationInsert(false, true, actions);
 
     expect(actions.invalidateMessages).toHaveBeenCalledTimes(1);
     expect(actions.invalidateConversation).toHaveBeenCalledTimes(1);
     expect(actions.scheduleMarkRead).toHaveBeenCalledTimes(1);
   });
 
+  it('does not schedule mark-read when the conversation screen is not focused', () => {
+    const actions = makeActions();
+
+    handleConversationInsert(false, false, actions);
+
+    expect(actions.invalidateMessages).toHaveBeenCalledTimes(1);
+    expect(actions.invalidateConversation).toHaveBeenCalledTimes(1);
+    expect(actions.scheduleMarkRead).not.toHaveBeenCalled();
+  });
+
   it('exposes no inbox action — the global inbox channel owns that invalidation', () => {
     const actions = makeActions();
 
-    handleConversationInsert(false, actions);
+    handleConversationInsert(false, true, actions);
 
     // The action surface intentionally has no inbox hook; assert we did not grow one.
     expect(Object.keys(actions)).toEqual([

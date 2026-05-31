@@ -1,6 +1,7 @@
 /* Main tab navigator — renders the 4 primary tabs with a custom floating pill nav bar.
    Mounts global side-effect hooks shared across all tabs:
    - useRealtimeInbox: keeps the message badge live via Supabase Realtime
+   - useRealtimeLikes: keeps the likes badge live via Supabase Realtime
    - useConversationRealtimeHost: owns the active conv:<id> channel at session scope
      so it survives screen mount/unmount (no re-subscribe churn on notification taps)
    - usePushRegistration: stores the device Expo Push Token on login
@@ -15,6 +16,7 @@ import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import BottomNav from '../../src/components/BottomNav';
 import { shouldHideMainTabBar } from '../../src/navigation/shouldHideMainTabBar';
 import { useRealtimeInbox } from '../../src/features/chat/hooks/useRealtimeInbox';
+import { useRealtimeLikes } from '../../src/features/likes/hooks/useRealtimeLikes';
 import { useConversationRealtimeHost } from '../../src/features/chat/hooks/useConversationRealtimeHost';
 import { usePushRegistration } from '../../src/features/push/hooks/usePushRegistration';
 import { usePushDeepLink } from '../../src/features/push/hooks/usePushDeepLink';
@@ -32,6 +34,7 @@ function MainTabBar(props: BottomTabBarProps) {
 
 export default function MainLayout() {
   useRealtimeInbox();
+  useRealtimeLikes();
   useConversationRealtimeHost();
   usePushRegistration();
   usePushDeepLink();

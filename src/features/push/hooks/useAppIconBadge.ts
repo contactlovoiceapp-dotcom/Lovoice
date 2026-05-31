@@ -1,5 +1,6 @@
 /* Keeps the OS app icon badge in sync with the in-app unread/unseen counts.
-   The badge is the sum of unread messages and unseen received likes.
+   The badge is the sum of unread messages and unseen received likes, updated
+   whenever those React Query counters change — on any tab, foreground or not.
 
    The setBadgeCountAsync call is debounced because a single message exchange
    triggers multiple count changes in quick succession (Realtime INSERT, query
