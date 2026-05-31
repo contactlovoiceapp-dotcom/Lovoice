@@ -338,7 +338,14 @@ export const COPY = {
         playA11y: 'Lecture du message vocal',
         pauseA11y: 'Pause du message vocal',
         duration: (mmss: string) => `Durée : ${mmss}`,
-        playError: 'Impossible de lire ce vocal',
+        // Keys mirror ChatMessagePlayerErrorCode in chatMessagePlayer.ts.
+        playErrors: {
+          play_timeout: 'Le vocal met trop de temps à démarrer. Réessaie.',
+          play_network: 'Impossible d\'accéder au vocal. Vérifie ta connexion.',
+          play_load_failed: 'Impossible de charger le vocal. Réessaie.',
+          play_unreadable: 'Ce vocal semble illisible ou endommagé. Réessaie.',
+          play_failed: 'Impossible de lire ce vocal.',
+        },
       },
       otherIsTyping: (name: string) => `${name} écrit…`,
       otherIsRecording: (name: string) => `${name} enregistre un vocal…`,

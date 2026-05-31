@@ -52,7 +52,7 @@ recording session**.
 │  positionMs         : number          ← mirrored from status  │
 │  durationMs         : number          ← mirrored from status  │
 │  isLoading          : boolean         ← url fetch / source swp│
-│  error              : 'play_timeout' | 'play_failed' | null   │
+│  error              : ChatMessagePlayerErrorCode | null        │
 └───────────────────────────────────────────────────────────────┘
 
   Bubble snapshot selector:
@@ -230,12 +230,22 @@ just-sent voice bubble.
 
 ### Playback errors
 
-| Condition | What the user sees | How the store reflects it |
+Store codes are mapped to user-facing copy in `MessageBubble` via
+`COPY.chat.conversation.voiceMessage.playErrors`.
+
+| Condition | Store code | What the user sees |
 | --- | --- | --- |
-| Signed URL fetch fails | Red `AlertCircle` on the bubble + tap-to-retry | `{ activeMessageId stays, isLoading: false, error: 'play_failed' }` |
-| `player.replace()` throws | Same | Same |
-| Native player never starts within 8 s | Same with `error: 'play_timeout'` | `activeMessageId stays`, full position/duration reset |
-| `didJustFinish` < 400 ms after confirmed playback | First occurrence: silent retry with cache-busted URL. Second: red icon with `error: 'play_failed'` | `retried = true` after the first |
+| Signed URL fetch fails | `play_network` | "Impossible d'accéder au vocal. Vérifie ta connexion." |
+| `player.replace()` throws | `play_load_failed` | "Impossible de charger le vocal. Réessaie." |
+| Native player never starts within 8 s | `play_timeout` | "Le vocal met trop de temps à démarrer. Réessaie." |
+| `didJustFinish` < 400 ms after confirmed playback (2nd time) | `play_unreadable` | "Ce vocal semble illisible ou endommagé. Réessaie." |
+| Unknown playback failure | `play_failed` | "Impossible de lire ce vocal." (fallback) |
+
+On the first suspicious finish, a silent retry with cache-busted URL runs
+(`retried = true`). After every `replace()`, `startPlayback` polls
+`player.isLoaded` (bounded by `PLAYER_READY_TIMEOUT_MS`, 2 s) before
+`play()` so the first tap does not race the native load (invariant 14).
+
 | Natural end of track | UI returns to idle | Store fully reset to `INITIAL_STORE_STATE` |
 
 ### Recording errors
@@ -340,6 +350,19 @@ All recording errors are instrumented with Sentry breadcrumbs (category
     `recording.finalized` Sentry event carries `msRecordToPause` as the
     regression guard: it must stay positive. A short bleed of a still-playing
     voice into the first tens of ms of the recording is the accepted trade-off.
+14. **`startPlayback` must wait for the native player to be loaded before
+    `play()` after every `replace()`.** Swapping any source — remote signed URL
+    or local optimistic file — starts an async native load; calling `play()`
+    before the AVPlayer has buffered makes iOS fire `didJustFinish` at position 0
+    immediately. The `didJustFinish` handler then reads `playConfirmedAt === 0`,
+    classifies the finish as suspicious, and the immediate cache-bust retry
+    repeats the same unbuffered race — so users saw `play_unreadable` on the
+    **first** tap and only a manual retap 1–2 s later (once the buffer had
+    filled) succeeded. The fix polls `player.isLoaded` (every
+    `PLAYER_READY_POLL_MS`, bounded by `PLAYER_READY_TIMEOUT_MS`) between
+    `replace()` and `play()`. Replay of the same URL skips `replace()` and
+    therefore skips the gate. Keep the 8 s `PLAY_TIMEOUT_MS` and the
+    suspicious-finish retry as fallbacks for a genuinely broken source.
 
 ## 10. Things this architecture deliberately does NOT do
 

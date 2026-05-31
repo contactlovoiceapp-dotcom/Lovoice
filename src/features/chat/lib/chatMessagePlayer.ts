@@ -39,6 +39,14 @@ const PLAY_TIMEOUT_MS = 8_000;
 // If didJustFinish fires within this window after confirmed playback, it's
 // likely a broken / expired signed URL — retry once with cache-bust.
 const SUSPICIOUS_FINISH_MS = 400;
+// After every `replace()`, the native AVPlayer needs a moment to load — remote
+// streams over the network, local files still commit asynchronously on iOS.
+// Calling play() before `isLoaded` makes iOS fire didJustFinish at position 0,
+// which the suspicious-finish handler surfaces as play_unreadable. Poll up to
+// this deadline before play(); a genuinely broken source still falls through
+// to play() and is caught by PLAY_TIMEOUT_MS / the suspicious-finish retry.
+const PLAYER_READY_TIMEOUT_MS = 2_000;
+const PLAYER_READY_POLL_MS = 50;
 
 interface SignedUrlEntry {
   url: string;
@@ -90,12 +98,20 @@ async function ensureSignedUrl(path: string): Promise<string> {
 // Public types
 // ---------------------------------------------------------------------------
 
+/** Stable playback error codes surfaced in MessageBubble — mapped via COPY. */
+export type ChatMessagePlayerErrorCode =
+  | 'play_timeout'
+  | 'play_network'
+  | 'play_load_failed'
+  | 'play_unreadable'
+  | 'play_failed';
+
 export interface ChatMessagePlayerSnapshot {
   isPlaying: boolean;
   positionMs: number;
   durationMs: number;
   isLoading: boolean;
-  error: string | null;
+  error: ChatMessagePlayerErrorCode | null;
 }
 
 export interface ChatMessagePlayerControls {
@@ -145,7 +161,7 @@ interface ChatPlayerStoreState {
   positionMs: number;
   durationMs: number;
   isLoading: boolean;
-  error: string | null;
+  error: ChatMessagePlayerErrorCode | null;
 }
 
 const INITIAL_STORE_STATE: ChatPlayerStoreState = {
@@ -213,6 +229,28 @@ function safeNativeCall(fn: () => void): void {
   }
 }
 
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isHostLoaded(host: AudioPlayer): boolean {
+  try {
+    return host.isLoaded === true;
+  } catch {
+    // SharedObject may be mid-recycle; treat as not-ready and let the poll retry.
+    return false;
+  }
+}
+
+// Resolve once the native player reports it has buffered enough to start, the
+// load token is superseded by a newer attempt, or the readiness deadline passes.
+async function waitForHostReady(host: AudioPlayer, token: number): Promise<void> {
+  const deadline = Date.now() + PLAYER_READY_TIMEOUT_MS;
+  while (loadToken === token && !isHostLoaded(host) && Date.now() < deadline) {
+    await delay(PLAYER_READY_POLL_MS);
+  }
+}
+
 async function startPlayback(args: {
   messageId: string;
   source: string;
@@ -272,7 +310,7 @@ async function startPlayback(args: {
     Sentry.captureException(err, { extra: { step: 'signed_url', messageId, isRetry } });
     useChatPlayerStore.setState({
       isLoading: false,
-      error: err instanceof Error ? err.message : 'play_failed',
+      error: 'play_network',
     });
     return;
   }
@@ -282,15 +320,23 @@ async function startPlayback(args: {
   const hostAfterAwait = getActiveHost();
   if (loadToken !== token || !hostAfterAwait) return;
 
+  let didReplace = false;
   if (isRetry || loadedUrl !== url) {
     try {
       hostAfterAwait.replace(url);
       loadedUrl = url;
+      didReplace = true;
     } catch (err) {
       Sentry.captureException(err, { extra: { step: 'replace', messageId } });
-      useChatPlayerStore.setState({ isLoading: false, error: 'play_failed' });
+      useChatPlayerStore.setState({ isLoading: false, error: 'play_load_failed' });
       return;
     }
+  }
+
+  // Every fresh replace() — remote or local — needs a beat before play().
+  if (didReplace) {
+    await waitForHostReady(hostAfterAwait, token);
+    if (loadToken !== token || getActiveHost() !== hostAfterAwait) return;
   }
 
   playConfirmedAt = 0;
@@ -425,7 +471,12 @@ export function useChatMessagePlayerHost(): void {
         category: 'playback',
         message: 'playback.suspicious_finish_retry',
         level: 'warning',
-        data: { messageId: state.activeMessageId, timeSinceConfirmed },
+        data: {
+          messageId: state.activeMessageId,
+          timeSinceConfirmed,
+          isLocalFile: state.activeIsLocal,
+          neverConfirmed: playConfirmedAt === 0,
+        },
       });
       void startPlayback({
         messageId: state.activeMessageId,
@@ -436,6 +487,7 @@ export function useChatMessagePlayerHost(): void {
       return;
     }
 
+    const hadRetried = retried;
     loadedUrl = null;
     playConfirmedAt = 0;
     retried = false;
@@ -443,16 +495,21 @@ export function useChatMessagePlayerHost(): void {
     if (isSuspicious) {
       Sentry.captureMessage('playback.failed', {
         level: 'error',
-        extra: { messageId: state.activeMessageId, timeSinceConfirmed, retriedAlready: retried },
+        extra: {
+          messageId: state.activeMessageId,
+          timeSinceConfirmed,
+          isLocalFile: state.activeIsLocal,
+          retriedAlready: hadRetried,
+        },
       });
-      // Keep activeMessageId so the bubble can surface 'play_failed' in its UI;
+      // Keep activeMessageId so the bubble can surface the error in its UI;
       // INACTIVE_SNAPSHOT would hide the error otherwise.
       useChatPlayerStore.setState({
         isPlaying: false,
         isLoading: false,
         positionMs: 0,
         durationMs: 0,
-        error: 'play_failed',
+        error: 'play_unreadable',
       });
     } else {
       Sentry.addBreadcrumb({

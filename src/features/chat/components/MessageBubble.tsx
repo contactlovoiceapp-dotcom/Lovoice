@@ -11,12 +11,21 @@ import type { ChatMessage } from '../types';
 import {
   useChatMessagePlayer,
   generateBarHeights,
+  type ChatMessagePlayerErrorCode,
 } from '../lib/chatMessagePlayer';
 
 const MAX_BUBBLE_WIDTH = Dimensions.get('window').width * 0.75;
 const VOICE_BUBBLE_WIDTH = 250;
 const VOICE_BUBBLE_HEIGHT = 44;
 const BAR_COUNT = 28;
+
+function playbackErrorMessage(code: ChatMessagePlayerErrorCode | null): string {
+  const map = COPY.chat.conversation.voiceMessage.playErrors;
+  if (code && code in map) {
+    return map[code];
+  }
+  return map.play_failed;
+}
 
 interface MessageBubbleProps {
   message: ChatMessage;
@@ -135,7 +144,7 @@ function VoiceBubbleContent({
           }}
           numberOfLines={1}
         >
-          {COPY.chat.conversation.voiceMessage.playError}
+          {playbackErrorMessage(snapshot.error)}
         </Text>
       </View>
     );

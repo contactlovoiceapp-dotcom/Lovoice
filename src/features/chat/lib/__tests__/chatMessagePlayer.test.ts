@@ -25,6 +25,7 @@ const expoAudioMocks = (global as Record<string, unknown>).__expoAudioMocks as {
     pause: jest.Mock;
     seekTo: jest.Mock;
     replace: jest.Mock;
+    isLoaded: boolean;
   };
   playerStatus: {
     playing: boolean;
@@ -52,6 +53,9 @@ beforeEach(() => {
   expoAudioMocks.player.pause.mockClear();
   expoAudioMocks.player.seekTo.mockClear();
   expoAudioMocks.player.replace.mockClear();
+  // Default to a player that is already buffered; the readiness-gate test below
+  // flips this to false to assert play() waits for the native load to complete.
+  expoAudioMocks.player.isLoaded = true;
   expoAudioMocks.playerStatus.playing = false;
   expoAudioMocks.playerStatus.currentTime = 0;
   expoAudioMocks.playerStatus.duration = 0;
@@ -211,6 +215,83 @@ describe('useChatMessagePlayer — with host', () => {
       durationMs: 0,
       isLoading: false,
       error: null,
+    });
+  });
+
+  // Regression: every replace() must finish loading before play(), otherwise iOS
+  // fires didJustFinish at position 0 (recipient remote tap, sender post-record).
+  it('waits for the native player to load after replace() on a remote source', async () => {
+    mockSupabaseSignedUrls();
+    expoAudioMocks.player.isLoaded = false;
+
+    const { result } = renderHook(() => {
+      useChatMessagePlayerHost();
+      return useChatMessagePlayer({ messageId: 'm', source: 'remote.m4a', isLocalFile: false });
+    });
+
+    await act(async () => {
+      result.current.controls.play();
+      await Promise.resolve();
+    });
+
+    await waitFor(() =>
+      expect(expoAudioMocks.player.replace).toHaveBeenCalledWith('https://signed.example/remote.m4a'),
+    );
+    expect(expoAudioMocks.player.play).not.toHaveBeenCalled();
+
+    act(() => {
+      expoAudioMocks.player.isLoaded = true;
+    });
+
+    await waitFor(() => expect(expoAudioMocks.player.play).toHaveBeenCalled());
+  });
+
+  it('waits for the native player to load after replace() on a local source', async () => {
+    mockSupabaseSignedUrls();
+    expoAudioMocks.player.isLoaded = false;
+
+    const { result } = renderHook(() => {
+      useChatMessagePlayerHost();
+      return useChatMessagePlayer({
+        messageId: 'optimistic',
+        source: 'file:///tmp/local.m4a',
+        isLocalFile: true,
+      });
+    });
+
+    await act(async () => {
+      result.current.controls.play();
+      await Promise.resolve();
+    });
+
+    await waitFor(() =>
+      expect(expoAudioMocks.player.replace).toHaveBeenCalledWith('file:///tmp/local.m4a'),
+    );
+    expect(expoAudioMocks.player.play).not.toHaveBeenCalled();
+
+    act(() => {
+      expoAudioMocks.player.isLoaded = true;
+    });
+
+    await waitFor(() => expect(expoAudioMocks.player.play).toHaveBeenCalled());
+  });
+
+  it('surfaces play_network when the signed URL fetch fails', async () => {
+    jest.mocked(getSupabaseClient).mockReturnValue(null);
+
+    const { result } = renderHook(() => {
+      useChatMessagePlayerHost();
+      return useChatMessagePlayer({ messageId: 'm', source: 'remote.m4a', isLocalFile: false });
+    });
+
+    await act(async () => {
+      result.current.controls.play();
+      await Promise.resolve();
+    });
+
+    await waitFor(() => {
+      expect(result.current.snapshot.error).toBe('play_network');
+      expect(result.current.snapshot.isLoading).toBe(false);
     });
   });
 });
