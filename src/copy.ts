@@ -226,6 +226,8 @@ export const COPY = {
     resetError: 'La réinitialisation a échoué. Réessaie dans un instant.',
     loadError: 'Impossible de charger les voix. Réessaie.',
     retry: 'Réessayer',
+    swipeHint: 'Glisse vers le bas pour découvrir d\'autres voix',
+    swipeHintGotIt: 'Compris',
   },
 
   actions: {

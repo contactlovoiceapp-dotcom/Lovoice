@@ -36,7 +36,9 @@ import type { FeedPlayerControls, FeedPlayerSnapshot } from '../../src/lib/feedP
 
 import ProfileCard from '../../src/components/ProfileCard';
 import DiscoverHeader from '../../src/components/DiscoverHeader';
+import DiscoverSwipeHintOverlay from '../../src/components/DiscoverSwipeHintOverlay';
 import FiltersModal from '../../src/components/main/FiltersModal';
+import { useDiscoverSwipeHint } from '../../src/features/feed/hooks/useDiscoverSwipeHint';
 
 // Shared end-of-feed UI: shown both as the scrollable footer card and as the
 // standalone empty state when no items match the active filters at all.
@@ -168,6 +170,10 @@ export default function DiscoverScreen() {
   const [showFilters, setShowFilters] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
 
+  const { visible: showSwipeHint, dismiss: dismissSwipeHint } = useDiscoverSwipeHint();
+  const dismissSwipeHintRef = useRef(dismissSwipeHint);
+  dismissSwipeHintRef.current = dismissSwipeHint;
+  const userDragActiveRef = useRef(false);
 
   const seenBatcher = useFeedSeenBatcher();
   const resetFeedSeen = useResetFeedSeen();
@@ -317,7 +323,13 @@ export default function DiscoverScreen() {
           ? viewableItems[0].index
           : itemsCountRef.current;
 
-      if (newIndex === activeIndexRef.current) return;
+      const previousIndex = activeIndexRef.current;
+      if (newIndex === previousIndex) return;
+
+      if (userDragActiveRef.current && newIndex > previousIndex) {
+        dismissSwipeHintRef.current();
+      }
+      userDragActiveRef.current = false;
 
       // Pause immediately for instant audio cutoff during the swipe animation.
       // The load effect will pause again + call replace() on the next render anyway,
@@ -331,6 +343,7 @@ export default function DiscoverScreen() {
   // autoplay's scrollToIndex). This is the single, reliable place to disable autoplay
   // on manual swipes — no timing-sensitive ref flags needed.
   const handleScrollBeginDrag = useCallback(() => {
+    userDragActiveRef.current = true;
     if (autoplay) {
       setAutoplay(false);
     }
@@ -489,6 +502,10 @@ export default function DiscoverScreen() {
             onReset={() => setShowResetConfirm(true)}
           />
         </View>
+      )}
+
+      {items.length > 0 && showSwipeHint && (
+        <DiscoverSwipeHintOverlay onDismiss={dismissSwipeHint} />
       )}
 
       {showFilters && <FiltersModal onClose={() => setShowFilters(false)} />}
