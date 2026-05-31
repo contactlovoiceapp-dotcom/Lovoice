@@ -103,8 +103,9 @@ export function useConversations(): UseQueryResult<InboxConversation[], Error> {
           const otherUserId = iAmA ? conv.user_b : conv.user_a;
           const lastMsg = lastMsgMap.get(conv.id)!;
 
-          // Safe cast: row passed the filter so both profile joins must be non-null in valid data.
-          const displayName = otherProfile?.display_name ?? '';
+          // otherProfile is null when the other participant's account was deleted and the
+          // tombstone RLS policy is not yet applied — fall back to a safe display label.
+          const displayName = otherProfile?.display_name ?? 'Compte supprimé';
           const avatarEmojis = otherProfile?.bio_emojis ?? [];
 
           const convRow: ConversationRow = {
@@ -241,7 +242,7 @@ export function useConversationDetails(
       return {
         conversationId: conv.id,
         otherUserId,
-        otherDisplayName: otherProfile?.display_name ?? '',
+        otherDisplayName: otherProfile?.display_name ?? 'Compte supprimé',
         otherCity: otherProfile?.city ?? '',
         otherEmojis: otherProfile?.bio_emojis ?? [],
         otherBirthdate: otherProfile?.birthdate ?? '',
