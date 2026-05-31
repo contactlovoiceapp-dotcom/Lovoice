@@ -8,7 +8,12 @@ jest.mock('expo-router', () => ({
   },
 }));
 
+jest.mock('@/lib/push', () => ({
+  dismissNotificationsForConversation: jest.fn(() => Promise.resolve()),
+}));
+
 import { router } from 'expo-router';
+import { dismissNotificationsForConversation } from '@/lib/push';
 import {
   closeConversation,
   navigateToMessagesInbox,
@@ -32,6 +37,7 @@ describe('messagesNavigation', () => {
 
   it('openConversation seeds the inbox before pushing the conversation route', () => {
     openConversation('conv-123');
+    expect(dismissNotificationsForConversation).toHaveBeenCalledWith('conv-123');
     expect(router.navigate).toHaveBeenCalledWith('/(main)/messages');
     expect(router.push).toHaveBeenCalledWith('/(main)/messages/conv-123');
   });

@@ -36,6 +36,42 @@ async function ensureAndroidDefaultChannel(): Promise<void> {
  * Clears the last notification tap stored by the OS so it is not replayed on the
  * next unrelated navigation (e.g. finishing onboarding and entering the main tabs).
  */
+/** Deep link path used in push payloads for a conversation thread. */
+export function conversationPushDeepLink(conversationId: string): string {
+  return `/messages/${conversationId}`;
+}
+
+/**
+ * Removes all Notification Center entries whose deep_link targets the given
+ * conversation. Safe to call from any conversation entry point; does not touch
+ * the OS app-icon badge or the last notification tap response.
+ */
+export async function dismissNotificationsForConversation(
+  conversationId: string,
+): Promise<void> {
+  try {
+    const targetDeepLink = conversationPushDeepLink(conversationId);
+    const presented = await Notifications.getPresentedNotificationsAsync();
+
+    await Promise.all(
+      presented
+        .filter((notification) => {
+          const deepLink = notification.request.content.data?.deep_link;
+          return typeof deepLink === 'string' && deepLink === targetDeepLink;
+        })
+        .map((notification) =>
+          Notifications.dismissNotificationAsync(notification.request.identifier),
+        ),
+    );
+  } catch (error: unknown) {
+    console.warn('[push] Failed to dismiss conversation notifications:', error);
+  }
+}
+
+/**
+ * Clears the last notification tap stored by the OS so it is not replayed on the
+ * next unrelated navigation (e.g. finishing onboarding and entering the main tabs).
+ */
 export async function clearPendingNotificationDeepLink(): Promise<void> {
   try {
     const clear = (

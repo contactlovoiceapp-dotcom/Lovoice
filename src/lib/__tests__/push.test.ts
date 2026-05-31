@@ -8,6 +8,8 @@ jest.mock('expo-notifications', () => ({
   requestPermissionsAsync: jest.fn(),
   getExpoPushTokenAsync: jest.fn(),
   setNotificationChannelAsync: jest.fn(() => Promise.resolve()),
+  getPresentedNotificationsAsync: jest.fn(),
+  dismissNotificationAsync: jest.fn(() => Promise.resolve()),
   AndroidImportance: { MAX: 5 },
 }));
 
@@ -29,7 +31,7 @@ jest.mock('expo-constants', () => ({
 
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
-import { setupNotificationHandler, registerForPushNotificationsAsync } from '../push';
+import { setupNotificationHandler, registerForPushNotificationsAsync, dismissNotificationsForConversation, conversationPushDeepLink } from '../push';
 
 type MutableEasConfig = { projectId: string };
 type MutableExtra = { eas: MutableEasConfig };
@@ -187,5 +189,54 @@ describe('registerForPushNotificationsAsync', () => {
     );
 
     Object.defineProperty(Platform, 'OS', { value: originalOS, configurable: true });
+  });
+});
+
+describe('conversationPushDeepLink', () => {
+  it('returns the push payload deep_link path for a conversation', () => {
+    expect(conversationPushDeepLink('abc-123')).toBe('/messages/abc-123');
+  });
+});
+
+describe('dismissNotificationsForConversation', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.mocked(Notifications.dismissNotificationAsync).mockResolvedValue(undefined);
+  });
+
+  it('dismisses only notifications whose deep_link matches the conversation', async () => {
+    jest.mocked(Notifications.getPresentedNotificationsAsync).mockResolvedValue([
+      {
+        request: {
+          identifier: 'notif-1',
+          content: { data: { deep_link: '/messages/conv-a' } },
+        },
+      },
+      {
+        request: {
+          identifier: 'notif-2',
+          content: { data: { deep_link: '/messages/conv-b' } },
+        },
+      },
+      {
+        request: {
+          identifier: 'notif-3',
+          content: { data: { kind: 'like' } },
+        },
+      },
+    ] as unknown as Awaited<ReturnType<typeof Notifications.getPresentedNotificationsAsync>>);
+
+    await dismissNotificationsForConversation('conv-a');
+
+    expect(Notifications.dismissNotificationAsync).toHaveBeenCalledTimes(1);
+    expect(Notifications.dismissNotificationAsync).toHaveBeenCalledWith('notif-1');
+  });
+
+  it('does not throw when getPresentedNotificationsAsync fails', async () => {
+    jest.mocked(Notifications.getPresentedNotificationsAsync).mockRejectedValue(
+      new Error('simulator unsupported'),
+    );
+
+    await expect(dismissNotificationsForConversation('conv-a')).resolves.toBeUndefined();
   });
 });

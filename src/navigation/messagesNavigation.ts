@@ -2,6 +2,8 @@
 
 import { router, type Href } from 'expo-router';
 
+import { dismissNotificationsForConversation } from '@/lib/push';
+
 const MESSAGES_INBOX = '/(main)/messages' as Href;
 
 /**
@@ -25,6 +27,7 @@ export function closeConversation(): void {
  * escapes to another tab.
  */
 export function openConversation(conversationId: string): void {
+  void dismissNotificationsForConversation(conversationId);
   router.navigate(MESSAGES_INBOX);
   router.push(`/(main)/messages/${conversationId}` as Href);
 }

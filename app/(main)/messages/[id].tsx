@@ -29,6 +29,7 @@ import type { ChatMessage } from '../../../src/features/chat/types';
 import { useActiveConversation } from '../../../src/features/chat/hooks/useActiveConversation';
 import ConversationScreen from '../../../src/components/main/ConversationScreen';
 import { closeConversation } from '../../../src/navigation/messagesNavigation';
+import { dismissNotificationsForConversation } from '../../../src/lib/push';
 
 export default function ConversationRoute() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -69,8 +70,11 @@ export default function ConversationRoute() {
 
   useFocusEffect(
     useCallback(() => {
+      if (id) {
+        void dismissNotificationsForConversation(id);
+      }
       markRead();
-    }, [markRead]),
+    }, [id, markRead]),
   );
 
   const handleSendText = useCallback(
