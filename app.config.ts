@@ -78,8 +78,9 @@ const config: ExpoConfig = {
     [
       "expo-notifications",
       {
-        // TODO(phase-11): replace with a dedicated monochrome 96×96 PNG before App Store / Play Store submission.
-        icon: "./assets/adaptive-icon.png",
+        // Monochrome (white-on-transparent) 96×96 lips glyph; Android tints it solid
+        // white in the status bar, so a flat silhouette reads better than the wordmark.
+        icon: "./assets/notification-icon.png",
         color: "#e724ab",
         defaultChannel: "default",
       },
