@@ -310,6 +310,37 @@ describe('useReportContent', () => {
     expect(result.current.error?.message).toBe('constraint violation');
   });
 
+  it('maps Postgres rate_limit_exceeded to moderation.rate_limit_exceeded', async () => {
+    const supabaseMock = {
+      ...buildAuthMock(),
+      from: jest.fn(),
+    };
+    attachReportingTableMocks(supabaseMock, {
+      reportInsertError: { message: 'rate_limit_exceeded' },
+    });
+
+    const { getSupabaseClient } = jest.requireMock('@/lib/supabase') as {
+      getSupabaseClient: jest.Mock;
+    };
+    getSupabaseClient.mockReturnValue(supabaseMock);
+
+    const queryClient = makeQueryClient();
+    const { result } = renderHook(() => useReportContent(), { wrapper: makeWrapper(queryClient) });
+
+    await act(async () => {
+      result.current.mutate({
+        targetKind: 'voice',
+        targetId: VOICE_ID,
+        targetUserId: USER_ID,
+        reason: 'spam',
+        freeText: '',
+      });
+    });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.error?.message).toBe('moderation.rate_limit_exceeded');
+  });
+
   it('rejects when targetKind voice is missing targetUserId', async () => {
     const supabaseMock = {
       ...buildAuthMock(),

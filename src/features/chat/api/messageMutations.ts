@@ -7,6 +7,7 @@ import {
   type InfiniteData,
 } from '@tanstack/react-query';
 
+import { isRateLimitError, mapUploadFunctionErrorCode } from '@/lib/rateLimitErrors';
 import { getSupabaseClient } from '@/lib/supabase';
 import { Sentry } from '@/lib/sentry';
 import type { RequestUploadResult } from '@/features/voices/types';
@@ -37,6 +38,9 @@ function classifyError(err: Error): string {
   const msg = err.message ?? '';
   if (msg.startsWith('messages.')) {
     return mapMessageError(msg);
+  }
+  if (msg === 'chat.rate_limit_exceeded' || (msg.startsWith('chat.request_upload_failed:') && isRateLimitError(msg))) {
+    return 'rate_limit_exceeded';
   }
   if (/fetch|network|timeout/i.test(msg)) {
     return 'network';
@@ -296,7 +300,7 @@ export function useSendVoiceMessage(): UseMutationResult<
       if (requestError || !requestData) {
         const code = await extractFunctionErrorCode(requestError);
         Sentry.addBreadcrumb({ category: 'upload', message: 'upload.failed', level: 'warning', data: { stage: 'request', code } });
-        throw new Error(`chat.request_upload_failed:${code}`);
+        throw new Error(mapUploadFunctionErrorCode(code, 'uploadMessage'));
       }
 
       // sourceUuid is the pending-file uuid logged as destUri in recording.finalized;

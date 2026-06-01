@@ -2,6 +2,7 @@
 
 import { useMutation, useQueryClient, type UseMutationResult } from '@tanstack/react-query';
 
+import { toRateLimitAwareError } from '@/lib/rateLimitErrors';
 import { getSupabaseClient } from '@/lib/supabase';
 import { likeQueryKeys } from './likeQueries';
 
@@ -45,7 +46,7 @@ export function useLikeVoice(): UseMutationResult<void, Error, LikeVoiceInput, L
         );
 
       if (error) {
-        throw new Error(error.message);
+        throw toRateLimitAwareError(error.message, 'like');
       }
     },
 

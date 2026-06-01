@@ -4,9 +4,10 @@ import React, { useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 import { CheckCircle2 } from 'lucide-react-native';
 
+import { COPY } from '@/copy';
+import { getRateLimitUserMessage } from '@/lib/rateLimitErrors';
 import ModalOverlay from '@/components/ModalOverlay';
 import { COLORS, FONT, RADIUS } from '@/theme';
-import { COPY } from '@/copy';
 import { REPORT_REASONS, type ReportReason, type ReportTargetKind } from '../types';
 import { useReportContent } from '../api/reportMutations';
 
@@ -171,7 +172,7 @@ export default function ReportSheet({
 
       {mutation.isError && (
         <Text style={{ color: '#ef4444', fontSize: 13, marginBottom: 8 }}>
-          {COPY.reportSheet.error}
+          {getRateLimitUserMessage(mutation.error, 'report', COPY.reportSheet.error)}
         </Text>
       )}
 

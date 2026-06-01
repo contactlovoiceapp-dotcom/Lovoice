@@ -2,6 +2,7 @@
 
 import { useMutation, useQueryClient, type UseMutationResult } from '@tanstack/react-query';
 
+import { mapUploadFunctionErrorCode } from '@/lib/rateLimitErrors';
 import { getSupabaseClient } from '@/lib/supabase';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import type {
@@ -43,7 +44,7 @@ export function useUploadVoice(): UseMutationResult<VoiceRow, Error, UploadVoice
 
       if (requestError || !requestData) {
         const code = await extractFunctionErrorCode(requestError);
-        throw new Error(`voice.request_upload_failed:${code}`);
+        throw new Error(mapUploadFunctionErrorCode(code, 'uploadVoice'));
       }
 
       await putAudioWithRetry(input.uri, requestData.signedUrl);

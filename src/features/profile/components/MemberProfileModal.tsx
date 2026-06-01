@@ -18,6 +18,7 @@ import { useMemberVoicePreview, useVoiceSignedUrl } from '@/features/voices/api/
 import { useVoicePlayer } from '@/features/voices/hooks/useVoicePlayer';
 import { useFeedConversationMap } from '@/features/chat/api/conversationQueries';
 import { showToast } from '@/lib/toast';
+import { isMappedRateLimitError } from '@/lib/rateLimitErrors';
 import ProfileCard from '@/components/ProfileCard';
 import type { FeedItem, FeedItemTheme } from '@/features/feed/types';
 import type { FeedPlayerControls, FeedPlayerSnapshot } from '@/lib/feedPlayer';
@@ -158,7 +159,16 @@ export default function MemberProfileModal({ visible, userId, voiceId, onClose, 
     if (isLiked) {
       unlikeVoice.mutate({ voiceId: feedItem.voiceId });
     } else {
-      likeVoice.mutate({ voiceId: feedItem.voiceId, ownerId: feedItem.userId });
+      likeVoice.mutate(
+        { voiceId: feedItem.voiceId, ownerId: feedItem.userId },
+        {
+          onError: (err) => {
+            if (isMappedRateLimitError(err)) {
+              showToast(COPY.rateLimit.like);
+            }
+          },
+        },
+      );
     }
   }, [feedItem, isLiked, likeVoice, unlikeVoice]);
 

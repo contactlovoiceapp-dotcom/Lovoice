@@ -107,6 +107,31 @@ describe('useLikeVoice', () => {
     expect(cached?.has('voice-new')).toBe(false);
     expect(cached?.has('voice-existing')).toBe(true);
   });
+
+  it('maps Postgres rate_limit_exceeded to likes.rate_limit_exceeded', async () => {
+    const upsertMock = jest.fn().mockResolvedValue({ error: { message: 'rate_limit_exceeded' } });
+    const supabaseMock = {
+      ...buildAuthMock(),
+      from: jest.fn().mockReturnValue({ upsert: upsertMock }),
+    };
+
+    const { getSupabaseClient } = jest.requireMock('@/lib/supabase') as {
+      getSupabaseClient: jest.Mock;
+    };
+    getSupabaseClient.mockReturnValue(supabaseMock);
+
+    const queryClient = makeQueryClient();
+    queryClient.setQueryData<Set<string>>(likeQueryKeys.likedIds(MOCK_UID), new Set());
+
+    const { result } = renderHook(() => useLikeVoice(), { wrapper: makeWrapper(queryClient) });
+
+    await act(async () => {
+      result.current.mutate({ voiceId: 'voice-new', ownerId: 'owner-xyz' });
+    });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.error?.message).toBe('likes.rate_limit_exceeded');
+  });
 });
 
 // ---------------------------------------------------------------------------

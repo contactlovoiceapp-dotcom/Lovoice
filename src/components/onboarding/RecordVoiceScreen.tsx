@@ -26,6 +26,7 @@ import { File } from 'expo-file-system';
 import { COLORS, CTA_GRADIENT, FONT, ONBOARDING_GRADIENT, RADIUS, SHADOW } from '../../theme';
 import { COPY } from '../../copy';
 import { formatTime } from '../../lib/formatTime';
+import { isMappedRateLimitError } from '../../lib/rateLimitErrors';
 import { MAX_VOICE_DURATION_MS, MIN_VOICE_DURATION_MS } from '../../lib/audio';
 import { useVoiceRecorder, type VoiceRecorderResult } from '../../features/voices/hooks/useVoiceRecorder';
 import { useVoicePlayer } from '../../features/voices/hooks/useVoicePlayer';
@@ -249,7 +250,9 @@ function RecordVoicePreviewBody({
   }, [onRegisterUnload, player.unload]);
 
   const isUploading = uploadVoice.isPending;
-  const uploadFailed = uploadVoice.isError && !isUploading;
+  const uploadRateLimited =
+    uploadVoice.isError && uploadVoice.error != null && isMappedRateLimitError(uploadVoice.error);
+  const uploadFailed = uploadVoice.isError && !isUploading && !uploadRateLimited;
   const isSilent = isLikelySilent;
   const isPreviewPlaying = player.isPlaying;
 
@@ -259,6 +262,8 @@ function RecordVoicePreviewBody({
   let statusText: string;
   if (isUploading) {
     statusText = COPY.record.uploadingStatus;
+  } else if (uploadRateLimited) {
+    statusText = COPY.record.uploadRateLimitStatus;
   } else if (uploadFailed) {
     statusText = COPY.record.uploadErrorStatus;
   } else if (isSilent) {

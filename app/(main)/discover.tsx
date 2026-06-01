@@ -29,6 +29,7 @@ import { useFeedSeenBatcher } from '../../src/features/feed/hooks/useFeedSeenBat
 import { useFeedPlayer } from '../../src/lib/feedPlayer';
 import { useFeedConversationMap } from '../../src/features/chat/api/conversationQueries';
 import { showToast } from '../../src/lib/toast';
+import { isMappedRateLimitError } from '../../src/lib/rateLimitErrors';
 import { openConversation } from '../../src/navigation/messagesNavigation';
 import { ageFromBirthdate } from '../../src/lib/age';
 import type { FeedItem, FeedItemTheme } from '../../src/features/feed/types';
@@ -373,7 +374,16 @@ export default function DiscoverScreen() {
               if (isLiked) {
                 unlikeVoice.mutate({ voiceId: item.voiceId });
               } else {
-                likeVoice.mutate({ voiceId: item.voiceId, ownerId: item.userId });
+                likeVoice.mutate(
+                  { voiceId: item.voiceId, ownerId: item.userId },
+                  {
+                    onError: (err) => {
+                      if (isMappedRateLimitError(err)) {
+                        showToast(COPY.rateLimit.like);
+                      }
+                    },
+                  },
+                );
               }
             }}
             onRecordVoice={() => router.push('/(auth)/onboarding/record')}

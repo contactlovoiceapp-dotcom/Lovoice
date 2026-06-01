@@ -4,6 +4,7 @@ import { useMutation, useQueryClient, type UseMutationResult } from '@tanstack/r
 
 import { feedQueryKeys } from '@/features/feed/api/feedQueries';
 import { likeQueryKeys } from '@/features/likes/api/likeQueries';
+import { toRateLimitAwareError } from '@/lib/rateLimitErrors';
 import { getSupabaseClient } from '@/lib/supabase';
 import type { Database } from '@/types/database';
 import type { ReportInput } from '../types';
@@ -92,7 +93,7 @@ export function useReportContent(): UseMutationResult<void, Error, ReportInput> 
       const { error: reportError } = await supabase.from('reports').insert(row);
 
       if (reportError) {
-        throw new Error(reportError.message);
+        throw toRateLimitAwareError(reportError.message, 'report');
       }
 
       if (blockedUserId && blockedUserId !== uid) {

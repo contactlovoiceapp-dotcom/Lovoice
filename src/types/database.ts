@@ -656,6 +656,42 @@ export type Database = {
           },
         ]
       }
+      rate_limits: {
+        Row: {
+          bucket: string
+          count: number
+          user_id: string
+          window_start: string
+        }
+        Insert: {
+          bucket: string
+          count?: number
+          user_id: string
+          window_start: string
+        }
+        Update: {
+          bucket?: string
+          count?: number
+          user_id?: string
+          window_start?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rate_limits_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "pending_reports"
+            referencedColumns: ["reporter_id"]
+          },
+          {
+            foreignKeyName: "rate_limits_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       spatial_ref_sys: {
         Row: {
           auth_name: string | null
@@ -994,6 +1030,15 @@ export type Database = {
           isOneToOne: false
           isSetofReturn: true
         }
+      }
+      consume_rate_limit: {
+        Args: {
+          p_bucket: string
+          p_limit: number
+          p_user_id: string
+          p_window_seconds: number
+        }
+        Returns: undefined
       }
       delete_own_voice: { Args: { p_voice_id: string }; Returns: number }
       disablelongtransactions: { Args: never; Returns: string }

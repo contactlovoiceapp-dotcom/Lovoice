@@ -2,6 +2,7 @@
 
 import { corsHeaders } from '../_shared/cors.ts';
 import { requireAuth } from '../_shared/auth.ts';
+import { getUploadRateLimit, RATE_LIMIT_ERROR } from '../_shared/rateLimits.ts';
 import { supabaseAdmin } from '../_shared/supabaseAdmin.ts';
 import type { RequestUploadResult } from '../_shared/types.ts';
 
@@ -72,6 +73,26 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
   if (profile?.is_banned) {
     return json({ error: 'banned' }, 403, req);
+  }
+
+  const uploadLimit = getUploadRateLimit(kind);
+  const { error: rateLimitError } = await supabaseAdmin.rpc('consume_rate_limit', {
+    p_user_id: user.id,
+    p_bucket: uploadLimit.bucket,
+    p_limit: uploadLimit.limit,
+    p_window_seconds: uploadLimit.windowSeconds,
+  });
+
+  if (rateLimitError) {
+    if (rateLimitError.message?.includes(RATE_LIMIT_ERROR)) {
+      return json({ error: RATE_LIMIT_ERROR }, 429, req);
+    }
+    console.error('request_upload: rate limit check failed', {
+      userId: user.id,
+      bucket: uploadLimit.bucket,
+      error: rateLimitError.message,
+    });
+    return json({ error: 'internal_server_error' }, 500, req);
   }
 
   let bucket: string;

@@ -88,6 +88,7 @@ export const COPY = {
     previewPlayingStatus: 'Lecture de ta voix',
     uploadingStatus: 'Envoi de ta voix…',
     uploadErrorStatus: "Échec de l'envoi. Vérifie ta connexion.",
+    uploadRateLimitStatus: 'Tu as envoyé trop de vocaux aujourd\'hui. Réessaie demain.',
     permissionDeniedStatus: "Lovoice a besoin d'accéder à ton micro pour enregistrer ta voix.",
     profileRefreshError: "Impossible de charger ton profil. Réessaie dans quelques instants.",
     minimumRemaining: (seconds: number) => `Encore ${seconds} sec minimum`,
@@ -292,10 +293,18 @@ export const COPY = {
     submit: 'Envoyer le signalement',
     submitting: 'Envoi…',
     error: 'Échec du signalement. Réessaie dans un instant.',
+    rateLimitError: 'Tu as envoyé trop de signalements récemment. Réessaie plus tard.',
     successTitle: 'Signalement reçu',
     successBody:
       "Merci de protéger la communauté Lovoice. Ce profil est aussi bloqué : tu ne le verras plus dans Découvrir ni dans tes likes. Notre équipe examinera le signalement.",
     successCta: 'Compris',
+  },
+
+  rateLimit: {
+    like: 'Tu as aimé trop de voix récemment. Réessaie dans un instant.',
+    report: 'Tu as envoyé trop de signalements récemment. Réessaie plus tard.',
+    uploadVoice: 'Tu as envoyé trop de vocaux aujourd\'hui. Réessaie demain.',
+    uploadMessage: 'Tu as envoyé trop de vocaux récemment. Réessaie dans un instant.',
   },
 
   chat: {
@@ -336,6 +345,7 @@ export const COPY = {
         not_a_participant: 'Tu ne fais pas partie de cette conversation.',
         update_forbidden: 'Action non autorisée.',
         empty_body: 'Écris quelque chose avant d\'envoyer.',
+        rate_limit_exceeded: 'Tu as envoyé trop de vocaux récemment. Réessaie dans un instant.',
         network: 'Échec de l\'envoi. Réessaie dans un instant.',
         unknown: 'Une erreur est survenue. Réessaie dans un instant.',
       },
