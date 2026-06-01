@@ -2,6 +2,7 @@
 // notifications row is inserted. Called by the pg_net trigger, NOT by clients.
 
 import { corsHeaders } from '../_shared/cors.ts';
+import { withSentry } from '../_shared/sentry.ts';
 // supabaseAdmin is imported lazily inside the handler (see below) so that the pure helpers
 // exported by this module (buildExpoPushMessage / parseExpoPushResponse) can be unit-tested
 // under `deno test` without the Edge runtime environment variables that supabaseAdmin requires.
@@ -147,7 +148,7 @@ function getJwtRole(token: string): string | null {
 // Handler
 // ---------------------------------------------------------------------------
 
-Deno.serve(async (req: Request): Promise<Response> => {
+Deno.serve(withSentry(async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: corsHeaders(req) });
   }
@@ -340,4 +341,4 @@ Deno.serve(async (req: Request): Promise<Response> => {
   }
 
   return json({ ok: true }, 200, req);
-});
+}));

@@ -11,6 +11,7 @@ import type {
   VoiceRow,
   MessageRow,
 } from '../_shared/types.ts';
+import { withSentry } from '../_shared/sentry.ts';
 
 const MAX_DURATION_MS = 90_000;
 const MAX_FILE_BYTES = 2_000_000;
@@ -35,7 +36,7 @@ function json(body: unknown, status: number, req: Request): Response {
   });
 }
 
-Deno.serve(async (req: Request): Promise<Response> => {
+Deno.serve(withSentry(async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: corsHeaders(req) });
   }
@@ -73,7 +74,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
 
   // Phase 7 — wires through here
   return handleMessageCommit(req, user, jwt, rawBody as unknown as CommitMessageUploadInput);
-});
+}));
 
 async function handleVoiceCommit(
   req: Request,

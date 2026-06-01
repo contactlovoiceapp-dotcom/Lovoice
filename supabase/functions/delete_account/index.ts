@@ -9,6 +9,7 @@
 import { corsHeaders } from '../_shared/cors.ts';
 import { requireAuth } from '../_shared/auth.ts';
 import { purgeAccount } from '../_shared/purgeAccount.ts';
+import { withSentry } from '../_shared/sentry.ts';
 
 function json(body: unknown, status: number, req: Request): Response {
   return new Response(JSON.stringify(body), {
@@ -17,7 +18,7 @@ function json(body: unknown, status: number, req: Request): Response {
   });
 }
 
-Deno.serve(async (req: Request): Promise<Response> => {
+Deno.serve(withSentry(async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: corsHeaders(req) });
   }
@@ -46,4 +47,4 @@ Deno.serve(async (req: Request): Promise<Response> => {
     console.error('delete_account: purge failed', { userId: user.id, error: (err as Error).message });
     return json({ error: 'internal_server_error' }, 500, req);
   }
-});
+}));

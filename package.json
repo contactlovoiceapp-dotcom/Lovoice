@@ -15,7 +15,7 @@
     "build:android": "EAS_BUILD_NO_EXPO_GO_WARNING=true eas build --platform android --profile production",
     "submit:ios": "eas submit --platform ios --profile production --latest",
     "submit:android": "eas submit --platform android --profile production --latest",
-    "test:edge": "deno test --allow-env --allow-net supabase/functions/",
+    "test:edge": "deno test --config=supabase/functions/deno.json --allow-env --allow-net supabase/functions/",
     "postinstall": "patch-package"
   },
   "dependencies": {
@@ -55,6 +55,7 @@
     "zustand": "^5.0.12"
   },
   "devDependencies": {
+    "@sentry/deno": "^10.55.0",
     "@testing-library/react-native": "^13.3.3",
     "@types/jest": "29.5.14",
     "@types/react": "~19.1.0",

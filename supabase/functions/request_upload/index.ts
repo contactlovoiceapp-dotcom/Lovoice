@@ -5,6 +5,7 @@ import { requireAuth } from '../_shared/auth.ts';
 import { getUploadRateLimit, RATE_LIMIT_ERROR } from '../_shared/rateLimits.ts';
 import { supabaseAdmin } from '../_shared/supabaseAdmin.ts';
 import type { RequestUploadResult } from '../_shared/types.ts';
+import { captureEdgeException, withSentry } from '../_shared/sentry.ts';
 
 const MAX_DURATION_MS = 90_000;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
@@ -20,7 +21,7 @@ function json(body: unknown, status: number, req: Request): Response {
   });
 }
 
-Deno.serve(async (req: Request): Promise<Response> => {
+Deno.serve(withSentry(async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: corsHeaders(req) });
   }
@@ -92,6 +93,12 @@ Deno.serve(async (req: Request): Promise<Response> => {
       bucket: uploadLimit.bucket,
       error: rateLimitError.message,
     });
+    await captureEdgeException(rateLimitError, {
+      function: 'request_upload',
+      step: 'rate_limit',
+      userId: user.id,
+      bucket: uploadLimit.bucket,
+    });
     return json({ error: 'internal_server_error' }, 500, req);
   }
 
@@ -144,4 +151,4 @@ Deno.serve(async (req: Request): Promise<Response> => {
   };
 
   return json(result, 200, req);
-});
+}));

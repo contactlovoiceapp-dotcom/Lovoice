@@ -4,6 +4,7 @@ import { corsHeaders } from '../_shared/cors.ts';
 import { requireAdmin } from '../_shared/admin.ts';
 import { supabaseAdmin } from '../_shared/supabaseAdmin.ts';
 import { writeAuditLog } from '../_shared/auditLog.ts';
+import { withSentry } from '../_shared/sentry.ts';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
@@ -14,7 +15,7 @@ function json(body: unknown, status: number, req: Request): Response {
   });
 }
 
-Deno.serve(async (req: Request): Promise<Response> => {
+Deno.serve(withSentry(async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { status: 204, headers: corsHeaders(req) });
   }
@@ -93,4 +94,4 @@ Deno.serve(async (req: Request): Promise<Response> => {
   });
 
   return json({ ok: true, report_id }, 200, req);
-});
+}));
