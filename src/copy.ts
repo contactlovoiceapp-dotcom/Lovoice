@@ -29,6 +29,12 @@ export const COPY = {
     resetFilters: 'Réinitialiser les filtres',
   },
 
+  errorBoundary: {
+    title: 'Oups, un imprévu',
+    body: "Quelque chose n'a pas fonctionné. Tu peux réessayer.",
+    retry: 'Réessayer',
+  },
+
   home: {
     headline: 'Trouve ta ',
     headlineAccent: 'Voix',

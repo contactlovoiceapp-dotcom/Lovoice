@@ -27,6 +27,7 @@ import {
 } from '@expo-google-fonts/playfair-display';
 
 import { COLORS } from '../src/theme';
+import AppErrorBoundary from '../src/components/AppErrorBoundary';
 import AuthRedirector from '../src/features/auth/components/AuthRedirector';
 import { AuthProvider } from '../src/features/auth/hooks/useAuth';
 import { setupNotificationHandler } from '../src/lib/push';
@@ -91,6 +92,10 @@ function RootLayout() {
     </QueryClientProvider>
   );
 }
+
+// expo-router renders this in place of the crashed tree instead of a white screen.
+// Exported from the root layout so it catches render errors anywhere below.
+export { default as ErrorBoundary } from '../src/components/AppErrorBoundary';
 
 // Sentry.wrap() enables touch-event breadcrumbs and React Navigation auto-instrumentation.
 // Safe to use even when initSentry() no-ops: the wrap is inert without a configured client.
