@@ -3,6 +3,14 @@
 import { useMutation, type UseMutationResult } from '@tanstack/react-query';
 
 import { getSupabaseClient } from '@/lib/supabase';
+import {
+  isValidContactEmail,
+  normalizeContactEmail,
+} from '@/features/profile/helpers/contactEmail';
+
+export type RequestDataExportInput = {
+  contactEmail: string;
+};
 
 type PostgrestErrorLike = { code?: string; message?: string } | null;
 
@@ -14,9 +22,13 @@ export function mapDataExportError(error: PostgrestErrorLike): string {
   return 'export.request_failed';
 }
 
-export function useRequestDataExport(): UseMutationResult<void, Error, void> {
+export function useRequestDataExport(): UseMutationResult<void, Error, RequestDataExportInput> {
   return useMutation({
-    mutationFn: async (): Promise<void> => {
+    mutationFn: async ({ contactEmail }: RequestDataExportInput): Promise<void> => {
+      if (!isValidContactEmail(contactEmail)) {
+        throw new Error('export.email_invalid');
+      }
+
       const supabase = getSupabaseClient();
 
       if (!supabase) {
@@ -34,6 +46,7 @@ export function useRequestDataExport(): UseMutationResult<void, Error, void> {
 
       const { error } = await supabase.from('data_export_requests').insert({
         user_id: user.id,
+        contact_email: normalizeContactEmail(contactEmail),
       });
 
       if (error) {

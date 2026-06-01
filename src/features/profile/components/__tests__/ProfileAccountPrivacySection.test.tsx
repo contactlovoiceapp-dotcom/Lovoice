@@ -80,27 +80,18 @@ describe('ProfileAccountPrivacySection', () => {
     expect(Linking.openURL).toHaveBeenCalledWith(PRIVACY_URL);
   });
 
-  it('shows success alert after export mutation succeeds', async () => {
+  it('shows success alert after export with valid email', async () => {
     mockMutateAsync.mockResolvedValue(undefined);
 
-    const { getByText } = renderSection();
+    const { getByText, getByLabelText } = renderSection();
     fireEvent.press(getByText(COPY.profile.exportDataCta));
 
-    expect(Alert.alert).toHaveBeenCalledWith(
-      COPY.profile.exportDataConfirmTitle,
-      COPY.profile.exportDataConfirmBody,
-      expect.any(Array),
-    );
-
-    const confirmButtons = (Alert.alert as jest.Mock).mock.calls[0][2] as Array<{
-      text: string;
-      onPress?: () => void;
-    }>;
-    const confirm = confirmButtons.find((b) => b.text === COPY.profile.exportDataConfirmCta);
-    confirm?.onPress?.();
+    expect(getByText(COPY.profile.exportDataConfirmTitle)).toBeTruthy();
+    fireEvent.changeText(getByLabelText(COPY.profile.exportDataEmailLabel), 'user@example.com');
+    fireEvent.press(getByText(COPY.profile.exportDataConfirmCta));
 
     await waitFor(() => {
-      expect(mockMutateAsync).toHaveBeenCalled();
+      expect(mockMutateAsync).toHaveBeenCalledWith({ contactEmail: 'user@example.com' });
       expect(Alert.alert).toHaveBeenCalledWith(
         COPY.profile.exportDataSuccessTitle,
         COPY.profile.exportDataSuccessBody,
@@ -111,15 +102,10 @@ describe('ProfileAccountPrivacySection', () => {
   it('shows already-pending message when export mutation fails with that code', async () => {
     mockMutateAsync.mockRejectedValue(new Error('export.already_pending'));
 
-    const { getByText } = renderSection();
+    const { getByText, getByLabelText } = renderSection();
     fireEvent.press(getByText(COPY.profile.exportDataCta));
-
-    const confirmButtons = (Alert.alert as jest.Mock).mock.calls[0][2] as Array<{
-      text: string;
-      onPress?: () => void;
-    }>;
-    const confirm = confirmButtons.find((b) => b.text === COPY.profile.exportDataConfirmCta);
-    confirm?.onPress?.();
+    fireEvent.changeText(getByLabelText(COPY.profile.exportDataEmailLabel), 'user@example.com');
+    fireEvent.press(getByText(COPY.profile.exportDataConfirmCta));
 
     await waitFor(() => {
       expect(Alert.alert).toHaveBeenCalledWith(

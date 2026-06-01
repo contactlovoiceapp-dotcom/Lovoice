@@ -74,11 +74,14 @@ describe('useRequestDataExport', () => {
     });
 
     await act(async () => {
-      result.current.mutate();
+      result.current.mutate({ contactEmail: 'user@example.com' });
     });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(supabaseMock.insert).toHaveBeenCalledWith({ user_id: MOCK_UID });
+    expect(supabaseMock.insert).toHaveBeenCalledWith({
+      user_id: MOCK_UID,
+      contact_email: 'user@example.com',
+    });
   });
 
   it('rejects with export.already_pending on duplicate pending request', async () => {
@@ -94,7 +97,7 @@ describe('useRequestDataExport', () => {
     });
 
     await act(async () => {
-      result.current.mutate();
+      result.current.mutate({ contactEmail: 'user@example.com' });
     });
 
     await waitFor(() => expect(result.current.isError).toBe(true));
@@ -114,10 +117,31 @@ describe('useRequestDataExport', () => {
     });
 
     await act(async () => {
-      result.current.mutate();
+      result.current.mutate({ contactEmail: 'user@example.com' });
     });
 
     await waitFor(() => expect(result.current.isError).toBe(true));
     expect(result.current.error?.message).toBe('export.request_failed');
+  });
+
+  it('rejects with export.email_invalid before calling Supabase', async () => {
+    const supabaseMock = buildSupabaseMock();
+    const { getSupabaseClient } = jest.requireMock('@/lib/supabase') as {
+      getSupabaseClient: jest.Mock;
+    };
+    getSupabaseClient.mockReturnValue(supabaseMock);
+
+    const queryClient = makeQueryClient();
+    const { result } = renderHook(() => useRequestDataExport(), {
+      wrapper: makeWrapper(queryClient),
+    });
+
+    await act(async () => {
+      result.current.mutate({ contactEmail: 'bad' });
+    });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+    expect(result.current.error?.message).toBe('export.email_invalid');
+    expect(supabaseMock.insert).not.toHaveBeenCalled();
   });
 });

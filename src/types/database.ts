@@ -147,6 +147,7 @@ export type Database = {
         Row: {
           completed_at: string | null
           completed_by: string | null
+          contact_email: string
           created_at: string
           id: string
           status: string
@@ -155,6 +156,7 @@ export type Database = {
         Insert: {
           completed_at?: string | null
           completed_by?: string | null
+          contact_email: string
           created_at?: string
           id?: string
           status?: string
@@ -163,6 +165,7 @@ export type Database = {
         Update: {
           completed_at?: string | null
           completed_by?: string | null
+          contact_email?: string
           created_at?: string
           id?: string
           status?: string

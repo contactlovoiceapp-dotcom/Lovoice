@@ -171,9 +171,12 @@ export const COPY = {
     termsLink: 'Conditions générales',
     privacyLink: 'Politique de confidentialité',
     exportDataCta: 'Exporter mes données',
-    exportDataConfirmTitle: 'Demander l’export de tes données ?',
+    exportDataConfirmTitle: 'Demander l’export de tes données',
     exportDataConfirmBody:
-      'Nous traiterons ta demande manuellement sous quelques jours ouvrés. Tu recevras un lien ou un fichier avec une copie de tes données Lovoice. Ce n’est pas un téléchargement instantané.',
+      'Nous traiterons ta demande manuellement sous quelques jours ouvrés. Indique l’adresse e-mail où tu veux recevoir ton export (ce n’est pas un téléchargement instantané).',
+    exportDataEmailLabel: 'Adresse e-mail',
+    exportDataEmailPlaceholder: 'exemple@email.com',
+    exportDataEmailInvalid: 'Entre une adresse e-mail valide.',
     exportDataConfirmCta: 'Envoyer la demande',
     exportDataSuccessTitle: 'Demande envoyée',
     exportDataSuccessBody:
