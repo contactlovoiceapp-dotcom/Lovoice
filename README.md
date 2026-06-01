@@ -275,6 +275,21 @@ npm run submit:ios     # submit latest production iOS build to App Store Connect
 
 Optional: under `submit.production.ios`, add `appleId`, `ascAppId` (numeric App ID in App Store Connect → App Information), and `appleTeamId` so `eas submit` does not prompt every time. Never commit secrets; use EAS Secrets or local env if needed.
 
+### Android signing keystore
+
+Production Android builds are signed by **EAS managed credentials** (the cloud build holds the
+keystore) — the local `android/app/build.gradle` only references the throwaway *debug* key. The
+release keystore (`*.jks`) is **never committed**: it is gitignored (`.gitignore` → `*.jks` /
+`*.keystore`) and absent from the repo.
+
+- Verify EAS holds the production keystore: `eas credentials` → Android → production. This is the
+  single source of truth for signing; losing it means you can no longer ship updates to an existing
+  Play listing.
+- Any loose `*.jks` file in the working tree (e.g. a manual export) is a backup, not the source of
+  truth. Keep it in a password manager / secure vault, not in the project folder. Do **not** delete
+  it until you have confirmed EAS owns the same keystore.
+- Build artifacts (`*.ipa`, `*.apk`, `*.aab`) are gitignored — never commit them.
+
 ---
 
 ## 8. Where to find what
