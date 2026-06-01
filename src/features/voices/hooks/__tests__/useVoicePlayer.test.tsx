@@ -12,6 +12,7 @@ const mocks = (global as Record<string, unknown>).__expoAudioMocks as {
     seekTo: jest.Mock;
     replace: jest.Mock;
     remove: jest.Mock;
+    isLoaded: boolean;
   };
   playerStatus: {
     playing: boolean;

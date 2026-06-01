@@ -110,8 +110,8 @@ function scrubExtras(extras: Record<string, unknown>): Record<string, unknown> {
   return out;
 }
 
-/** Scrubs user PII and request URLs on outbound error events. */
-export function scrubMobileEvent(event: Event): Event {
+/** Scrubs user PII and request URLs on outbound events (generic over ErrorEvent / Event). */
+export function scrubMobileEvent<T extends Event>(event: T): T {
   if (event.request?.url) {
     event.request = {
       ...event.request,

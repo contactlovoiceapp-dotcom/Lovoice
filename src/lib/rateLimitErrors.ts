@@ -30,7 +30,7 @@ export function toRateLimitAwareError(rawMessage: string, domain: RateLimitDomai
 
 /** True when an Error from our mutations carries a mapped rate-limit code. */
 export function isMappedRateLimitError(err: Error): boolean {
-  return Object.values(DOMAIN_ERROR_CODE).includes(err.message);
+  return (Object.values(DOMAIN_ERROR_CODE) as string[]).includes(err.message);
 }
 
 /** Resolves user-facing French copy from a mutation error, falling back when not rate-limited. */

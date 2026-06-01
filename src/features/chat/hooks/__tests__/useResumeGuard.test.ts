@@ -13,7 +13,7 @@ type AppStateHandler = (state: string) => void;
 type InteractionCallback = (() => void) | { run: () => void };
 
 let capturedAppStateHandlers: AppStateHandler[] = [];
-let capturedInteractionCallbacks: Array<{ fn: () => void; cancelMock: jest.Mock }> = [];
+let capturedInteractionCallbacks: { fn: () => void; cancelMock: jest.Mock }[] = [];
 
 let addEventListenerSpy: jest.SpyInstance;
 let runAfterInteractionsSpy: jest.SpyInstance;
@@ -23,20 +23,21 @@ beforeEach(() => {
   capturedAppStateHandlers = [];
   capturedInteractionCallbacks = [];
 
+  // The test mocks use looser signatures than RN's typed overloads; cast to satisfy the spy.
   addEventListenerSpy = jest
     .spyOn(AppState, 'addEventListener')
-    .mockImplementation((_event: string, cb: AppStateHandler) => {
+    .mockImplementation(((_event: string, cb: AppStateHandler) => {
       capturedAppStateHandlers.push(cb);
       return {
         remove: jest.fn(() => {
           capturedAppStateHandlers = capturedAppStateHandlers.filter((h) => h !== cb);
         }),
       };
-    });
+    }) as unknown as typeof AppState.addEventListener);
 
   runAfterInteractionsSpy = jest
     .spyOn(InteractionManager, 'runAfterInteractions')
-    .mockImplementation((cb: InteractionCallback) => {
+    .mockImplementation(((cb: InteractionCallback) => {
       const fn = typeof cb === 'function' ? cb : cb.run;
       const cancelMock = jest.fn(() => {
         capturedInteractionCallbacks = capturedInteractionCallbacks.filter(
@@ -45,7 +46,7 @@ beforeEach(() => {
       });
       capturedInteractionCallbacks.push({ fn, cancelMock });
       return { cancel: cancelMock };
-    });
+    }) as unknown as typeof InteractionManager.runAfterInteractions);
 });
 
 afterEach(() => {

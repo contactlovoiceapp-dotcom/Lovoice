@@ -51,7 +51,8 @@ function makeChannel(topic: string): MockChannel {
     (type: string, config: { event: string }, handler: PgHandler & BroadcastHandler) => {
       if (type === 'postgres_changes') {
         if (config.event === 'INSERT') handlers.insert = handler;
-        else if (config.event === 'UPDATE') handlers.update = handler;
+        // The UPDATE handler is invoked with no args in tests; narrow to the stored shape.
+        else if (config.event === 'UPDATE') handlers.update = handler as () => void;
       } else if (type === 'broadcast') {
         if (config.event === 'typing') handlers.typing = handler;
         else if (config.event === 'recording') handlers.recording = handler;
