@@ -259,7 +259,7 @@ Only use `EXPO_PUBLIC_*` for values that are safe to ship in the client bundle. 
 
 #### Optional: Sentry crash reporting
 
-Set `EXPO_PUBLIC_SENTRY_DSN` in `.env.local`, then run `npm run sync-eas-env` to push it to EAS. The DSN is a public identifier (safe to ship in the client bundle). When the DSN is missing, `initSentry()` is a no-op so the app still runs cleanly without it.
+Set `EXPO_PUBLIC_SENTRY_DSN` in `.env.local`, then run `npm run sync-eas-env` to push it to EAS. The DSN is a public identifier (safe to ship in the client bundle). When the DSN is missing, `initSentry()` is a no-op so the app still runs cleanly without it. Edge Functions use a separate secret `SENTRY_DSN` on Supabase — full details in **`docs/SENTRY.md`**.
 
 ### App Store / TestFlight (EAS)
 

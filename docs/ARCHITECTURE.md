@@ -565,8 +565,9 @@ Edge Function `delete_account` (called by authenticated user):
 
 V1 MVP — committed:
 
+- **Sentry** (mobile + Edge Functions): setup, scrubbing rules, and deployment — see **`docs/SENTRY.md`**.
 - **Sentry RN**: capture unhandled errors, audio recording failures, upload failures. Scrub `phone`, `body_text`, `transcript` from breadcrumbs.
-- **Sentry server**: each Edge Function wrapped in a try/catch that captures with context.
+- **Sentry server**: each Edge Function wrapped in `withSentry`; uncaught errors and selected internal 500s reported with scrubbed context.
 
 Optional / post-MVP:
 
