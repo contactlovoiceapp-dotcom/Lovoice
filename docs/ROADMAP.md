@@ -371,25 +371,3 @@ This phase produces a **separate Next.js repository** (suggested name `lovoice-a
 4. Identify users with their `profiles.id` (never the phone).
 5. Validate end-to-end: events show up in PostHog within 1 minute on a real device.
 6. **Back-office extension** (in the `lovoice-admin` repo): add a `/stats` route that embeds the operator's chosen PostHog insights as iframes (PostHog supports public iframe sharing per insight). Read-only, no new Edge Function.
-
----
-
-## Phase 11 — Production build + store submission (EAS + App Store + Play Store)
-
-**Goal**: app is in TestFlight and Google Play Internal Testing.
-
-### Scope
-
-1. App icons, splash, adaptive icons (1024 + Android adaptive).
-2. App Store Connect: app record, screenshots (FR), description, age rating (17+), privacy nutrition labels.
-3. Google Play Console: app record, screenshots, content rating, data safety form.
-4. Build production with EAS Build, submit via `eas submit`.
-5. Internal testing groups invited.
-
-### Deliverables
-
-- Build available in TestFlight.
-- Build available in Internal Testing on Play.
-- Crash-free rate > 99% on the first internal-testing release.
-
----

@@ -431,6 +431,12 @@ Walk through this checklist in order:
 
 ## 13. Known crash — foreground resume Hermes corruption (TestFlight 0.8.2)
 
+> **RESOLVED (2026-05).** Both variants (foreground-resume and push-notification tap) are
+> fixed and validated in production over several days (clean Sentry, no `GCScope` /
+> `convertNSExceptionToJSError`). See `docs/REALTIME_STABILITY.md` §1 and §6 for the final
+> status. The analysis below is retained for posterity; re-open it only if the signature
+> reappears on a new build.
+
 > **Update (0.9.1, 2026-05-29).** The resume guard below fixed the *foreground-resume*
 > variant. A **second variant survives**: the same fatal Hermes corruption fires on
 > **push-notification taps** (~1 in 3), and it is **audio-independent** — the 0.8.1 (32)

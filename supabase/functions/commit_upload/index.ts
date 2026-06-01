@@ -1,4 +1,10 @@
 // Edge Function: confirms an upload, validates the storage object, and commits the DB row.
+//
+// Rate limiting: upload counters are consumed in request_upload only (one signed URL = one
+// counted attempt), NOT here. A client that re-commits an already-uploaded object_path is
+// therefore not re-counted. This is intentional for V1 MVP (the signed-URL step gates volume);
+// if abuse via direct commit_upload calls ever appears at scale, add a consume_rate_limit()
+// guard here keyed on the same buckets as request_upload. See docs/ARCHITECTURE.md §4.2.
 
 import { corsHeaders } from '../_shared/cors.ts';
 import { requireAuth, getUserScopedClient } from '../_shared/auth.ts';

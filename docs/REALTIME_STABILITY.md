@@ -13,17 +13,18 @@
 
 | Field | Value |
 | --- | --- |
-| Symptom | App crashes (~1 in 3) when tapping a push notification, especially while inside a conversation exchanging messages. Foreground or background. |
+| State | **RESOLVED.** Stable in production for several days (validated via TestFlight + Sentry, late May 2026): no new `convertNSExceptionToJSError` / `HadesGC` / `GCScope` crash on the build carrying Steps 1a + 1b + 2. |
+| Symptom (historic) | App crashed (~1 in 3) when tapping a push notification, especially while inside a conversation exchanging messages. Foreground or background. |
 | Crash type | `EXC_BAD_ACCESS (SIGSEGV)` / `KERN_INVALID_ADDRESS at 0x50`, inside Hermes young-gen GC. |
 | Root mechanism | **Confirmed (two byte-identical crashlogs).** |
-| Trigger (dev-reproduced) | **The notif-tap unmount/remount churn** throws on both the audio host (`pause` on a destroyed player) and the Realtime channel (`.on()` after `subscribe()`). See §4.1. |
-| Current branch | `phase-9-hardening`, marketing version 0.9.2. |
-| Progress | **Step 1a shipped** (`removeChannelsByName` teardown) — `after subscribe()` redbox gone, crash not reproducible in dev. Pending release validation + Steps 1b/2/3. See §5–§6. |
-| Audio involvement | **None.** The crash predates the expo-audio patch. See §3. |
+| Fix shipped | Steps 1a (`removeChannelsByName` teardown), 1b (cut redundant React Query fan-out), and 2 (session-scoped conversation channel, idempotent `setActiveConversationId` churn guard). Together they remove the unmount/remount re-subscribe churn that fed the off-JS-thread allocation race. |
+| Audio involvement | **None.** The crash predated the expo-audio patch. See §3. |
 
-> **Do not write a fix until §4 (device test) has identified the throwing module.**
-> A previous attempt (0.9.2/0.9.3) guessed the cause, shipped a navigation change,
-> did not fix the crash, and regressed voice recording. Rolled back to 0.9.1.
+> **Resolution note.** Steps 1a + 1b + 2 (no navigation changes, no audio-invariant
+> changes) eliminated the churn that fed ingredient (a). Several days of clean Sentry on
+> the released build confirm the fix; Step 3 (identify the throwing `void` TurboModule)
+> proved unnecessary — removing the churn closed the window. The full analysis below is
+> retained for posterity. If the signature ever reappears, re-open §5 Step 3.
 
 ---
 
@@ -269,9 +270,12 @@ from ~4× to 1×.
   conversation, never inbox; debounced mark-read), broadcast→store, and the emit helpers.
   464/464 tests pass. _Device regression gate (record → immediate playback) and Sentry
   confirmation of the gone churn still pending on the next build._
-- **Release validation (TestFlight + Sentry):** _TBD — must confirm no
-  `convertNSExceptionToJSError` / `HadesGC` crash over several days (the prod fault is a
-  race; dev no-repro is necessary but not sufficient)._
+- **2026-05 — Release validation PASSED → crash RESOLVED.** The TestFlight build carrying
+  Steps 1a + 1b + 2 ran clean for several days: zero new `convertNSExceptionToJSError` /
+  `HadesGC` / `GCScope::_newChunkAndPHV` events in Sentry, no `after subscribe()` errors, no
+  reproduction on repeated notification taps inside an active conversation. The race window
+  was closed by removing the re-subscribe / fan-out churn (ingredient (a)); Step 3 (the
+  throwing `void` TurboModule) was not needed. Status moved to RESOLVED in §1.
 
 ---
 
