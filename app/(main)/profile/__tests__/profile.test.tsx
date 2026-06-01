@@ -61,6 +61,10 @@ jest.mock('../../../../src/features/voices/hooks/useVoicePlayer', () => ({
   }),
 }));
 
+jest.mock('../../../../src/features/profile/components/ProfileAccountPrivacySection', () => ({
+  ProfileAccountPrivacySection: () => null,
+}));
+
 function Wrapper({ children }: { children: ReactNode }) {
   return <SafeAreaProvider>{children}</SafeAreaProvider>;
 }

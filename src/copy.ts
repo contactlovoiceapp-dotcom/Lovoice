@@ -167,6 +167,22 @@ export const COPY = {
     signOutConfirmCta: 'Me déconnecter',
     signOutError: 'Impossible de te déconnecter pour le moment. Réessaie dans quelques instants.',
 
+    legalSectionTitle: 'Compte & confidentialité',
+    termsLink: 'Conditions générales',
+    privacyLink: 'Politique de confidentialité',
+    exportDataCta: 'Exporter mes données',
+    exportDataConfirmTitle: 'Demander l’export de tes données ?',
+    exportDataConfirmBody:
+      'Nous traiterons ta demande manuellement sous quelques jours ouvrés. Tu recevras un lien ou un fichier avec une copie de tes données Lovoice. Ce n’est pas un téléchargement instantané.',
+    exportDataConfirmCta: 'Envoyer la demande',
+    exportDataSuccessTitle: 'Demande envoyée',
+    exportDataSuccessBody:
+      'Ton export est en file d’attente. Notre équipe te contactera ou t’enverra tes données dès que possible.',
+    exportDataAlreadyPending:
+      'Tu as déjà une demande d’export en cours. Patiente quelques jours ouvrés avant d’en refaire une.',
+    exportDataError:
+      'Impossible d’enregistrer ta demande pour le moment. Réessaie dans quelques instants.',
+
     deleteAccountCta: 'Supprimer mon compte',
     deleteAccountConfirmTitle: 'Supprimer ton compte ?',
     deleteAccountConfirmBody:

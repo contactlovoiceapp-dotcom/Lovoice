@@ -296,8 +296,8 @@ This phase produces a **separate Next.js repository** (suggested name `lovoice-a
 ### Scope (V1 MVP — committed)
 
 1. Edge Function `delete_account` per ARCHITECTURE §9. Reachable from a Profile → Danger Zone screen.
-2. Data export (RGPD right to portability): Edge Function `export_my_data` returns a JSON of all the user's data + signed URLs to their audio files (1h TTL).
-3. CGU + Privacy Policy hosted (Notion / Webflow) and linked from the app.
+2. Data export (RGPD right to portability): mobile users enqueue a row in `data_export_requests` (one pending request per user); operators fulfill manually. **lovoice-admin** (sibling repo): add `/data-exports` — list `status = 'pending'` ordered by `created_at`, columns date / `user_id` (link to `/users/[id]`) / `display_name` (join `profiles`), action **Marquer comme traité** → `status = 'completed'`, `completed_at = now()`, `completed_by = admin uid`. Until that page ships, export from Supabase Studio or scripts.
+3. CGU + Privacy Policy hosted on lovoice-admin (`/legal/terms`, `/legal/privacy-policy`) and linked from the app profile section.
 4. **Sentry** wired (mobile + Edge Functions) with PII scrubbing.
 5. Rate limiting on Edge Functions: per-user buckets in Postgres (`rate_limits` table) for `request_upload`, `commit_upload`, `like`, `report`. Reasonable limits (e.g. 30 uploads/day, 100 likes/hour).
 6. Audit table `audit_log(actor_id, action, target, created_at)` for security-sensitive actions (block, report, delete, moderate).

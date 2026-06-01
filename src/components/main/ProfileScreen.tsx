@@ -24,7 +24,7 @@ import { COPY } from '@/copy';
 import { COLORS, CTA_GRADIENT, FONT, ONBOARDING_GRADIENT, RADIUS, SHADOW, THEME_GRADIENTS } from '@/theme';
 import { ColorTheme } from '@/theme';
 import { useAuth } from '@/features/auth/hooks/useAuth';
-import { useDeleteAccount } from '@/features/auth/api/accountMutations';
+import { ProfileAccountPrivacySection } from '@/features/profile/components/ProfileAccountPrivacySection';
 import { type CitySearchResult } from '@/features/profile/api/citySearch';
 import { useUpsertProfile } from '@/features/profile/api/profileMutations';
 import { useCitySearch } from '@/features/profile/hooks/useCitySearch';
@@ -179,8 +179,6 @@ export default function ProfileScreen({ isOnboarding = false, onOnboardingComple
   const upsertProfile = useUpsertProfile();
   const updateVoice = useUpdateVoice();
   const deleteVoice = useDeleteVoice();
-  const deleteAccount = useDeleteAccount();
-
   const activeVoiceQuery = useActiveVoice(profile?.id ?? null);
   const activeVoice = activeVoiceQuery.data ?? null;
   const signedUrlQuery = useVoiceSignedUrl(activeVoice?.storage_path ?? null);
@@ -358,47 +356,6 @@ export default function ProfileScreen({ isOnboarding = false, onOnboardingComple
       Alert.alert(COPY.profile.signOutTitle, COPY.profile.signOutError);
     }
   }, [signOut]);
-
-  const handleDeleteAccount = useCallback(() => {
-    if (deleteAccount.isPending) return;
-
-    // Two-step confirmation for an irreversible, RGPD-grade destructive action.
-    Alert.alert(
-      COPY.profile.deleteAccountConfirmTitle,
-      COPY.profile.deleteAccountConfirmBody,
-      [
-        { text: COPY.common.cancel, style: 'cancel' },
-        {
-          text: COPY.profile.deleteAccountConfirmCta,
-          style: 'destructive',
-          onPress: () => {
-            Alert.alert(
-              COPY.profile.deleteAccountFinalTitle,
-              COPY.profile.deleteAccountFinalBody,
-              [
-                { text: COPY.common.cancel, style: 'cancel' },
-                {
-                  text: COPY.profile.deleteAccountFinalCta,
-                  style: 'destructive',
-                  onPress: async () => {
-                    try {
-                      // On success the hook clears the session; AuthRedirector navigates away.
-                      await deleteAccount.mutateAsync();
-                    } catch {
-                      Alert.alert(
-                        COPY.profile.deleteAccountConfirmTitle,
-                        COPY.profile.deleteAccountError,
-                      );
-                    }
-                  },
-                },
-              ],
-            );
-          },
-        },
-      ],
-    );
-  }, [deleteAccount]);
 
   const handleDeleteVoice = useCallback(() => {
     if (!activeVoice || !profile?.id) return;
@@ -1149,34 +1106,7 @@ export default function ProfileScreen({ isOnboarding = false, onOnboardingComple
               </LinearGradient>
             </Pressable>
 
-            {/* RGPD — irreversible account deletion (hidden during onboarding) */}
-            {!isOnboarding && (
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel={COPY.profile.deleteAccountCta}
-                disabled={deleteAccount.isPending}
-                onPress={handleDeleteAccount}
-                style={{
-                  alignSelf: 'center',
-                  marginTop: 24,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: 6,
-                  paddingVertical: 10,
-                  paddingHorizontal: 16,
-                  opacity: deleteAccount.isPending ? 0.4 : 1,
-                }}
-              >
-                {deleteAccount.isPending ? (
-                  <ActivityIndicator size="small" color={COLORS.primary} />
-                ) : (
-                  <Trash2 size={14} color={COLORS.primary} />
-                )}
-                <Text style={{ fontFamily: FONT.semibold, fontSize: 13, color: COLORS.primary }}>
-                  {COPY.profile.deleteAccountCta}
-                </Text>
-              </Pressable>
-            )}
+            {!isOnboarding ? <ProfileAccountPrivacySection /> : null}
           </ScrollView>
         </KeyboardAvoidingView>
       </LinearGradient>
