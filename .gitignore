@@ -13,10 +13,16 @@ expo-env.d.ts
 .kotlin/
 *.orig.*
 *.jks
+*.keystore
 *.p8
 *.p12
 *.key
 *.mobileprovision
+
+# Build artifacts — produced by EAS/native builds, never commit
+*.ipa
+*.apk
+*.aab
 
 # Metro
 .metro-health-check*
