@@ -31,7 +31,27 @@ jest.mock('expo-constants', () => ({
 
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
-import { setupNotificationHandler, registerForPushNotificationsAsync, dismissNotificationsForConversation, conversationPushDeepLink } from '../push';
+import {
+  setupNotificationHandler,
+  registerForPushNotificationsAsync,
+  dismissNotificationsForConversation,
+  conversationPushDeepLink,
+  resolveForegroundPresentation,
+  setForegroundNotificationSuppressionFilter,
+} from '../push';
+
+type HandlerArg = Parameters<
+  NonNullable<Parameters<typeof Notifications.setNotificationHandler>[0]>['handleNotification']
+>[0];
+
+function notificationWith(data: Record<string, unknown>): HandlerArg {
+  return { request: { content: { data } } } as unknown as HandlerArg;
+}
+
+function latestHandler() {
+  const calls = jest.mocked(Notifications.setNotificationHandler).mock.calls;
+  return calls[calls.length - 1][0]!.handleNotification;
+}
 
 type MutableEasConfig = { projectId: string };
 type MutableExtra = { eas: MutableEasConfig };
@@ -68,6 +88,66 @@ describe('setupNotificationHandler', () => {
       shouldPlaySound: true,
       shouldSetBadge: true,
     });
+  });
+});
+
+describe('resolveForegroundPresentation', () => {
+  it('presents everything when no filter is set', () => {
+    expect(resolveForegroundPresentation({ deep_link: '/messages/x' }, null)).toEqual({
+      shouldShowBanner: true,
+      shouldShowList: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+    });
+  });
+
+  it('suppresses everything when the filter matches', () => {
+    expect(resolveForegroundPresentation({ deep_link: '/messages/x' }, () => true)).toEqual({
+      shouldShowBanner: false,
+      shouldShowList: false,
+      shouldPlaySound: false,
+      shouldSetBadge: false,
+    });
+  });
+
+  it('presents when the filter does not match', () => {
+    expect(
+      resolveForegroundPresentation({ deep_link: '/messages/x' }, () => false).shouldShowBanner,
+    ).toBe(true);
+  });
+});
+
+describe('setupNotificationHandler — active-conversation suppression', () => {
+  afterEach(() => setForegroundNotificationSuppressionFilter(null));
+
+  it('suppresses a notification matching the registered filter', async () => {
+    setForegroundNotificationSuppressionFilter((data) => data.deep_link === '/messages/abc');
+    setupNotificationHandler();
+
+    const behavior = await latestHandler()(notificationWith({ deep_link: '/messages/abc' }));
+
+    expect(behavior.shouldShowBanner).toBe(false);
+    expect(behavior.shouldShowList).toBe(false);
+  });
+
+  it('still presents a notification for a different conversation', async () => {
+    setForegroundNotificationSuppressionFilter((data) => data.deep_link === '/messages/abc');
+    setupNotificationHandler();
+
+    const behavior = await latestHandler()(notificationWith({ deep_link: '/messages/other' }));
+
+    expect(behavior.shouldShowBanner).toBe(true);
+    expect(behavior.shouldShowList).toBe(true);
+  });
+
+  it('presents again once the filter is cleared', async () => {
+    setForegroundNotificationSuppressionFilter((data) => data.deep_link === '/messages/abc');
+    setForegroundNotificationSuppressionFilter(null);
+    setupNotificationHandler();
+
+    const behavior = await latestHandler()(notificationWith({ deep_link: '/messages/abc' }));
+
+    expect(behavior.shouldShowBanner).toBe(true);
   });
 });
 

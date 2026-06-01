@@ -3,18 +3,62 @@ import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 
+export interface NotificationPresentation {
+  shouldShowBanner: boolean;
+  shouldShowList: boolean;
+  shouldPlaySound: boolean;
+  shouldSetBadge: boolean;
+}
+
+const PRESENT: NotificationPresentation = {
+  shouldShowBanner: true,
+  shouldShowList: true,
+  shouldPlaySound: true,
+  shouldSetBadge: true,
+};
+
+const SUPPRESS: NotificationPresentation = {
+  shouldShowBanner: false,
+  shouldShowList: false,
+  shouldPlaySound: false,
+  shouldSetBadge: false,
+};
+
+/** Returns true when a foreground-received notification should be hidden (no banner, not
+    listed in Notification Center). Registered by the chat layer to mute the conversation the
+    user is currently viewing. */
+export type ForegroundNotificationFilter = (data: Record<string, unknown>) => boolean;
+
+let foregroundSuppressionFilter: ForegroundNotificationFilter | null = null;
+
+/** Installs (or clears, with null) the predicate that decides whether a foreground
+    notification is suppressed. Last writer wins; the chat mute hook owns it. */
+export function setForegroundNotificationSuppressionFilter(
+  filter: ForegroundNotificationFilter | null,
+): void {
+  foregroundSuppressionFilter = filter;
+}
+
+/** Pure: how to present a foreground notification given its data and the active filter. */
+export function resolveForegroundPresentation(
+  data: Record<string, unknown>,
+  filter: ForegroundNotificationFilter | null,
+): NotificationPresentation {
+  return filter?.(data) ? SUPPRESS : PRESENT;
+}
+
 /**
- * Configures the foreground notification handler so banners show while the app is open.
+ * Configures the foreground notification handler. Banners show while the app is open, EXCEPT
+ * for a notification targeting the conversation the user is currently viewing — that one is
+ * suppressed so it never lingers on the lock screen (see setForegroundNotificationSuppressionFilter).
  * Must be called once at app startup, before any notification can arrive.
  */
 export function setupNotificationHandler(): void {
   Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowBanner: true,
-      shouldShowList: true,
-      shouldPlaySound: true,
-      shouldSetBadge: true,
-    }),
+    handleNotification: async (notification) => {
+      const data = (notification?.request?.content?.data ?? {}) as Record<string, unknown>;
+      return resolveForegroundPresentation(data, foregroundSuppressionFilter);
+    },
   });
 }
 

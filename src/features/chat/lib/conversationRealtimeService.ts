@@ -266,6 +266,14 @@ export function setConversationScreenFocused(focused: boolean): void {
   isConversationScreenFocused = focused;
 }
 
+/** The conversation the user is actively viewing right now (focused screen), or null.
+    Distinct from activeConversationId, which persists after blur to avoid channel
+    re-subscribe churn — so we gate on the focus flag here. Used to mute foreground push
+    for a thread already on screen. */
+export function getViewedConversationId(): string | null {
+  return isConversationScreenFocused ? activeConversationId : null;
+}
+
 /** Declares which conversation owns the Realtime channel. Idempotent: selecting the
     already-active conversation is a no-op (the churn guard). Pass null to tear down. */
 export function setActiveConversationId(conversationId: string | null): void {

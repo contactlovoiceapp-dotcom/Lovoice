@@ -6,6 +6,7 @@
      so it survives screen mount/unmount (no re-subscribe churn on notification taps)
    - usePushRegistration: stores the device Expo Push Token on login
    - usePushDeepLink: navigates to the right screen when the user taps a notification
+   - useActiveConversationPushMute: hides foreground push for the thread already on screen
    - useAppIconBadge: syncs the OS app icon badge with unread/unseen counts */
 
 import React from 'react';
@@ -20,6 +21,7 @@ import { useRealtimeLikes } from '../../src/features/likes/hooks/useRealtimeLike
 import { useConversationRealtimeHost } from '../../src/features/chat/hooks/useConversationRealtimeHost';
 import { usePushRegistration } from '../../src/features/push/hooks/usePushRegistration';
 import { usePushDeepLink } from '../../src/features/push/hooks/usePushDeepLink';
+import { useActiveConversationPushMute } from '../../src/features/push/hooks/useActiveConversationPushMute';
 import { useAppIconBadge } from '../../src/features/push/hooks/useAppIconBadge';
 
 function MainTabBar(props: BottomTabBarProps) {
@@ -38,6 +40,7 @@ export default function MainLayout() {
   useConversationRealtimeHost();
   usePushRegistration();
   usePushDeepLink();
+  useActiveConversationPushMute();
   useAppIconBadge();
 
   return (
