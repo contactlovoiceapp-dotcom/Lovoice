@@ -407,38 +407,10 @@ function RecordVoicePreviewBody({
               {COPY.record.silenceWarningHint}
             </Text>
           )}
-
-          {!isUploading && (
-            <Pressable
-              accessibilityRole="button"
-              onPress={handleRestart}
-              style={{ marginTop: 8 }}
-            >
-              <Text
-                style={{ fontSize: 14, fontFamily: FONT.medium, color: COLORS.textTertiary, textDecorationLine: 'underline' }}
-              >
-                {COPY.record.restart}
-              </Text>
-            </Pressable>
-          )}
         </View>
       </View>
 
       <View style={{ width: '100%', alignSelf: 'center', gap: 12, maxWidth: contentMaxWidth }}>
-        <View
-          style={{
-            borderRadius: RADIUS.lg,
-            borderWidth: 1,
-            borderColor: COLORS.border,
-            backgroundColor: COLORS.surfaceMuted,
-            padding: 16,
-          }}
-        >
-          <Text style={{ fontSize: 14, lineHeight: 20, fontFamily: FONT.regular, color: COLORS.textSecondary }}>
-            {COPY.record.previewHint}
-          </Text>
-        </View>
-
         <Pressable
           accessibilityRole="button"
           disabled={isUploading}
@@ -465,6 +437,19 @@ function RecordVoicePreviewBody({
             </View>
           </LinearGradient>
         </Pressable>
+
+        {!isUploading && !isSilent && (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => void handleRestart()}
+            testID="discard-recording-button"
+            style={{ alignSelf: 'center', paddingVertical: 8 }}
+          >
+            <Text style={{ fontSize: 14, fontFamily: FONT.medium, color: COLORS.textTertiary }}>
+              {COPY.record.restart}
+            </Text>
+          </Pressable>
+        )}
 
         {isSilent && onSkip && (
           <Pressable
