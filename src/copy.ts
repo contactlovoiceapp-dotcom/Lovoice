@@ -263,7 +263,7 @@ export const COPY = {
   replyVoiceModal: {
     title: 'Un seul message.',
     hint: (name: string) =>
-      `Envoie un vocal à ${name}. Un seul essai pour faire bonne impression.`,
+      `Envoie ton vocal, à ${name} de faire le prochain pas.`,
     tapToRecord: 'Appuie pour enregistrer',
     tapToStop: 'Appuie pour terminer',
     tooShort: 'Trop court — continue un peu.',
