@@ -10,7 +10,7 @@ const config: ExpoConfig = {
   name: "Lovoice",
   slug: "lovoice",
   scheme: "lovoice",
-  version: "0.9.9",
+  version: "1.0.0",
   orientation: "portrait",
   icon: "./assets/icon.png",
   userInterfaceStyle: "light",
