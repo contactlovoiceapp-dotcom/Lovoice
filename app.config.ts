@@ -9,6 +9,7 @@ const supabasePublishableKey =
 const config: ExpoConfig = {
   name: "Lovoice",
   slug: "lovoice",
+  owner: "lovoice-app",
   scheme: "lovoice",
   version: "1.0.0",
   orientation: "portrait",
