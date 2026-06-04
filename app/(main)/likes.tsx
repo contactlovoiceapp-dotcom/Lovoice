@@ -4,17 +4,19 @@ import React, { useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useFocusEffect } from 'expo-router';
+import { useQueryClient } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import MemberProfileModal from '@/features/profile/components/MemberProfileModal';
 import { COLORS } from '../../src/theme';
 import { ageFromBirthdate } from '../../src/lib/age';
-import { useReceivedLikes, useGivenLikes } from '../../src/features/likes/api/likeQueries';
+import { useReceivedLikes, useGivenLikes, likeQueryKeys } from '../../src/features/likes/api/likeQueries';
 import { useMarkLikesSeen } from '../../src/features/likes/hooks/useUnseenLikes';
 import LikesScreen from '../../src/components/main/LikesScreen';
 
 export default function LikesRoute() {
   const insets = useSafeAreaInsets();
+  const queryClient = useQueryClient();
   const [memberPreview, setMemberPreview] = useState<{ userId: string; voiceId: string | null } | null>(null);
   const markSeen = useMarkLikesSeen();
 
@@ -23,11 +25,15 @@ export default function LikesRoute() {
 
   const isLoading = receivedQuery.isLoading || givenQuery.isLoading;
 
-  // Mark received likes as seen whenever this tab gains focus.
+  // On focus: refetch the likes so a tap on a like push (or a plain tab switch)
+  // shows the new like immediately instead of waiting for staleTime, then mark them
+  // seen. Realtime alone misses likes that arrived while the app was backgrounded.
   useFocusEffect(
     React.useCallback(() => {
+      void queryClient.invalidateQueries({ queryKey: likeQueryKeys.received });
+      void queryClient.invalidateQueries({ queryKey: likeQueryKeys.given });
       markSeen();
-    }, [markSeen]),
+    }, [queryClient, markSeen]),
   );
 
   if (receivedQuery.isError) {

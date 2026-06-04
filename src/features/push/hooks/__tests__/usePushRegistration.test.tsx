@@ -54,6 +54,7 @@ function createProfile(userId: string, pushToken: string | null = null): Profile
     bio_emojis: [],
     created_at: '2026-04-30T00:00:00.000Z',
     last_seen_at: null,
+    likes_seen_at: null,
     push_token: pushToken,
     is_banned: false,
     deleted_at: null,

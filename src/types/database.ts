@@ -491,6 +491,7 @@ export type Database = {
           id: string
           is_banned: boolean
           last_seen_at: string | null
+          likes_seen_at: string | null
           location: unknown
           looking_for: string[]
           push_token: string | null
@@ -507,6 +508,7 @@ export type Database = {
           id?: string
           is_banned?: boolean
           last_seen_at?: string | null
+          likes_seen_at?: string | null
           location?: unknown
           looking_for?: string[]
           push_token?: string | null
@@ -523,6 +525,7 @@ export type Database = {
           id?: string
           is_banned?: boolean
           last_seen_at?: string | null
+          likes_seen_at?: string | null
           location?: unknown
           looking_for?: string[]
           push_token?: string | null

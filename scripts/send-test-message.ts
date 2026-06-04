@@ -55,7 +55,7 @@ function getFlag(name: string): string | undefined {
 
 const recipientPhone = process.argv[2] && !process.argv[2].startsWith("--") ? process.argv[2] : undefined;
 const convIdFlag = getFlag("conv");
-const senderPhone = getFlag("sender") ?? "+33099900001";
+const senderPhone = getFlag("sender") ?? "+33605764744";
 const customText = getFlag("text");
 const count = Math.max(1, Number.parseInt(getFlag("count") ?? "1", 10) || 1);
 

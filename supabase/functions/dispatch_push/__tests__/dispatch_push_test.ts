@@ -119,6 +119,61 @@ Deno.test('buildExpoPushMessage — message with null actor falls back to "Nouve
   assertEquals(msg.title, 'Nouveau message');
 });
 
+Deno.test('buildExpoPushMessage — stamps badge when provided', () => {
+  const likeMsg = buildExpoPushMessage({
+    kind: 'like',
+    pushToken: 'ExponentPushToken[abc123]',
+    actorDisplayName: 'Marie',
+    notificationId: '00000000-0000-0000-0000-000000000007',
+    badge: 4,
+  });
+  assertEquals(likeMsg.badge, 4);
+
+  const messageMsg = buildExpoPushMessage({
+    kind: 'message',
+    pushToken: 'ExponentPushToken[xyz789]',
+    actorDisplayName: 'Léa',
+    notificationId: '00000000-0000-0000-0000-000000000008',
+    conversationId: '55555555-5555-5555-5555-555555555555',
+    messageKind: 'text',
+    messageBodyText: 'Coucou',
+    badge: 1,
+  });
+  assertEquals(messageMsg.badge, 1);
+});
+
+Deno.test('buildExpoPushMessage — omits badge when not provided or negative', () => {
+  const noBadge = buildExpoPushMessage({
+    kind: 'like',
+    pushToken: 'ExponentPushToken[abc123]',
+    actorDisplayName: 'Marie',
+    notificationId: '00000000-0000-0000-0000-000000000009',
+  });
+  assertEquals('badge' in noBadge, false);
+
+  const negativeBadge = buildExpoPushMessage({
+    kind: 'like',
+    pushToken: 'ExponentPushToken[abc123]',
+    actorDisplayName: 'Marie',
+    notificationId: '00000000-0000-0000-0000-00000000000a',
+    badge: -1,
+  });
+  assertEquals('badge' in negativeBadge, false);
+});
+
+Deno.test('buildExpoPushMessage — stamps a zero badge to clear the OS badge', () => {
+  const msg = buildExpoPushMessage({
+    kind: 'message',
+    pushToken: 'ExponentPushToken[xyz789]',
+    actorDisplayName: 'Léa',
+    notificationId: '00000000-0000-0000-0000-00000000000b',
+    conversationId: '66666666-6666-6666-6666-666666666666',
+    messageKind: 'voice',
+    badge: 0,
+  });
+  assertEquals(msg.badge, 0);
+});
+
 // ---------------------------------------------------------------------------
 // parseExpoPushResponse
 // ---------------------------------------------------------------------------

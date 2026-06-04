@@ -7,7 +7,9 @@
    - usePushRegistration: stores the device Expo Push Token on login
    - usePushDeepLink: navigates to the right screen when the user taps a notification
    - useActiveConversationPushMute: hides foreground push for the thread already on screen
-   - useAppIconBadge: syncs the OS app icon badge with unread/unseen counts */
+   - useAppIconBadge: syncs the OS app icon badge with unread/unseen counts
+   - useForegroundSync: refetches inbox + received likes on background → active so badges
+     and the Likes screen reflect what arrived while the app was backgrounded/killed */
 
 import React from 'react';
 import { Tabs } from 'expo-router';
@@ -23,6 +25,7 @@ import { usePushRegistration } from '../../src/features/push/hooks/usePushRegist
 import { usePushDeepLink } from '../../src/features/push/hooks/usePushDeepLink';
 import { useActiveConversationPushMute } from '../../src/features/push/hooks/useActiveConversationPushMute';
 import { useAppIconBadge } from '../../src/features/push/hooks/useAppIconBadge';
+import { useForegroundSync } from '../../src/features/push/hooks/useForegroundSync';
 
 function MainTabBar(props: BottomTabBarProps) {
   const segments = useSegments();
@@ -42,6 +45,7 @@ export default function MainLayout() {
   usePushDeepLink();
   useActiveConversationPushMute();
   useAppIconBadge();
+  useForegroundSync();
 
   return (
     <Tabs screenOptions={{ headerShown: false }} tabBar={(props) => <MainTabBar {...props} />}>

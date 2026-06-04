@@ -89,6 +89,7 @@ describe('ProfileSetupRoute', () => {
         deleted_at: null,
         is_banned: false,
         last_seen_at: null,
+        likes_seen_at: null,
         push_token: null,
       },
       isLoading: false,

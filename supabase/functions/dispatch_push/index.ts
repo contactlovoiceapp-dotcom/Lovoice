@@ -28,6 +28,9 @@ export interface ExpoPushMessage {
   data: Record<string, string>;
   priority: 'high';
   channelId: 'default';
+  // Authoritative OS badge total (unread messages + unseen likes). Omitted when the
+  // count could not be computed, so we never reset a correct badge to a wrong value.
+  badge?: number;
 }
 
 export interface BuildExpoPushMessageArgs {
@@ -38,6 +41,9 @@ export interface BuildExpoPushMessageArgs {
   conversationId?: string;
   messageBodyText?: string | null;
   messageKind?: 'text' | 'voice';
+  // Total unread/unseen count for the recipient, stamped on the push so the OS badge
+  // updates even while the app is backgrounded or killed (no client JS runs then).
+  badge?: number;
 }
 
 export interface ParsedExpoPushResponse {
@@ -51,7 +57,11 @@ export interface ParsedExpoPushResponse {
 // ---------------------------------------------------------------------------
 
 export function buildExpoPushMessage(args: BuildExpoPushMessageArgs): ExpoPushMessage {
-  const { kind, pushToken, actorDisplayName, notificationId } = args;
+  const { kind, pushToken, actorDisplayName, notificationId, badge } = args;
+
+  // Only attach badge when it was computed (>= 0); leaving it off keeps the OS badge
+  // untouched rather than overwriting a correct value with a wrong one.
+  const badgeField = typeof badge === 'number' && badge >= 0 ? { badge } : {};
 
   if (kind === 'like') {
     return {
@@ -62,6 +72,7 @@ export function buildExpoPushMessage(args: BuildExpoPushMessageArgs): ExpoPushMe
       data: { deep_link: '/likes', notification_id: notificationId, kind: 'like' },
       priority: 'high',
       channelId: 'default',
+      ...badgeField,
     };
   }
 
@@ -88,6 +99,7 @@ export function buildExpoPushMessage(args: BuildExpoPushMessageArgs): ExpoPushMe
     },
     priority: 'high',
     channelId: 'default',
+    ...badgeField,
   };
 }
 
@@ -236,6 +248,23 @@ Deno.serve(withSentry(async (req: Request): Promise<Response> => {
     actorDisplayName = actor?.display_name ?? null;
   }
 
+  // --- Compute the authoritative OS badge total for the recipient ---
+  // This is the only way to update the badge while the app is backgrounded/killed.
+  // On failure we leave badge undefined so the push omits it (never overwrite a
+  // correct badge with a wrong value).
+  let badge: number | undefined;
+  {
+    const { data: badgeCount, error: badgeError } = await supabaseAdmin.rpc(
+      'unread_badge_count',
+      { p_user: notification.user_id },
+    );
+    if (badgeError) {
+      console.error('dispatch_push: badge count failed', { error: badgeError.message });
+    } else if (typeof badgeCount === 'number') {
+      badge = badgeCount;
+    }
+  }
+
   // --- Build the Expo push message ---
 
   const notifKind = notification.kind as 'like' | 'message';
@@ -246,6 +275,7 @@ Deno.serve(withSentry(async (req: Request): Promise<Response> => {
     pushToken,
     actorDisplayName,
     notificationId,
+    badge,
   };
 
   if (notifKind === 'message') {
