@@ -16,6 +16,8 @@ function HookConsumer() {
   return null;
 }
 
+type InteractionCallback = (() => void) | { run: () => void };
+
 describe('useProfileLastSeen', () => {
   const mockEq = jest.fn().mockResolvedValue({ error: null });
   const mockUpdate = jest.fn(() => ({ eq: mockEq }));
@@ -25,10 +27,20 @@ describe('useProfileLastSeen', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    jest.spyOn(InteractionManager, 'runAfterInteractions').mockImplementation((task) => {
-      task();
-      return { cancel: jest.fn() };
-    });
+    jest
+      .spyOn(InteractionManager, 'runAfterInteractions')
+      .mockImplementation(((cb: InteractionCallback) => {
+        const fn = typeof cb === 'function' ? cb : cb.run;
+        fn();
+        return {
+          then: (onfulfilled?: () => void) => {
+            onfulfilled?.();
+            return Promise.resolve();
+          },
+          done: jest.fn(),
+          cancel: jest.fn(),
+        };
+      }) as unknown as typeof InteractionManager.runAfterInteractions);
     (getSupabaseClient as jest.Mock).mockReturnValue({
       auth: { getSession: mockGetSession },
       from: jest.fn(() => ({ update: mockUpdate })),

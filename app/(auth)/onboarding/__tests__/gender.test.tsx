@@ -52,15 +52,6 @@ describe('OnboardingGenderRoute', () => {
     expect(mockPush).toHaveBeenCalledWith('/(auth)/onboarding/looking-for');
   });
 
-  it('navigates to looking-for after selecting Non-binaire', () => {
-    const { getByRole } = render(<OnboardingGenderRoute />, { wrapper: Wrapper });
-
-    fireEvent.press(getByRole('button', { name: 'Non-binaire' }));
-    fireEvent.press(getByRole('button', { name: 'Continuer' }));
-
-    expect(mockPush).toHaveBeenCalledWith('/(auth)/onboarding/looking-for');
-  });
-
   it('navigates to looking-for after selecting Autre', () => {
     const { getByRole } = render(<OnboardingGenderRoute />, { wrapper: Wrapper });
 

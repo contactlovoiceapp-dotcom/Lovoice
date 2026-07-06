@@ -47,12 +47,12 @@ describe('OnboardingLookingForRoute', () => {
     const { getByRole } = render(<OnboardingLookingForRoute />, { wrapper: Wrapper });
 
     fireEvent.press(getByRole('checkbox', { name: 'Homme' }));
-    fireEvent.press(getByRole('checkbox', { name: 'Non-binaire' }));
+    fireEvent.press(getByRole('checkbox', { name: 'Autre' }));
     fireEvent.press(getByRole('button', { name: 'Continuer' }));
 
     expect(mockPush).toHaveBeenCalledWith('/(auth)/onboarding/city');
     expect(useProfileOnboardingState.getState().lookingFor).toEqual(
-      expect.arrayContaining(['male', 'nonbinary']),
+      expect.arrayContaining(['male', 'other']),
     );
   });
 
