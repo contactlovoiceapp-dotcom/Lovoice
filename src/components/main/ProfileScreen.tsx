@@ -407,92 +407,105 @@ export default function ProfileScreen({ isOnboarding = false, onOnboardingComple
         animationType="slide"
         onRequestClose={() => setEmojiPickerIndex(null)}
       >
-        <Pressable
-          style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' }}
-          onPress={() => setEmojiPickerIndex(null)}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={{ flex: 1 }}
         >
           <Pressable
-            onPress={() => {
-              /* Prevent tap-through closing modal when tapping inside sheet. */
-            }}
-            style={{
-              backgroundColor: COLORS.surface,
-              borderTopLeftRadius: RADIUS.modal,
-              borderTopRightRadius: RADIUS.modal,
-              padding: 24,
-              paddingBottom: insets.bottom + 24,
-            }}
+            style={{ flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' }}
+            onPress={() => setEmojiPickerIndex(null)}
           >
-            <Text
+            <Pressable
+              onPress={() => {
+                /* Prevent tap-through closing modal when tapping inside sheet. */
+              }}
               style={{
-                marginBottom: 20,
-                fontSize: 17,
-                fontFamily: FONT.bold,
-                color: COLORS.dark,
-                textAlign: 'center',
+                backgroundColor: COLORS.surface,
+                borderTopLeftRadius: RADIUS.modal,
+                borderTopRightRadius: RADIUS.modal,
+                maxHeight: '80%',
               }}
             >
-              {COPY.profile.emojiPickerTitle}
-            </Text>
-
-            {/* Emoji grid — 6 columns */}
-            <View
-              style={{
-                flexDirection: 'row',
-                flexWrap: 'wrap',
-                gap: 8,
-                justifyContent: 'center',
-                marginBottom: 20,
-              }}
-            >
-              {SUGGESTED_EMOJIS.map((emoji) => (
-                <Pressable
-                  key={emoji}
-                  accessibilityRole="button"
-                  onPress={() => selectEmoji(emoji)}
+              <ScrollView
+                keyboardShouldPersistTaps="handled"
+                bounces={false}
+                contentContainerStyle={{
+                  padding: 24,
+                  paddingBottom: insets.bottom + 24,
+                }}
+              >
+                <Text
                   style={{
-                    width: 48,
-                    height: 48,
-                    borderRadius: RADIUS.md,
-                    backgroundColor: COLORS.surfaceMuted,
-                    borderWidth: 1,
-                    borderColor: COLORS.border,
-                    alignItems: 'center',
-                    justifyContent: 'center',
+                    marginBottom: 20,
+                    fontSize: 17,
+                    fontFamily: FONT.bold,
+                    color: COLORS.dark,
+                    textAlign: 'center',
                   }}
                 >
-                  <Text style={{ fontSize: 26 }}>{emoji}</Text>
-                </Pressable>
-              ))}
-            </View>
+                  {COPY.profile.emojiPickerTitle}
+                </Text>
 
-            {/* Free-text fallback */}
-            <TextInput
-              value={emojiManualInput}
-              onChangeText={(text) => {
-                setEmojiManualInput(text);
-                if (text.trim().length > 0) {
-                  selectEmoji(text.trim());
-                }
-              }}
-              placeholder={COPY.profile.emojiPickerInputPlaceholder}
-              placeholderTextColor={COLORS.textTertiary}
-              maxLength={2}
-              style={{
-                borderRadius: RADIUS.input,
-                borderWidth: 1,
-                borderColor: COLORS.border,
-                backgroundColor: COLORS.surfaceMuted,
-                paddingVertical: 14,
-                paddingHorizontal: 16,
-                fontSize: 24,
-                textAlign: 'center',
-                fontFamily: FONT.regular,
-                color: COLORS.dark,
-              }}
-            />
+                {/* Emoji grid — 6 columns */}
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    flexWrap: 'wrap',
+                    gap: 8,
+                    justifyContent: 'center',
+                    marginBottom: 20,
+                  }}
+                >
+                  {SUGGESTED_EMOJIS.map((emoji) => (
+                    <Pressable
+                      key={emoji}
+                      accessibilityRole="button"
+                      onPress={() => selectEmoji(emoji)}
+                      style={{
+                        width: 48,
+                        height: 48,
+                        borderRadius: RADIUS.md,
+                        backgroundColor: COLORS.surfaceMuted,
+                        borderWidth: 1,
+                        borderColor: COLORS.border,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      <Text style={{ fontSize: 26 }}>{emoji}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+
+                {/* Free-text fallback */}
+                <TextInput
+                  value={emojiManualInput}
+                  onChangeText={(text) => {
+                    setEmojiManualInput(text);
+                    if (text.trim().length > 0) {
+                      selectEmoji(text.trim());
+                    }
+                  }}
+                  placeholder={COPY.profile.emojiPickerInputPlaceholder}
+                  placeholderTextColor={COLORS.textTertiary}
+                  maxLength={2}
+                  style={{
+                    borderRadius: RADIUS.input,
+                    borderWidth: 1,
+                    borderColor: COLORS.border,
+                    backgroundColor: COLORS.surfaceMuted,
+                    paddingVertical: 14,
+                    paddingHorizontal: 16,
+                    fontSize: 24,
+                    textAlign: 'center',
+                    fontFamily: FONT.regular,
+                    color: COLORS.dark,
+                  }}
+                />
+              </ScrollView>
+            </Pressable>
           </Pressable>
-        </Pressable>
+        </KeyboardAvoidingView>
       </Modal>
 
       <LinearGradient
