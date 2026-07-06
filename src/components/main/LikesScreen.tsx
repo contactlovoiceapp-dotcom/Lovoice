@@ -1,7 +1,8 @@
 /* Likes tab — groups received and given likes in one focused screen. */
 
 import React, { useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Heart, Sparkles } from 'lucide-react-native';
 
 import { COLORS, FONT, RADIUS, SHADOW } from '../../theme';
@@ -159,7 +160,10 @@ const LikesScreen: React.FC<LikesScreenProps> = ({
   receivedLikeProfiles,
   onOpenProfile,
 }) => {
+  const insets = useSafeAreaInsets();
   const [activeSubTab, setActiveSubTab] = useState<LikesSubTab>('received');
+  // Match Profile tab clearance so list items can scroll behind the floating nav pill.
+  const scrollBottomInset = insets.bottom + 120;
 
   return (
     <View style={{ flex: 1, flexDirection: 'column' }}>
@@ -223,6 +227,12 @@ const LikesScreen: React.FC<LikesScreenProps> = ({
         })}
       </View>
 
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ flexGrow: 1, paddingBottom: scrollBottomInset }}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
       {activeSubTab === 'received' ? (
         receivedLikeProfiles.length > 0 ? (
           <View style={{ flexDirection: 'column', gap: 10 }}>
@@ -323,6 +333,7 @@ const LikesScreen: React.FC<LikesScreenProps> = ({
           showTips
         />
       )}
+      </ScrollView>
     </View>
   );
 };

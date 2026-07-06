@@ -66,7 +66,7 @@ export default function LikesRoute() {
   return (
     <View style={{ flex: 1, backgroundColor: COLORS.background }}>
       <StatusBar style="dark" />
-      <View style={{ flex: 1, paddingHorizontal: 16, paddingBottom: 112, paddingTop: insets.top + 16 }}>
+      <View style={{ flex: 1, paddingHorizontal: 16, paddingTop: insets.top + 16 }}>
         {isLoading ? (
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
             <ActivityIndicator size="large" color={COLORS.primary} />
