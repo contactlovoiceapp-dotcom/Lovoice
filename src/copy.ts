@@ -406,7 +406,7 @@ export const COPY = {
 
   lockedModal: {
     title: 'Prêt·e à les entendre ?',
-    body: 'Enregistre ta voix pour débloquer les autres vocaux. 30 secondes. Juste toi.',
+    body: 'Enregistre ta voix pour débloquer les autres vocaux. 10 secondes.',
     cta: 'Enregistrer ma Voix',
   },
 
