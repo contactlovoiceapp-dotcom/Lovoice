@@ -16,10 +16,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { COLORS, CTA_GRADIENT, FONT, ONBOARDING_GRADIENT, RADIUS, SHADOW } from '../../theme';
 import { COPY } from '../../copy';
+import { TERMS_URL } from '../../lib/legal';
 
 const LOGO = require('../../../assets/logo.png');
-
-const CGU_URL = 'https://lovoice.app/conditions-generales';
 
 interface Props {
   onConnect: () => void;
@@ -97,7 +96,11 @@ const HomeScreen: React.FC<Props> = ({ onConnect }) => {
             {COPY.home.cguNotice}
             <Text
               accessibilityRole="link"
-              onPress={() => { void Linking.openURL(CGU_URL); }}
+              onPress={() => {
+                void Linking.openURL(TERMS_URL).catch((err) => {
+                  console.warn('[home] open terms failed', err);
+                });
+              }}
               style={{ fontFamily: FONT.semibold, color: COLORS.dark, textDecorationLine: 'underline' }}
             >
               {COPY.home.cguLink}
