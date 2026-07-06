@@ -186,7 +186,7 @@ export default function DiscoverScreen() {
   const handleEnded = useCallback(
     (voiceId: string) => {
       seenBatcher.enqueue(voiceId);
-      if (!autoplay) return;
+      if (!autoplay || !hasRecordedVoice) return;
       requestAnimationFrame(() => {
         if (activeIndex < items.length - 1) {
           flatListRef.current?.scrollToIndex({ index: activeIndex + 1, animated: true });
@@ -195,14 +195,14 @@ export default function DiscoverScreen() {
         }
       });
     },
-    [autoplay, activeIndex, items.length, seenBatcher],
+    [autoplay, hasRecordedVoice, activeIndex, items.length, seenBatcher],
   );
 
   const { snapshot, controls } = useFeedPlayer({
     items,
     currentIndex: activeIndex,
     onCurrentEnded: handleEnded,
-    autoplayNext: autoplay,
+    autoplayNext: autoplay && hasRecordedVoice,
   });
 
   // User-facing controls: tapping play/pause is an explicit takeover, so we
@@ -230,6 +230,13 @@ export default function DiscoverScreen() {
   controlsRef.current = controls;
   const seenBatcherRef = useRef(seenBatcher);
   seenBatcherRef.current = seenBatcher;
+
+  // Autoplay must never run without a recorded voice — reset toggle and stop playback if voice is removed.
+  useEffect(() => {
+    if (hasRecordedVoice) return;
+    if (autoplay) setAutoplay(false);
+    controlsRef.current.pause();
+  }, [hasRecordedVoice, autoplay, setAutoplay]);
 
   const handleReplySent = useCallback((displayName: string) => {
     showToast(COPY.replyVoiceModal.sentToast(displayName));
@@ -286,6 +293,10 @@ export default function DiscoverScreen() {
   // but this scroll ensures the UX responds immediately and naturally.
   const handleToggleAutoplay = useCallback(() => {
     const enabling = !autoplay;
+    if (enabling && !hasRecordedVoice) {
+      showToast(COPY.lockedModal.body);
+      return;
+    }
     setAutoplay(enabling);
     if (enabling && activeIndex < items.length - 1) {
       const isAtEnd =
@@ -296,7 +307,7 @@ export default function DiscoverScreen() {
         });
       }
     }
-  }, [autoplay, setAutoplay, activeIndex, items.length, snapshot.durationMs, snapshot.positionMs]);
+  }, [autoplay, hasRecordedVoice, setAutoplay, activeIndex, items.length, snapshot.durationMs, snapshot.positionMs]);
 
 
   // Track the items count and active index in refs so the viewability callback (which must be
