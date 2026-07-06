@@ -9,7 +9,8 @@
    - useActiveConversationPushMute: hides foreground push for the thread already on screen
    - useAppIconBadge: syncs the OS app icon badge with unread/unseen counts
    - useForegroundSync: refetches inbox + received likes on background → active so badges
-     and the Likes screen reflect what arrived while the app was backgrounded/killed */
+     and the Likes screen reflect what arrived while the app was backgrounded/killed
+   - useProfileLastSeen: mirrors app activity to profiles.last_seen_at for presence */
 
 import React from 'react';
 import { Tabs } from 'expo-router';
@@ -26,6 +27,7 @@ import { usePushDeepLink } from '../../src/features/push/hooks/usePushDeepLink';
 import { useActiveConversationPushMute } from '../../src/features/push/hooks/useActiveConversationPushMute';
 import { useAppIconBadge } from '../../src/features/push/hooks/useAppIconBadge';
 import { useForegroundSync } from '../../src/features/push/hooks/useForegroundSync';
+import { useProfileLastSeen } from '../../src/features/profile/hooks/useProfileLastSeen';
 
 function MainTabBar(props: BottomTabBarProps) {
   const segments = useSegments();
@@ -46,6 +48,7 @@ export default function MainLayout() {
   useActiveConversationPushMute();
   useAppIconBadge();
   useForegroundSync();
+  useProfileLastSeen();
 
   return (
     <Tabs screenOptions={{ headerShown: false }} tabBar={(props) => <MainTabBar {...props} />}>
