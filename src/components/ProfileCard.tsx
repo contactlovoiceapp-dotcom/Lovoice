@@ -365,6 +365,10 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
   const innerGlowSize = windowWidth * 0.9;
 
   const handleLike = () => {
+    if (!hasRecordedVoice) {
+      setShowLockedModal(true);
+      return;
+    }
     if (!isLiked) {
       void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } else {

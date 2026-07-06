@@ -14,7 +14,7 @@ import { getSupabaseClient } from '@/lib/supabase';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { useLikedVoiceIds } from '@/features/likes/api/likeQueries';
 import { useLikeVoice, useUnlikeVoice } from '@/features/likes/api/likeMutations';
-import { useMemberVoicePreview, useVoiceSignedUrl } from '@/features/voices/api/voiceQueries';
+import { useActiveVoice, useMemberVoicePreview, useVoiceSignedUrl } from '@/features/voices/api/voiceQueries';
 import { useVoicePlayer } from '@/features/voices/hooks/useVoicePlayer';
 import { useFeedConversationMap } from '@/features/chat/api/conversationQueries';
 import { showToast } from '@/lib/toast';
@@ -97,6 +97,8 @@ export default function MemberProfileModal({ visible, userId, voiceId, onClose, 
 
   const likedIdsQuery = useLikedVoiceIds(ownUserId);
   const likedIds = likedIdsQuery.data ?? new Set<string>();
+  const activeVoiceQuery = useActiveVoice(ownUserId);
+  const hasRecordedVoice = !!activeVoiceQuery.data;
   const likeVoice = useLikeVoice();
   const unlikeVoice = useUnlikeVoice();
   const feedConversationMapQuery = useFeedConversationMap();
@@ -156,6 +158,10 @@ export default function MemberProfileModal({ visible, userId, voiceId, onClose, 
 
   const handleToggleLike = useCallback(() => {
     if (!feedItem) return;
+    if (!hasRecordedVoice) {
+      showToast(COPY.lockedModal.body);
+      return;
+    }
     if (isLiked) {
       unlikeVoice.mutate({ voiceId: feedItem.voiceId });
     } else {
@@ -170,7 +176,7 @@ export default function MemberProfileModal({ visible, userId, voiceId, onClose, 
         },
       );
     }
-  }, [feedItem, isLiked, likeVoice, unlikeVoice]);
+  }, [feedItem, hasRecordedVoice, isLiked, likeVoice, unlikeVoice]);
 
   const handleReplySent = useCallback((displayName: string) => {
     showToast(COPY.replyVoiceModal.sentToast(displayName));
@@ -216,7 +222,7 @@ export default function MemberProfileModal({ visible, userId, voiceId, onClose, 
               controls={controls}
               isLiked={isLiked}
               onToggleLike={handleToggleLike}
-              hasRecordedVoice
+              hasRecordedVoice={hasRecordedVoice}
               conversationId={conversationId}
               onOpenConversation={handleOpenConversation}
               onReplySent={handleReplySent}
