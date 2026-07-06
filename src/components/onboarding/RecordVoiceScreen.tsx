@@ -27,7 +27,7 @@ import { COLORS, CTA_GRADIENT, FONT, ONBOARDING_GRADIENT, RADIUS, SHADOW } from 
 import { COPY } from '../../copy';
 import { formatTime } from '../../lib/formatTime';
 import { isMappedRateLimitError } from '../../lib/rateLimitErrors';
-import { MAX_VOICE_DURATION_MS, MIN_VOICE_DURATION_MS } from '../../lib/audio';
+import { MIN_VOICE_DURATION_MS } from '../../lib/audio';
 import { useVoiceRecorder, type VoiceRecorderResult } from '../../features/voices/hooks/useVoiceRecorder';
 import { useVoicePlayer } from '../../features/voices/hooks/useVoicePlayer';
 import { useUploadVoice } from '../../features/voices/api/voiceMutations';
@@ -35,7 +35,6 @@ import { useUploadVoice } from '../../features/voices/api/voiceMutations';
 const MIC_SIZE = 128;
 const GLOW_SIZE = 500;
 const MIN_RECORDING_SECONDS = MIN_VOICE_DURATION_MS / 1000;
-const MAX_RECORDING_SECONDS = MAX_VOICE_DURATION_MS / 1000;
 
 // Visual range for the metering bars: -50 dBFS clamps to a barely visible bar, 0 dBFS is full height.
 const METERING_DB_FLOOR = -50;
@@ -79,6 +78,7 @@ function ReactiveGlow({ isRecording }: { isRecording: boolean }) {
       opacity.value = withTiming(0.1, { duration: 1000 });
       scale.value = withTiming(1, { duration: 1000 });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Reanimated shared values are stable refs.
   }, [isRecording]);
 
   const animatedStyle = useAnimatedStyle(() => ({
@@ -146,6 +146,7 @@ function PingRing({
       cancelAnimation(scale);
       cancelAnimation(opacity);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Reanimated shared values are stable refs.
   }, [delayMs]);
 
   const ringStyle = useAnimatedStyle(() => ({

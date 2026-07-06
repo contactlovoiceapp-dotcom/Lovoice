@@ -100,7 +100,7 @@ describe('MessagesScreen', () => {
 
   it('shows loading indicator when isLoading and conversations is empty', () => {
     const props = { ...defaultProps, isLoading: true };
-    const { getByTestId, queryByText } = render(<MessagesScreen {...props} />);
+    const { queryByText } = render(<MessagesScreen {...props} />);
     expect(queryByText(COPY.chat.inbox.emptyTitle)).toBeNull();
     // ActivityIndicator is rendered — verify no empty state is shown
     expect(queryByText(COPY.chat.inbox.emptyBody)).toBeNull();

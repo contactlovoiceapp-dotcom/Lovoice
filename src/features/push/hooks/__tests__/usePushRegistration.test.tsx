@@ -1,4 +1,5 @@
 /* Tests for usePushRegistration hook: token registration and Supabase update logic. */
+/* eslint-disable import/first -- jest.mock must precede imports under test */
 
 import React from 'react';
 import { render, waitFor } from '@testing-library/react-native';
@@ -59,18 +60,6 @@ function createProfile(userId: string, pushToken: string | null = null): Profile
     is_banned: false,
     deleted_at: null,
   };
-}
-
-function buildMockSupabase(updateResult: { error: null | { message: string } } = { error: null }) {
-  const mockUpdate = jest.fn(() => ({
-    eq: jest.fn().mockResolvedValue(updateResult),
-  }));
-
-  return jest.fn(() => ({
-    from: jest.fn(() => ({
-      update: mockUpdate,
-    })),
-  })) as unknown as jest.MockedFunction<typeof getSupabaseClient>;
 }
 
 function HookConsumer() {

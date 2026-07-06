@@ -1,7 +1,7 @@
 /* Bottom-of-card sheet: lets the user signal or block the profile shown on a feed card. */
 
 import React from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, Text } from 'react-native';
 import { Ban, Flag } from 'lucide-react-native';
 
 import ModalOverlay from '@/components/ModalOverlay';

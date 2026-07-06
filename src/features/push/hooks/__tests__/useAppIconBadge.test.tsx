@@ -1,4 +1,5 @@
 /* Tests for useAppIconBadge hook: OS badge count stays in sync with unread/unseen totals. */
+/* eslint-disable import/first -- jest.mock must precede imports under test */
 
 import React from 'react';
 import { render, waitFor } from '@testing-library/react-native';

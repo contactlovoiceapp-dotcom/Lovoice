@@ -9,11 +9,11 @@ import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import type { AudioPlayer } from 'expo-audio';
 
 import { getSupabaseClient } from '@/lib/supabase';
+import type { FeedItem } from '@/features/feed/types';
 
 // Module-scoped ref to the active feed player. Set on hook mount, cleared on
 // unmount. Allows VoiceRecordingSession to pause the feed before recording.
 let activeFeedPlayer: AudioPlayer | null = null;
-import type { FeedItem } from '@/features/feed/types';
 
 // Verbose tracing for the autoplay rollout. Filter with `[feedPlayer]` in Metro.
 // Compiled out of production builds via __DEV__. Remove after the feature is stable.
@@ -294,7 +294,6 @@ export function useFeedPlayer({
       onCurrentEndedRef.current?.(voiceId);
     }
     // deps intentionally limited to currentDidJustFinish only — see comment above.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentDidJustFinish]);
 
   // Shared playback starter used by both controls.play (user tap) and the

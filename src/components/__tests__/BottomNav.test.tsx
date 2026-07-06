@@ -121,7 +121,6 @@ describe('BottomNav', () => {
     );
 
     const likesTab = getByLabelText(COPY.nav.likes);
-    const badge = likesTab.findAllByProps?.({ style: expect.objectContaining({ backgroundColor: '#ef4444' }) });
     // Simpler: just confirm the component rendered without error while count > 0
     expect(likesTab).toBeTruthy();
 

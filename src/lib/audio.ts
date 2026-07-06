@@ -8,8 +8,8 @@ import {
   AudioQuality,
   type AudioRecorder,
   type RecorderState,
+  type RecordingOptions,
 } from 'expo-audio';
-import type { RecordingOptions } from 'expo-audio';
 
 // AAC mono 32kbps 22050Hz — matches §3 "Audio format" and ARCHITECTURE §4.1 preset.
 export const VOICE_AUDIO_FORMAT: RecordingOptions = {
@@ -114,6 +114,7 @@ export function useAudioRecorderStateGated(
 
     return () => clearInterval(handle);
     // recorder.id is stable for the recorder lifetime; interval/enabled cover dynamic changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- avoid re-subscribing on recorder identity churn.
   }, [recorder.id, enabled, intervalMs]);
 
   return state;

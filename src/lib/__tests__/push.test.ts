@@ -1,4 +1,5 @@
 /* Tests for push notification helpers: handler setup and token registration. */
+/* eslint-disable import/first -- jest.mock must precede imports under test */
 
 import { Platform } from 'react-native';
 
@@ -55,7 +56,6 @@ function latestHandler() {
 
 type MutableEasConfig = { projectId: string };
 type MutableExtra = { eas: MutableEasConfig };
-type MutableExpoConfig = { extra: MutableExtra };
 
 function getEasConfig(): MutableEasConfig {
   return (Constants.expoConfig?.extra as MutableExtra).eas;

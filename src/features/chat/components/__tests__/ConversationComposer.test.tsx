@@ -8,7 +8,8 @@ import type { ConversationLifecycle } from '../../types';
 import { COPY } from '@/copy';
 
 jest.mock('../VoiceRecordingSession', () => {
-  const { useEffect: mockUseEffect } = require('react');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports -- isolated jest factory scope
+  const { useEffect } = require('react');
   return function MockVoiceRecordingSession({
     mode,
     onReady,
@@ -18,7 +19,7 @@ jest.mock('../VoiceRecordingSession', () => {
     onReady?: () => void;
     onFinalized?: (result: { uri: string; durationMs: number }) => void;
   }) {
-    mockUseEffect(() => {
+    useEffect(() => {
       if (mode === 'recording') onReady?.();
       if (mode === 'finalizing') {
         onFinalized?.({ uri: 'file:///tmp/voice.m4a', durationMs: 5_000 });

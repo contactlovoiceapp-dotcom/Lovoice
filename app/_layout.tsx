@@ -27,7 +27,6 @@ import {
 } from '@expo-google-fonts/playfair-display';
 
 import { COLORS } from '../src/theme';
-import AppErrorBoundary from '../src/components/AppErrorBoundary';
 import AuthRedirector from '../src/features/auth/components/AuthRedirector';
 import { AuthProvider } from '../src/features/auth/hooks/useAuth';
 import { setupNotificationHandler } from '../src/lib/push';

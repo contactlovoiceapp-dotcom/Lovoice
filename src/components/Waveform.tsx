@@ -78,6 +78,7 @@ function WaveformBar({ height: staticHeight, color, isPlaying, delay }: Waveform
       cancelAnimation(animatedHeight);
       animatedHeight.value = withTiming(staticHeight, { duration: 300 });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Reanimated shared values are stable refs.
   }, [isPlaying, delay, staticHeight]);
 
   const animatedStyle = useAnimatedStyle(() => ({

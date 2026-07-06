@@ -1,7 +1,7 @@
 /* Messages inbox route — feeds cached conversation data into MessagesScreen.
    Realtime invalidation is handled globally by useRealtimeInbox in _layout.tsx. */
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { router, useFocusEffect } from 'expo-router';
@@ -17,7 +17,7 @@ export default function MessagesRoute() {
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const { data, isLoading, isError, refetch } = useConversations();
-  const conversations = data ?? [];
+  const conversations = useMemo(() => data ?? [], [data]);
 
   useFocusEffect(
     useCallback(() => {

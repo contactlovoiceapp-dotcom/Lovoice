@@ -13,8 +13,7 @@
    - useProfileLastSeen: mirrors app activity to profiles.last_seen_at for presence */
 
 import React from 'react';
-import { Tabs } from 'expo-router';
-import { useSegments } from 'expo-router';
+import { Tabs, useSegments } from 'expo-router';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 
 import BottomNav from '../../src/components/BottomNav';

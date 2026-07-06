@@ -82,7 +82,7 @@ export default function OnboardingCityRoute() {
         coordinates,
       });
       router.push('/(auth)/onboarding/record');
-    } catch (saveError) {
+    } catch {
       setError('save_failed');
     }
   };

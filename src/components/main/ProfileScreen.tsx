@@ -21,8 +21,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 
 import { COPY } from '@/copy';
-import { COLORS, CTA_GRADIENT, FONT, ONBOARDING_GRADIENT, RADIUS, SHADOW, THEME_GRADIENTS } from '@/theme';
-import { ColorTheme } from '@/theme';
+import { COLORS, CTA_GRADIENT, FONT, ONBOARDING_GRADIENT, RADIUS, SHADOW, THEME_GRADIENTS, ColorTheme } from '@/theme';
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { ProfileAccountPrivacySection } from '@/features/profile/components/ProfileAccountPrivacySection';
 import { type CitySearchResult } from '@/features/profile/api/citySearch';

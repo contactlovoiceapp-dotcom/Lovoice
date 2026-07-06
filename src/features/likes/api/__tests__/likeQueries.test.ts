@@ -19,7 +19,6 @@ function buildSupabaseMock(result: MockResult) {
   const chain: Record<string, jest.Mock> = {};
 
   const terminal = jest.fn().mockResolvedValue(result);
-  const makeLink = () => chain;
 
   chain.from = jest.fn().mockReturnValue(chain);
   chain.select = jest.fn().mockReturnValue(chain);

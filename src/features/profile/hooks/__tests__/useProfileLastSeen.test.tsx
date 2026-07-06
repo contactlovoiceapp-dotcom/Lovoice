@@ -1,4 +1,5 @@
 /* Tests for useProfileLastSeen: throttled profiles.last_seen_at heartbeat. */
+/* eslint-disable import/first -- jest.mock must precede imports under test */
 
 import React from 'react';
 import { AppState, InteractionManager } from 'react-native';

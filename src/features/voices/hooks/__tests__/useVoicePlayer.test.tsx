@@ -1,7 +1,6 @@
 /* Smoke tests for useVoicePlayer: initial state, play/pause/seek/unload, and URI-change behaviour. */
 
 import { act, renderHook } from '@testing-library/react-native';
-import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 
 import { useVoicePlayer } from '../useVoicePlayer';
 

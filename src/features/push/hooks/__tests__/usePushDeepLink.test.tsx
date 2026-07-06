@@ -1,4 +1,5 @@
 /* Tests for usePushDeepLink hook: cold-start, live tap, dedup, and deep-link validation. */
+/* eslint-disable import/first -- jest.mock must precede imports under test */
 
 import React from 'react';
 import { render, waitFor, act } from '@testing-library/react-native';

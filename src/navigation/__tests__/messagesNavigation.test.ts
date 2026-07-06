@@ -1,4 +1,5 @@
 /* Tests for messages tab navigation helpers. */
+/* eslint-disable import/first -- jest.mock must precede imports under test */
 
 jest.mock('expo-router', () => ({
   router: {

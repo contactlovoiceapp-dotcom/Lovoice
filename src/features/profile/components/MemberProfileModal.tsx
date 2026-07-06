@@ -1,6 +1,6 @@
 /* Full-screen modal wrapping the immersive ProfileCard from Discover for the likes context. */
 
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { ActivityIndicator, Modal, Pressable, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { X } from 'lucide-react-native';
@@ -121,23 +121,23 @@ export default function MemberProfileModal({ visible, userId, voiceId, onClose, 
   const isLoading = profileQuery.isLoading || voiceQuery.isLoading;
   const isError = profileQuery.isError || voiceQuery.isError;
 
-  const feedItem: FeedItem | null =
-    profileQuery.data && voice
-      ? {
-          voiceId: voice.id,
-          storagePath: voice.storage_path,
-          durationMs: voice.duration_ms,
-          theme: normalizeTheme(voice.theme),
-          title: voice.title ?? null,
-          promptBody: null,
-          createdAt: voice.created_at,
-          userId: voice.user_id,
-          displayName: profileQuery.data.display_name,
-          birthdate: profileQuery.data.birthdate,
-          city: profileQuery.data.city,
-          bioEmojis: (profileQuery.data.bio_emojis ?? []).filter(Boolean),
-        }
-      : null;
+  const feedItem = useMemo<FeedItem | null>(() => {
+    if (!profileQuery.data || !voice) return null;
+    return {
+      voiceId: voice.id,
+      storagePath: voice.storage_path,
+      durationMs: voice.duration_ms,
+      theme: normalizeTheme(voice.theme),
+      title: voice.title ?? null,
+      promptBody: null,
+      createdAt: voice.created_at,
+      userId: voice.user_id,
+      displayName: profileQuery.data.display_name,
+      birthdate: profileQuery.data.birthdate,
+      city: profileQuery.data.city,
+      bioEmojis: (profileQuery.data.bio_emojis ?? []).filter(Boolean),
+    };
+  }, [profileQuery.data, voice]);
 
   const snapshot: FeedPlayerSnapshot = {
     isPlaying: voicePlayer.isPlaying,

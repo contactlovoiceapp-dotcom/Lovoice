@@ -98,6 +98,7 @@ function PulseRing({ color }: { color: string }) {
       cancelAnimation(scale);
       cancelAnimation(opacity);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Reanimated shared values are stable refs.
   }, []);
 
   const animStyle = useAnimatedStyle(() => ({
@@ -159,7 +160,7 @@ function GlowLayer({
       cancelAnimation(scale);
       cancelAnimation(opacity);
     };
-  }, []);
+  }, [duration, maxOpacity, scaleFrom, scaleTo]); // eslint-disable-line react-hooks/exhaustive-deps -- Reanimated shared values are stable refs.
 
   const animStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
@@ -322,6 +323,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
 
   useEffect(() => {
     intensity.value = withTiming(isPlaying || elapsedSec > 0 ? 1 : 0, { duration: 300 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Reanimated shared values are stable refs.
   }, [isPlaying, elapsedSec]);
 
   useEffect(() => {
@@ -331,6 +333,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
       // Slow fade-out so the glow dissolves rather than snapping off.
       glowOpacity.value = withTiming(0, { duration: 1200, easing: Easing.in(Easing.ease) });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Reanimated shared values are stable refs.
   }, [isPlaying]);
 
   useEffect(() => {
@@ -350,6 +353,7 @@ const ProfileCard: React.FC<ProfileCardProps> = ({
     return () => {
       cancelAnimation(playScale);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- Reanimated shared values are stable refs.
   }, [isPlaying]);
 
   const progress =

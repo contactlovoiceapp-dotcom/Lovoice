@@ -1,6 +1,6 @@
 /* Tests for French birthdate input formatting and ISO conversion used by onboarding. */
 
-import { formatBirthdateInput, frenchBirthdateToIso } from '../birthdateInput';
+import { formatBirthdateInput, frenchBirthdateToIso, isoBirthdateToFrench } from '../birthdateInput';
 
 describe('formatBirthdateInput', () => {
   it('formats numeric input as JJ / MM / AAAA', () => {
@@ -24,7 +24,6 @@ describe('frenchBirthdateToIso', () => {
 
 describe('isoBirthdateToFrench', () => {
   it('converts an ISO date to the French display format', () => {
-    const { isoBirthdateToFrench } = require('../birthdateInput');
     expect(isoBirthdateToFrench('1995-02-01')).toBe('01 / 02 / 1995');
   });
 });
