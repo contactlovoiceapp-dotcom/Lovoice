@@ -480,12 +480,17 @@ export type Database = {
       }
       profiles: {
         Row: {
+          app_version: string | null
           bio_emojis: string[]
           birthdate: string
           city: string
+          client_info_updated_at: string | null
           country: string
           created_at: string
           deleted_at: string | null
+          device_model: string | null
+          device_os_version: string | null
+          device_platform: string | null
           display_name: string
           gender: string
           id: string
@@ -497,12 +502,17 @@ export type Database = {
           push_token: string | null
         }
         Insert: {
+          app_version?: string | null
           bio_emojis?: string[]
           birthdate: string
           city: string
+          client_info_updated_at?: string | null
           country: string
           created_at?: string
           deleted_at?: string | null
+          device_model?: string | null
+          device_os_version?: string | null
+          device_platform?: string | null
           display_name: string
           gender: string
           id?: string
@@ -514,12 +524,17 @@ export type Database = {
           push_token?: string | null
         }
         Update: {
+          app_version?: string | null
           bio_emojis?: string[]
           birthdate?: string
           city?: string
+          client_info_updated_at?: string | null
           country?: string
           created_at?: string
           deleted_at?: string | null
+          device_model?: string | null
+          device_os_version?: string | null
+          device_platform?: string | null
           display_name?: string
           gender?: string
           id?: string

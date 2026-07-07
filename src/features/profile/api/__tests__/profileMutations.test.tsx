@@ -77,6 +77,11 @@ function createProfile(overrides: Partial<ProfileRow> = {}): ProfileRow {
     is_banned: false,
     last_seen_at: null,
     likes_seen_at: null,
+    device_platform: null,
+    device_model: null,
+    device_os_version: null,
+    app_version: null,
+    client_info_updated_at: null,
     push_token: null,
     ...overrides,
   };
