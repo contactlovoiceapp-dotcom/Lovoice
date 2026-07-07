@@ -19,6 +19,7 @@ import {
   MIN_VOICE_DURATION_MS,
   METERING_INTERVAL_MS,
   useAudioRecorderStateGated,
+  estimateBitrateOk,
 } from '@/lib/audio';
 import { pauseProfileVoicePlayer } from '@/features/voices/hooks/useVoicePlayer';
 
@@ -204,14 +205,22 @@ export function useVoiceRecorder(): VoiceRecorderHook {
       const rawDuration = recorderState.durationMillis || durationMs;
       const finalDuration = Math.min(rawDuration, MAX_VOICE_DURATION_MS);
 
-      const voiceRatio = totalSamplesRef.current > 0
-        ? voiceSamplesRef.current / totalSamplesRef.current
-        : 0;
-      const likelySilent = voiceRatio < VOICE_SAMPLE_MIN_RATIO;
+      // Some OEM Android builds (seen on Xiaomi/MIUI) can record/play audio correctly
+      // while never emitting metering samples (recorderState.metering stays undefined).
+      // In that case, we treat silence detection as "unknown" and do not block the user.
+      const voiceRatio =
+        totalSamplesRef.current > 0
+          ? voiceSamplesRef.current / totalSamplesRef.current
+          : null;
+      const fileSize = destFile.size ?? 0;
+      const bitrateOk = estimateBitrateOk(fileSize, finalDuration);
+      const likelySilent =
+        voiceRatio == null ? false : voiceRatio < VOICE_SAMPLE_MIN_RATIO;
       if (__DEV__) {
         console.warn('[REC] recorder_stopped', {
           durationMs: finalDuration,
-          fileSize: destFile.size ?? 0,
+          fileSize,
+          bitrateOk,
           voiceRatio,
           isLikelySilent: likelySilent,
           uri: finalUri,

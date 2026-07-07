@@ -175,6 +175,22 @@ describe('useVoiceRecorder — isLikelySilent', () => {
     expect(result.current.isLikelySilent).toBe(false);
   });
 
+  it('is false after stop() when metering is never available (avoid OEM false positives)', async () => {
+    mocks.recorderState.metering = undefined;
+    mocks.recorderState.durationMillis = 15_000;
+
+    const { result } = renderHook(() => useVoiceRecorder());
+
+    await act(async () => {
+      await result.current.start();
+    });
+    await act(async () => {
+      await result.current.stop();
+    });
+
+    expect(result.current.isLikelySilent).toBe(false);
+  });
+
   it('is true after stop() when all metering samples are below the voice threshold (-30 dBFS)', async () => {
     // -50 dBFS is ambient noise level — never reaches the -30 voice threshold.
     mocks.recorderState.metering = -50;
