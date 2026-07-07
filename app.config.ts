@@ -97,6 +97,9 @@ const config: ExpoConfig = {
         project: "lovoice",
       },
     ],
+    // Strip BOOT_COMPLETED from expo-notifications so Play Console does not flag
+    // expo-audio foreground services on Android 15+. See expo/expo#41627.
+    "./plugins/withDisableNotificationsBootActions",
   ],
   extra: {
     supabaseUrl,
